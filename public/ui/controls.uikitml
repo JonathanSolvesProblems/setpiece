@@ -1,5 +1,5 @@
 <!--
-  Eyeline control panel. Panel, Divider, Button, ButtonIcon and ButtonLabel come
+  Setpiece control panel. Panel, Divider, Button, ButtonIcon and ButtonLabel come
   from the bundled Horizon kit; Camera and RectangleGoggles are bundled Lucide icons.
 -->
 <style>
@@ -64,7 +64,7 @@
 </style>
 <Panel class="panel-root">
   <div class="content">
-    <div class="heading">Eyeline</div>
+    <div class="heading">Setpiece</div>
     <Divider></Divider>
     <div class="label">STAGE</div>
     <div id="stage-status" class="status">Floating in front of you. Grab the plate to move the set.</div>

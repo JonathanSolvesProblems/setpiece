@@ -24,5 +24,5 @@ World.create(
     .registerSystem(ControlsSystem, { priority: 30 });
 
   // Debug and test hook: lets scripts drive the app from the page.
-  (globalThis as Record<string, unknown>).eyeline = { world };
+  (globalThis as Record<string, unknown>).setpiece = { world };
 });

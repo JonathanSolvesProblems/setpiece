@@ -17,7 +17,7 @@ type Globals = {
   resetStageRequested: Signal<number>;
 };
 
-/** Wires the Eyeline control panel to the shared signals the viewfinder reads. */
+/** Wires the Setpiece control panel to the shared signals the viewfinder reads. */
 export class ControlsSystem extends createSystem({}) {
   init(): void {
     const panel = this.world.getSceneObject<UIKitMLAsset>('controls-panel');

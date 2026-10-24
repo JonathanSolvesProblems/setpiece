@@ -1,5 +1,5 @@
 /**
- * Eyeline viewfinder. Renders the shot camera's view into a texture shown on a
+ * Setpiece viewfinder. Renders the shot camera's view into a texture shown on a
  * monitor above the stage, draws actor-to-creature eyelines, and captures
  * storyboard frames on request. All distances reported to the panel are in
  * real set metres (stage scale is 1:10).

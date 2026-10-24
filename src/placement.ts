@@ -19,7 +19,7 @@ import {
 import type { Signal } from '@preact/signals-core';
 import { Placement, SetPiece, StageAnchor } from './set-components.js';
 
-const STORAGE_KEY = 'eyeline.stage.pose.v1';
+const STORAGE_KEY = 'setpiece.stage.pose.v1';
 const TABLE_LABELS = new Set(['table', 'desk']);
 const STAGE_LIFT = 0.002;
 /** Seconds to keep collecting tables after the first one, so the nearest wins. */
