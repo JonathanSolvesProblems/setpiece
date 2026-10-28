@@ -73,7 +73,7 @@ and the repo. Long-form reasoning: `~/.claude/hackathon-archive.md`, section
 
 ## 12. Demo [rules 25, 54, 101]
 - The final shot (the thing the verb produces, or a live success landing in field 5's system, never a number being revealed): a phone held up beside the real table, showing the PDF board with six frames, each with its lens and eyeline note, while the miniature set is still sitting on the table behind it.
-- The first live end-to-end success, on real data, with the sponsor's model in the loop, by (date, day 3 at the latest): Quest 3S ordered Oct 24, expected Oct 27 or 28. First unbroken headset-on-to-board run on the real device by Oct 31. If it has not happened by then, everything else stops until it does.
+- The first live end-to-end success, on real data, with the sponsor's model in the loop, by (date, day 3 at the latest): Quest 3S ordered Oct 24, delivered Oct 25, confirmed in hand Oct 28. The app is live at https://setpiece-kohl.vercel.app (Vercel, production, deployed Oct 28). First unbroken headset-on-to-board run on the real device by Oct 29. If it has not happened by then, everything else stops until it does.
 
 Demo script, 75 seconds, final shot first in mind:
 
@@ -86,8 +86,8 @@ Demo script, 75 seconds, final shot first in mind:
 
 ## Build dates
 
-- Oct 24: order the headset, rename, card committed.
-- Oct 28: headset in hand; Oct 31: first unbroken run on device (field 12).
+- Oct 24: headset ordered, rename, card committed. Oct 25: headset delivered.
+- Oct 28: public build live on Vercel; Oct 29: first unbroken run on device (field 12).
 - Nov 5: Send board to phone (field 5), gaze on the glasses profile (field 7), piece and shot persistence.
 - Nov 7: headline number measured on device (field 6).
 - Nov 12: depth (12 pieces, 6 lenses, 2 exports), polish pass, three outside testers timed.
