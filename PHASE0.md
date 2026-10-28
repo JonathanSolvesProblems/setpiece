@@ -73,7 +73,7 @@ and the repo. Long-form reasoning: `~/.claude/hackathon-archive.md`, section
 
 ## 12. Demo [rules 25, 54, 101]
 - The final shot (the thing the verb produces, or a live success landing in field 5's system, never a number being revealed): a phone held up beside the real table, showing the PDF board with six frames, each with its lens and eyeline note, while the miniature set is still sitting on the table behind it.
-- The first live end-to-end success, on real data, with the sponsor's model in the loop, by (date, day 3 at the latest): Quest 3S ordered Oct 24, delivered Oct 25, confirmed in hand Oct 28. The app is live at https://setpiece-kohl.vercel.app (Vercel, production, deployed Oct 28). First unbroken headset-on-to-board run on the real device by Oct 29. If it has not happened by then, everything else stops until it does.
+- The first live end-to-end success, on real data, with the sponsor's model in the loop, by (date, day 3 at the latest): Quest 3S ordered Oct 24, delivered Oct 25, confirmed in hand Oct 28. The app is live at https://setpiece-xr.vercel.app (Vercel, production, deployed Oct 28; setpiece-kohl.vercel.app also resolves). First unbroken headset-on-to-board run on the real device by Oct 29. If it has not happened by then, everything else stops until it does.
 
 Demo script, 75 seconds, final shot first in mind:
 
