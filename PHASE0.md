@@ -84,6 +84,23 @@ Demo script, 75 seconds, final shot first in mind:
 5. (55 to 70 s) Pinch Send board. A QR appears. My phone opens the PDF: six frames, lenses, eyelines, shot list.
 6. (70 to 75 s) The phone beside the table with the set still on it. Title card: Setpiece. Built with Immersive Web SDK.
 
+## Validation on Oct 29 against the official judging, FAQ and rules pages
+
+Read from the pages themselves (judging, FAQs, updates, rules), not from memory. What changed on the card:
+
+- Field 1: 4,440 participants on Oct 29 (3,865 on Oct 24). At last year's 22.6% that is about 1,000 submissions. Each entry can win one prize only, the highest it qualifies for, so the special awards are a fallback, not a stack.
+- Field 1: judging is two stages. Stage One is pass/fail on fit with the theme, the track and "reasonably applies the required tools and features". Stage Two is the four criteria at 25% each, by human judges; the rules say AI tools may assist judging.
+- Field 5: the FAQ says "Your experience should not require a third-party device to operate." The phone hand-off stays, but as an extra: the full board (six frames, lens, camera height, distance, eyelines) must be readable inside the headset, and a judge without a phone must lose nothing.
+- Field 7: judges review on Quest 3 or Quest 3S only, and the FAQ says builds must be playable on Quest 3/3S. Neither has eye tracking, so gaze on the glasses profile is dropped. What the criteria name and I can still score on: hand tracking, passthrough with the table as the play surface, scene understanding, persistent anchors, FoV-aware design.
+- Field 6 and Technical Implementation: "min 60 fps" on Quest hardware and "holding up in rooms the developer never tested". Neither is measured. The stage only auto-places on a surface labelled Table or Desk; a judge whose room has no labelled table gets a floating stage. Fix: if no table arrives within a few seconds, pinch on any horizontal surface to place (hit test is already enabled).
+- Experience Design: "clear onboarding" and "a rewarding, habit-forming purpose". There is no first-run guidance in the headset, and frames and shots do not persist across sessions yet.
+- Polish & Presentation names sound design. The app has one chime.
+- Video: "show real gameplay that honestly represents the experience... Don't lean on AI-generated video." The demo script is all real capture plus my own 2014 short.
+- Teardown: the build must "remain available until the Winner Announcement" (on or around Dec 11) with no changes after Nov 18 12:00 PT. The teardown reminder moves from Dec 9 to Dec 14, and nothing is deployed after the deadline.
+- Honesty fixes made today: the README claimed one-hand and two-hand grab and gaze; the scene ships distance grab only and no gaze code. README corrected.
+- Bugs found and fixed today in emulated XR: the name tags and eyelines sat on render layer 1, which three.js draws in the left eye only; and a sprite threw inside the hand ray every frame. Both fixed and verified in an immersive-ar session (snap works, no errors in 15 s).
+- Field 12 is overdue: the first run on the real headset was due today and has not happened. By the card, everything else waits for it.
+
 ## Build dates
 
 - Oct 24: headset ordered, rename, card committed. Oct 25: headset delivered.
@@ -92,7 +109,7 @@ Demo script, 75 seconds, final shot first in mind:
 - Nov 7: headline number measured on device (field 6).
 - Nov 12: depth (12 pieces, 6 lenses, 2 exports), polish pass, three outside testers timed.
 - Nov 14: video. Nov 16: pre-submit gate (T-minus 48 hours), gallery re-check, tagline final. Nov 18: submit.
-- Submission session: teardown reminder for Dec 9 (delete uploaded boards on the host), entry recorded as pending.
+- Submission session: teardown reminder for Dec 14, after the Dec 11 announcement (delete uploaded boards on the host; the app itself stays up as the archive), entry recorded as pending. No deploys between Nov 18 12:00 PT and the announcement.
 
 ## Verdict
 

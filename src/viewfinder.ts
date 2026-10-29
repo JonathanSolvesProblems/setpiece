@@ -500,6 +500,9 @@ export class ViewfinderSystem extends createSystem({
       overlays[i].visible = false;
     }
     xr.enabled = false;
+    // The point light's shadow is six passes; the lens reuses the main view's shadow map.
+    const shadowAutoUpdate = renderer.shadowMap.autoUpdate;
+    renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(this.target);
     renderer.setClearColor(0x0f1114, 1);
     renderer.autoClear = true;
@@ -508,6 +511,7 @@ export class ViewfinderSystem extends createSystem({
     renderer.setRenderTarget(prevTarget);
     renderer.setClearColor(this.prevClear, prevAlpha);
     renderer.autoClear = prevAutoClear;
+    renderer.shadowMap.autoUpdate = shadowAutoUpdate;
     xr.enabled = xrWasEnabled;
     monitor.visible = true;
     for (let i = 0; i < overlays.length; i++) overlays[i].visible = shown[i];
