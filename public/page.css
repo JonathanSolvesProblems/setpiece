@@ -172,8 +172,9 @@ h1 {
 .copy { grid-column: 1; grid-row: 2; width: var(--copy-w); }
 .lede { font-size: 1.12rem; line-height: 1.45; margin: 0 0 calc(var(--unit) * 6); text-wrap: pretty; max-width: 42ch; }
 .actions { display: grid; justify-items: start; gap: calc(var(--unit) * 2); margin-bottom: calc(var(--unit) * 6); }
+/* One button family: filled for the page's action, outline for the stage's, text for undo. */
 .primary {
-  font: 600 1.05rem var(--text);
+  font: 600 0.98rem var(--text);
   color: var(--ground);
   background: var(--ink);
   border: 0;
@@ -194,7 +195,8 @@ h1 {
   max-width: 42ch;
   text-wrap: pretty;
 }
-.shotlist { grid-column: 1; grid-row: 3; align-self: end; width: var(--copy-w); padding-top: calc(var(--unit) * 6); }
+.shotlist { grid-column: 1; grid-row: 3; align-self: start; width: var(--copy-w); padding-top: calc(var(--unit) * 6); }
+.shotlist .label span { color: var(--ink); margin-left: var(--unit); }
 .shotlist ol { list-style: none; margin: calc(var(--unit) * 1) 0 0; padding: 0; font-size: 0.92rem; line-height: 1.5; }
 .shotlist li { display: grid; grid-template-columns: 1.4em 1fr; gap: calc(var(--unit) * 2); border-top: 1px solid var(--rule); padding: 3px 0; }
 .shotlist li .i { font-family: var(--label); font-weight: 700; color: var(--ink-muted); }
@@ -267,7 +269,7 @@ h1 {
 .lens:hover { border-bottom-color: var(--frame-muted); }
 .strip-actions { margin-left: auto; display: flex; align-items: center; gap: calc(var(--unit) * 2); }
 .snap {
-  font: 600 0.9rem var(--text);
+  font: 600 0.98rem var(--text);
   color: var(--frame-ink);
   background: none;
   border: 1.5px solid var(--frame-ink);
@@ -279,7 +281,7 @@ h1 {
 }
 .snap:hover { background: rgba(246, 247, 239, 0.12); }
 .reset {
-  font: 500 0.92rem var(--text);
+  font: 600 0.98rem var(--text);
   color: var(--frame-muted);
   background: none;
   border: 0;
@@ -293,7 +295,7 @@ h1 {
 .board {
   grid-column: 2;
   grid-row: 3;
-  align-self: end;
+  align-self: start;
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
@@ -366,16 +368,15 @@ h1 {
   .hero { --copy-w: 100%; --overshoot: 0px; grid-template-columns: 1fr; grid-template-rows: repeat(7, auto); padding-top: calc(var(--unit) * 5); }
   h1 { grid-row: 1; width: 100%; margin: 0 0 calc(var(--unit) * 4); }
   .copy { display: contents; }
-  .actions { grid-column: 1; grid-row: 2; margin-bottom: calc(var(--unit) * 6); }
-  .slate-frame { grid-column: 1; grid-row: 3; margin-top: 10px; }
-  .board { grid-column: 1; grid-row: 4; align-self: start; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .lede { grid-column: 1; grid-row: 5; margin: calc(var(--unit) * 7) 0 calc(var(--unit) * 3); max-width: none; }
-  .try { grid-column: 1; grid-row: 6; max-width: none; }
+  .actions { grid-column: 1; grid-row: 2; margin-bottom: calc(var(--unit) * 5); }
+  .try { grid-column: 1; grid-row: 3; max-width: none; margin-bottom: calc(var(--unit) * 2); }
+  .slate-frame { grid-column: 1; grid-row: 4; margin-top: 10px; }
+  .board { grid-column: 1; grid-row: 5; align-self: start; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lede { grid-column: 1; grid-row: 6; margin: calc(var(--unit) * 7) 0 calc(var(--unit) * 3); max-width: none; }
   .shotlist { grid-column: 1; grid-row: 7; align-self: start; width: 100%; }
   #scene-container { aspect-ratio: 4 / 5; }
   .stripe { left: 8px; right: 8px; }
   .strip { gap: calc(var(--unit) * 3) calc(var(--unit) * 5); }
-  .frames-field { display: none; }
   .strip-actions { margin-left: 0; width: 100%; }
   .lens, .snap, .reset { min-height: 44px; }
   .snap { flex: 1; }

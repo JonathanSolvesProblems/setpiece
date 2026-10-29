@@ -127,8 +127,12 @@ World.create(
     }
   });
   eyelineText.subscribe((lines) => {
-    const match = lines[0] ? /^([^:]+): look (up|down) (\d+) deg/.exec(lines[0]) : null;
-    if (fieldEyeline) fieldEyeline.textContent = match ? `${match[1]} looks ${match[2]} ${match[3]}°` : 'place an actor';
+    const parts: string[] = [];
+    for (const line of lines) {
+      const match = /^([^:]+): look (up|down) (\d+) deg/.exec(line);
+      if (match) parts.push(`${match[1]} ${match[2]} ${match[3]}°`);
+    }
+    if (fieldEyeline) fieldEyeline.textContent = parts.length > 0 ? parts.join(' · ') : 'place an actor';
   });
 
   // Debug and test hook: lets scripts drive the app from the page.

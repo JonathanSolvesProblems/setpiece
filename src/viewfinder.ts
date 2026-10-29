@@ -395,6 +395,8 @@ export class ViewfinderSystem extends createSystem({
       line = new Line(geometry, new LineBasicMaterial({ color: OPTIC_YELLOW }));
       line.name = `Eyeline${i + 1}`;
       line.frustumCulled = false;
+      // The viewer sees the eyelines; the shot lens does not, so a frame shows the shot alone.
+      line.layers.set(TAG_LAYER);
       this.world.createTransformEntity(line);
       this.lines[i] = line;
     }
