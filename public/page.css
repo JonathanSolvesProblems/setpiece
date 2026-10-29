@@ -9,8 +9,8 @@
   the eyeline are written along its bottom, because a slate carries its fields
   on its face.
   The live stage is the hero's one object, because evidence beats illustration.
-  The storyboard sits under the frame at page scale, because the storyboard is
-  what the visitor leaves with.
+  The storyboard sits under the frame and the shot list beside it, at page
+  scale, because those two things are what the visitor leaves with.
   The only colours are the optic yellow of the eyeline ball and the red of the
   tally, because on a black slate the eye should go to the eyeline and to recording.
   Charter: .design/brand/CHARTER.md
@@ -78,7 +78,6 @@
     --rule: var(--paper-rule);
     --frame-ink: var(--slate-shadow);
     --frame-muted: var(--pencil);
-    --screen: #cfcdc0;
     --haze-opacity: 0.05;
     color-scheme: light;
   }
@@ -90,13 +89,12 @@
   --rule: var(--paper-rule);
   --frame-ink: var(--slate-shadow);
   --frame-muted: var(--pencil);
-  --screen: #cfcdc0;
   --haze-opacity: 0.05;
   color-scheme: light;
 }
 
 * { box-sizing: border-box; }
-html { font-size: var(--base); }
+html { font-size: var(--base); scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
 body {
   margin: 0;
   background: var(--ground);
@@ -143,15 +141,15 @@ button { font-feature-settings: "tnum"; }
 
 main { max-width: 1240px; margin: 0 auto; padding: 0 calc(var(--unit) * 8); }
 
-/* The hero: one object, the live stage inside a slate frame, with the
-   storyboard under it. The left column ends on the same line as the board. */
+/* The hero: one object, the live stage inside a slate frame, the storyboard
+   under it and the shot list beside it. The frame spans the first two rows;
+   the slack goes to the copy row, so the headline stays tight to the lede and
+   the shot list ends on the same line as the board. */
 .hero {
   --copy-w: 440px;
   --overshoot: 56px;
   display: grid;
   grid-template-columns: var(--copy-w) minmax(0, 1fr);
-  /* The frame spans the first two rows; the slack goes to the copy row, so the
-     headline stays tight to the lede and the last line of copy meets the board. */
   grid-template-rows: auto 1fr auto;
   column-gap: calc(var(--unit) * 8);
   padding-top: calc(var(--unit) * 7);
@@ -168,12 +166,12 @@ h1 {
   font-size: clamp(2.4rem, 4.2vw, 3.2rem);
   line-height: 0.92;
   letter-spacing: -0.01em;
-  margin: 8px 0 calc(var(--unit) * 5);
+  margin: -2px 0 calc(var(--unit) * 5);
   text-transform: uppercase;
 }
 .copy { grid-column: 1; grid-row: 2; width: var(--copy-w); }
 .lede { font-size: 1.12rem; line-height: 1.45; margin: 0 0 calc(var(--unit) * 6); text-wrap: pretty; max-width: 42ch; }
-.actions { display: grid; justify-items: start; gap: calc(var(--unit) * 2); }
+.actions { display: grid; justify-items: start; gap: calc(var(--unit) * 2); margin-bottom: calc(var(--unit) * 6); }
 .primary {
   font: 600 1.05rem var(--text);
   color: var(--ground);
@@ -187,18 +185,20 @@ h1 {
 }
 .primary:hover { opacity: 0.92; }
 .primary:active { transform: translateY(1px); }
-.hint { margin: 0; color: var(--ink-muted); font-size: 0.9rem; line-height: 1.35; max-width: 38ch; text-wrap: pretty; }
+.hint { margin: 0; color: var(--ink-muted); font-size: 0.9rem; line-height: 1.35; max-width: 40ch; text-wrap: pretty; }
 .try {
-  grid-column: 1;
-  grid-row: 3;
-  align-self: end;
-  margin: calc(var(--unit) * 6) 0 0;
+  margin: 0;
   color: var(--ink-muted);
   font-size: 0.95rem;
   line-height: 1.4;
   max-width: 42ch;
   text-wrap: pretty;
 }
+.shotlist { grid-column: 1; grid-row: 3; align-self: end; width: var(--copy-w); padding-top: calc(var(--unit) * 6); }
+.shotlist ol { list-style: none; margin: calc(var(--unit) * 1) 0 0; padding: 0; font-size: 0.92rem; line-height: 1.5; }
+.shotlist li { display: grid; grid-template-columns: 1.4em 1fr; gap: calc(var(--unit) * 2); border-top: 1px solid var(--rule); padding: 3px 0; }
+.shotlist li .i { font-family: var(--label); font-weight: 700; color: var(--ink-muted); }
+.shotlist li.empty { display: block; color: var(--ink-muted); border-top-color: transparent; padding-top: 0; }
 
 .slate-frame {
   grid-column: 2;
@@ -209,15 +209,16 @@ h1 {
   padding: 12px 12px 8px;
   border-radius: 4px;
 }
+/* The clapper: the bar across the whole top of the slate, hanging past its left edge the way the sticks do. */
 .stripe {
   position: absolute;
   left: calc(var(--overshoot) * -1);
+  right: 0;
   top: -9px;
-  width: calc(62% + var(--overshoot));
   height: 14px;
   background: repeating-linear-gradient(45deg, var(--chalk) 0 14px, var(--slate-shadow) 14px 28px);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 99%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 99%, transparent);
 }
 #scene-container {
   width: 100%;
@@ -233,7 +234,7 @@ h1 {
 .strip {
   display: flex;
   align-items: center;
-  gap: calc(var(--unit) * 6);
+  gap: calc(var(--unit) * 4);
   padding: 6px 2px 0;
   color: var(--frame-ink);
   flex-wrap: wrap;
@@ -242,22 +243,23 @@ h1 {
 .label {
   font-family: var(--label);
   font-weight: 700;
-  font-size: 0.8rem;
-  letter-spacing: 0.03em;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--frame-muted);
 }
-.value { font-family: var(--label); font-weight: 700; font-size: 1.1rem; }
-.lenses { display: flex; gap: 2px; }
+.shotlist .label { color: var(--ink-muted); }
+.value { font-family: var(--label); font-weight: 700; font-size: 1.12rem; white-space: nowrap; }
+.lenses { display: flex; gap: 0; }
 .lens {
   font-family: var(--label);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.12rem;
   color: var(--frame-ink);
   background: none;
   border: 0;
   border-bottom: 2px solid transparent;
-  padding: 6px 6px 3px;
+  padding: 6px 5px 3px;
   min-height: 36px;
   cursor: pointer;
 }
@@ -265,16 +267,17 @@ h1 {
 .lens:hover { border-bottom-color: var(--frame-muted); }
 .strip-actions { margin-left: auto; display: flex; align-items: center; gap: calc(var(--unit) * 2); }
 .snap {
-  font: 600 0.92rem var(--text);
-  color: var(--slate-shadow);
-  background: var(--chalk);
-  border: 0;
+  font: 600 0.9rem var(--text);
+  color: var(--frame-ink);
+  background: none;
+  border: 1.5px solid var(--frame-ink);
   border-radius: 2px;
-  padding: 7px 14px;
+  padding: 6px 12px;
   min-height: 36px;
   cursor: pointer;
+  white-space: nowrap;
 }
-.snap:hover { background: #fff; }
+.snap:hover { background: rgba(246, 247, 239, 0.12); }
 .reset {
   font: 500 0.92rem var(--text);
   color: var(--frame-muted);
@@ -334,17 +337,16 @@ h1 {
   text-overflow: ellipsis;
 }
 
-/* On paper the frame is drawn, not pasted: a pencil-weight outline around the screen. */
+/* On paper the frame is drawn, not pasted: a pencil-weight outline around the
+   screen, and the stage stays dark inside it, because a stage is dark. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) .slate-frame { background: var(--paper); border: 3px solid var(--slate-shadow); padding: 9px 9px 6px; }
   :root:not([data-theme="dark"]) .stripe { top: -11px; }
-  :root:not([data-theme="dark"]) .snap { background: var(--slate-shadow); color: var(--paper); }
-  :root:not([data-theme="dark"]) .snap:hover { background: #000; }
+  :root:not([data-theme="dark"]) .snap:hover { background: rgba(30, 35, 43, 0.08); }
 }
 :root[data-theme="light"] .slate-frame { background: var(--paper); border: 3px solid var(--slate-shadow); padding: 9px 9px 6px; }
 :root[data-theme="light"] .stripe { top: -11px; }
-:root[data-theme="light"] .snap { background: var(--slate-shadow); color: var(--paper); }
-:root[data-theme="light"] .snap:hover { background: #000; }
+:root[data-theme="light"] .snap:hover { background: rgba(30, 35, 43, 0.08); }
 
 .foot {
   max-width: 1240px;
@@ -358,19 +360,22 @@ h1 {
 
 @media (max-width: 900px) {
   .top { padding-left: 16px; padding-right: 16px; }
+  .wordmark img { width: 104px; }
   main { padding: 0 16px; }
   .foot { padding-left: 16px; padding-right: 16px; }
-  .hero { --copy-w: 100%; --overshoot: 0px; grid-template-columns: 1fr; grid-template-rows: repeat(6, auto); padding-top: calc(var(--unit) * 5); }
-  h1 { grid-row: 1; width: 100%; margin-bottom: calc(var(--unit) * 4); }
+  .hero { --copy-w: 100%; --overshoot: 0px; grid-template-columns: 1fr; grid-template-rows: repeat(7, auto); padding-top: calc(var(--unit) * 5); }
+  h1 { grid-row: 1; width: 100%; margin: 0 0 calc(var(--unit) * 4); }
   .copy { display: contents; }
   .actions { grid-column: 1; grid-row: 2; margin-bottom: calc(var(--unit) * 6); }
   .slate-frame { grid-column: 1; grid-row: 3; margin-top: 10px; }
   .board { grid-column: 1; grid-row: 4; align-self: start; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lede { grid-column: 1; grid-row: 5; margin: calc(var(--unit) * 7) 0 calc(var(--unit) * 3); max-width: none; }
-  .try { grid-column: 1; grid-row: 6; align-self: start; margin: 0; max-width: none; }
+  .try { grid-column: 1; grid-row: 6; max-width: none; }
+  .shotlist { grid-column: 1; grid-row: 7; align-self: start; width: 100%; }
   #scene-container { aspect-ratio: 4 / 5; }
-  .stripe { left: 8px; width: 60%; }
+  .stripe { left: 8px; right: 8px; }
   .strip { gap: calc(var(--unit) * 3) calc(var(--unit) * 5); }
+  .frames-field { display: none; }
   .strip-actions { margin-left: 0; width: 100%; }
   .lens, .snap, .reset { min-height: 44px; }
   .snap { flex: 1; }

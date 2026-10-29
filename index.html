@@ -46,13 +46,19 @@
           </p>
           <div class="actions">
             <button id="enter-xr" class="primary" type="button">Enter XR</button>
-            <p class="hint">Open this page in the Meta Quest Browser, sit at a table, and the set lands on it.</p>
+            <p class="hint" id="xr-hint">Open this page in the Meta Quest Browser, sit at a table, and the set lands on it.</p>
           </div>
+          <p class="try">
+            Try it here first: drag a figure, pick a lens, snap a frame. The eyeline from each actor to
+            the creature's eyes updates as you move them, in degrees and in metres on the real set.
+          </p>
         </div>
-        <p class="try">
-          Try it here first: drag a figure, pick a lens, snap a frame. The eyeline from each actor to
-          the creature's eyes updates as you move them, in degrees and in metres on the real set.
-        </p>
+        <div class="shotlist">
+          <span class="label">Shot list</span>
+          <ol id="shotlist" aria-live="polite">
+            <li class="empty">No frames yet. Pick a lens and snap one.</li>
+          </ol>
+        </div>
         <div class="slate-frame" aria-label="The stage, running in this page">
           <div class="stripe" aria-hidden="true"></div>
           <div id="scene-container"></div>
@@ -66,7 +72,7 @@
                 <button class="lens" type="button" data-lens="85">85</button>
               </div>
             </div>
-            <div class="field"><span class="label">Frames</span><span class="value" id="f-shot" aria-live="polite">0 of 6</span></div>
+            <div class="field frames-field"><span class="label">Frames</span><span class="value" id="f-shot" aria-live="polite">0 of 6</span></div>
             <div class="field"><span class="label">Eyeline</span><span class="value" id="f-eyeline" aria-live="polite">place an actor</span></div>
             <div class="strip-actions">
               <button id="page-snap" class="snap" type="button">Snap frame</button>

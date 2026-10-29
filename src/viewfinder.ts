@@ -24,6 +24,8 @@ import {
   PlaneGeometry,
   PointLight,
   RepeatWrapping,
+  Sprite,
+  SpriteMaterial,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
@@ -58,6 +60,10 @@ const MONITOR_GLOW = 0xdfe8ff;
 /** The lens aims this far below the nearest actor's eyes, so the eyes sit high in frame. */
 const AIM_BELOW_EYES = 0.012;
 const MAX_TILT = 0.6;
+/** Name tags over the pieces live on this layer, so the shot lens never sees them. */
+const TAG_LAYER = 1;
+const TAG_WIDTH = 0.07;
+const TAG_LIFT = 0.028;
 
 export interface Shot {
   index: number;
@@ -117,6 +123,8 @@ export class ViewfinderSystem extends createSystem({
     this.target.texture.colorSpace = SRGBColorSpace;
     this.lensCamera = new PerspectiveCamera(40, RT_WIDTH / RT_HEIGHT, 0.02, 50);
     this.lensCamera.name = 'ShotLens';
+    // The viewer sees the name tags; the shot lens, on layer 0 only, does not.
+    this.camera.layers.enable(TAG_LAYER);
 
     // The monitor is created once the stage entity exists; see ensureMonitor().
 
@@ -290,6 +298,7 @@ export class ViewfinderSystem extends createSystem({
     const seamTexture = new CanvasTexture(seam);
     seamTexture.colorSpace = SRGBColorSpace;
     for (const piece of this.queries.pieces.entities) {
+      this.tagPiece(piece);
       piece.object3D?.traverse((object) => {
         if (!(object instanceof Mesh)) return;
         const material = object.material as MeshStandardMaterial;
@@ -307,6 +316,42 @@ export class ViewfinderSystem extends createSystem({
         object.receiveShadow = true;
       });
     }
+  }
+
+  /**
+   * A chalk name tag over an actor or the creature, so "A looks up 30°" names
+   * something you can see. Tags ride the piece and face the viewer.
+   */
+  private tagPiece(piece: Entity): void {
+    const role = piece.getValue(SetPiece, 'role');
+    const object = piece.object3D;
+    if (object == null || (role !== SetRole.Actor && role !== SetRole.Creature)) return;
+    const text = role === SetRole.Creature ? 'creature' : String(piece.getValue(SetPiece, 'label') ?? '');
+    if (text === '') return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const g = canvas.getContext('2d');
+    if (g == null) return;
+    g.font = '700 84px "Big Shoulders", "Arial Narrow", sans-serif';
+    const width = Math.min(240, g.measureText(text).width + 56);
+    g.fillStyle = 'rgba(30, 35, 43, 0.86)';
+    g.beginPath();
+    g.roundRect((256 - width) / 2, 8, width, 112, 10);
+    g.fill();
+    g.fillStyle = '#f6f7ef';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, 128, 66);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    const tag = new Sprite(new SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
+    tag.name = 'NameTag';
+    tag.scale.set(TAG_WIDTH, TAG_WIDTH / 2, 1);
+    const top = role === SetRole.Creature ? (piece.getValue(SetPiece, 'eyeHeight') ?? 0) + 0.014 : 0.19;
+    tag.position.set(0, top + TAG_LIFT, 0);
+    tag.layers.set(TAG_LAYER);
+    object.add(tag);
   }
 
   private setLens(mm: number): void {
