@@ -62,3 +62,4 @@ artifacts/
 .design/brand/art/
 .design/refs/*.jpg
 .design/comfy-start.log
+tmp/
