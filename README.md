@@ -20,7 +20,7 @@ I wanted to be a VFX filmmaker before I switched to computer science. The short 
 
 ## Built on
 
-Immersive Web SDK (WebXR, three.js): hand tracking with one-hand, two-hand and distance grab, gaze targeting on the Meta VR Glasses profile with head fallback on Quest, scene understanding (planes and labelled room meshes), persistent spatial anchors, passthrough, spatial UI (UIKitML), and the IWSDK CLI and emulator for the build loop.
+Immersive Web SDK (WebXR, three.js): hand tracking with ray-and-pinch distance grab on every piece and on the stage plate, scene understanding (planes and labelled room meshes), persistent spatial anchors, passthrough, spatial UI (UIKitML), and the IWSDK CLI and emulator for the build loop.
 
 ## Run it
 

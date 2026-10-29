@@ -18,6 +18,7 @@ import {
   LineBasicMaterial,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   MeshStandardMaterial,
   PCFSoftShadowMap,
   PerspectiveCamera,
@@ -60,8 +61,6 @@ const MONITOR_GLOW = 0xdfe8ff;
 /** The lens aims this far below the nearest actor's eyes, so the eyes sit high in frame. */
 const AIM_BELOW_EYES = 0.012;
 const MAX_TILT = 0.6;
-/** Name tags over the pieces live on this layer, so the shot lens never sees them. */
-const TAG_LAYER = 1;
 const TAG_WIDTH = 0.07;
 const TAG_LIFT = 0.028;
 
@@ -103,6 +102,14 @@ export class ViewfinderSystem extends createSystem({
   private stageEntity: Entity | null = null;
   private tally: MeshStandardMaterial | null = null;
   private lines: Line[] = [];
+  /**
+   * Name tags and eyelines are for the viewer, not the shot. They are hidden for
+   * the lens pass rather than put on a render layer: in WebXR three.js gives the
+   * left and right eye cameras only layers 0 to 2, and layers 1 and 2 are one eye each.
+   */
+  private overlays: Object3D[] = [];
+  /** Each overlay's visibility before the lens pass, reused every frame. */
+  private overlayShown: boolean[] = [];
   private frames: (Entity | null)[] = [];
   private shots: Shot[] = [];
   private actors: Entity[] = [];
@@ -123,8 +130,6 @@ export class ViewfinderSystem extends createSystem({
     this.target.texture.colorSpace = SRGBColorSpace;
     this.lensCamera = new PerspectiveCamera(40, RT_WIDTH / RT_HEIGHT, 0.02, 50);
     this.lensCamera.name = 'ShotLens';
-    // The viewer sees the name tags; the shot lens, on layer 0 only, does not.
-    this.camera.layers.enable(TAG_LAYER);
 
     // The monitor is created once the stage entity exists; see ensureMonitor().
 
@@ -350,7 +355,10 @@ export class ViewfinderSystem extends createSystem({
     tag.scale.set(TAG_WIDTH, TAG_WIDTH / 2, 1);
     const top = role === SetRole.Creature ? (piece.getValue(SetPiece, 'eyeHeight') ?? 0) + 0.014 : 0.19;
     tag.position.set(0, top + TAG_LIFT, 0);
-    tag.layers.set(TAG_LAYER);
+    // A tag is a label, not a target: sprites throw inside the hand ray's raycast
+    // (it never sets Raycaster.camera), and that would stop every frame in XR.
+    tag.raycast = () => {};
+    this.overlays.push(tag);
     object.add(tag);
   }
 
@@ -396,7 +404,7 @@ export class ViewfinderSystem extends createSystem({
       line.name = `Eyeline${i + 1}`;
       line.frustumCulled = false;
       // The viewer sees the eyelines; the shot lens does not, so a frame shows the shot alone.
-      line.layers.set(TAG_LAYER);
+      this.overlays.push(line);
       this.world.createTransformEntity(line);
       this.lines[i] = line;
     }
@@ -485,6 +493,12 @@ export class ViewfinderSystem extends createSystem({
 
     const monitor = this.monitor!;
     monitor.visible = false;
+    const overlays = this.overlays;
+    const shown = this.overlayShown;
+    for (let i = 0; i < overlays.length; i++) {
+      shown[i] = overlays[i].visible;
+      overlays[i].visible = false;
+    }
     xr.enabled = false;
     renderer.setRenderTarget(this.target);
     renderer.setClearColor(0x0f1114, 1);
@@ -496,6 +510,7 @@ export class ViewfinderSystem extends createSystem({
     renderer.autoClear = prevAutoClear;
     xr.enabled = xrWasEnabled;
     monitor.visible = true;
+    for (let i = 0; i < overlays.length; i++) overlays[i].visible = shown[i];
   }
 
   private async captureFrame(cam: Entity): Promise<void> {
