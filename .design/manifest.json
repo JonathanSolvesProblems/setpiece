@@ -1,0 +1,79 @@
+{
+  "project": "setpiece",
+  "date": "2026-10-28",
+  "platform": "webxr-app with a 2D entry page",
+  "family": "dimensional-tactile",
+  "metaphor": "the stage is a clapper slate",
+  "register": "precise, warmed by chalk and wood",
+  "expressive_axis": "material and texture",
+  "home_polarity": "dark",
+  "category_convention_avoided": "grey capsule or wooden-doll placeholders on a blue or green wireframe grid floor under default lighting, a white rounded panel with pill buttons in a neo-grotesk, cyan or orange gizmo colours, a dark glass menu floating in space",
+  "design_code": [
+    "Every figure on the stage is a stand-in, never a character, because on a VFX set the creature is a tennis ball on a C-stand and the actors are marks on the floor",
+    "Field labels are condensed capitals with the value beside them in the same face, because that is how a slate carries REGIE, KAMERA and TON",
+    "The only colours on the stage are the optic yellow of the eyeline ball and the red of the tally, because on a black slate the eye should go to the eyeline and to recording",
+    "On the page the viewport is framed as a slate, stripe across its top and fields along its bottom, because a slate carries its fields on its face; in the headset the monitor is the only bordered object, because a director's monitor is where a shot is judged",
+    "Numbers sit in fixed columns with fixed precision, because a shot list is compared across shots"
+  ],
+  "axes": {
+    "canvas": "mid-dark tinted (painted slate) by default; aged paper light theme",
+    "chroma_budget": "monochrome plus one accent (optic yellow), with tally red reserved for recording",
+    "type_voice": "stencil display + condensed labels + a humanist grotesk for reading sizes",
+    "structure": "canvas-spatial in the headset; one object on the page",
+    "density": "functional",
+    "edge": "square, 2 px ease on the slate, 6 px only on the icon tile",
+    "depth": "material simulation (chalk haze, worn paint, wood)",
+    "ornament": "material and texture, plus chalk illustration",
+    "motion": "functional, one detented beat per action",
+    "numerals": "fixed columns (the family has no tabular figures), mm as integers, m to one decimal, deg as integers, a missing value is a word"
+  },
+  "tokens": {
+    "slate": "#3f4044",
+    "slate_shadow": "#1e232b",
+    "chalk": "#f6f7ef",
+    "chalk_dust": "#c7c7b7",
+    "chalk_haze": "#6f6c6b",
+    "paper": "#f5f6e5",
+    "pencil": "#585752",
+    "paper_rule": "#c7c7b7",
+    "wood_light": "#d9ac8b",
+    "wood": "#a37a60",
+    "wood_dark": "#64453e",
+    "optic_yellow": "#d6e13c",
+    "tally_red": "#e0352b",
+    "accent_role": "the eyeline ball, the selected lens, a stage state that is good to go",
+    "accent_hue_deg": 66,
+    "type_display": "Big Shoulders Stencil",
+    "type_body": "Schibsted Grotesk",
+    "type_mono": null,
+    "scale_ratio": 1.333,
+    "base_size_px": 17,
+    "space_unit_px": 4,
+    "radius_scale": [
+      0,
+      2,
+      6
+    ],
+    "motion_duration_ms": [
+      120,
+      240
+    ],
+    "motion_easing": "cubic-bezier(0.2, 0, 0, 1)",
+    "type_label": "Big Shoulders",
+    "screen": "#2a2d33"
+  },
+  "derivations": {
+    "slate": "the painted board of the Filmklappe under daylight, clapperboard-1.jpg",
+    "slate_shadow": "the shadowed side of the same board, clapperboard-0.jpg",
+    "chalk": "the whitest paper of the storyboard page, storyboard-film-drawing-0.jpg, so chalk and paper share one white",
+    "chalk_haze": "the chalk smudge on the slate, clapperboard-0.jpg",
+    "paper and pencil": "the aged storyboard page and its pencil, storyboard-film-drawing-0.jpg",
+    "wood": "the lay figures, artist-lay-figure-wooden-mannequin-0.jpg",
+    "optic_yellow": "domain fact: the ITF tennis ball colour as felt photographs under set light, lightness held so chalk text never sits on it",
+    "tally_red": "domain fact: the recording LED on a camera",
+    "screen": "the monitor glass, between the slate and its shadow, so the plate separates from the page"
+  },
+  "signature_device": "the clapper stripe: a bar of alternating slate and chalk diagonals at 45 degrees, worn at the ends; once per screen, across the top of the slate frame on the page (hanging past its left edge) and along the front edge of the stage in the headset",
+  "texture": "chalk haze: feTurbulence at low opacity on slate surfaces; a small tiled chalk-dust image on the stage plate",
+  "notes": "Passthrough means the headset has no canvas; everything must read against a real room, so the slate plate and the monitor bezel carry the slate colour and the panel is slate with chalk text. The lay figures are the only warm objects. Dark is default because the material is slate; paper is the light theme on the 2D page only. Round 4 critique moved body copy and panel values to Schibsted Grotesk: the condensed family at reading size read as a poster. Round 6 critique turned the viewport's frame into the slate (stripe on top, fields on the face), moved the controls out of the viewport onto the page, and lit the set with a key light and shadows."
+}

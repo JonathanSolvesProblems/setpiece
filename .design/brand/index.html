@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Setpiece brand sheet</title>
+<style>
+  @font-face { font-family: "Big Shoulders Stencil"; src: url("fonts/BigShouldersStencil.ttf"); font-weight: 100 900; }
+  @font-face { font-family: "Big Shoulders"; src: url("fonts/BigShoulders.ttf"); font-weight: 100 900; }
+  body { margin: 0; background: #3f4044; color: #f6f7ef; font-family: "Big Shoulders", sans-serif; font-weight: 500; font-size: 17px; line-height: 1.4; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px; display: grid; gap: 36px; }
+  h1 { font-family: "Big Shoulders Stencil"; font-weight: 900; font-size: 64px; line-height: 0.95; margin: 0; text-transform: uppercase; }
+  h2 { font-family: "Big Shoulders Stencil"; font-weight: 700; font-size: 15px; letter-spacing: 0.08em; color: #c7c7b7; margin: 0 0 12px; text-transform: uppercase; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .sw { height: 90px; display: flex; align-items: flex-end; padding: 8px; font-size: 14px; border-radius: 2px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  .on-slate { background: #3f4044; padding: 20px; }
+  .on-paper { background: #f5f6e5; color: #1e232b; padding: 20px; }
+  img { max-width: 100%; display: block; }
+  .stripe { height: 14px; width: 360px; background: repeating-linear-gradient(45deg, #f6f7ef 0 14px, #1e232b 14px 28px); -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+  .spec { display: grid; gap: 6px; }
+  .spec .d { font-family: "Big Shoulders Stencil"; font-weight: 900; font-size: 56px; line-height: 1; text-transform: uppercase; }
+  .spec .l { font-family: "Big Shoulders Stencil"; font-weight: 700; font-size: 14px; letter-spacing: 0.08em; color: #c7c7b7; }
+  .spec .v { font-size: 22px; }
+  .field { display: grid; grid-template-columns: 110px 1fr; gap: 12px; border-top: 1px solid #6f6c6b; padding: 8px 0; }
+  .field b { font-family: "Big Shoulders Stencil"; font-weight: 700; letter-spacing: 0.06em; color: #c7c7b7; font-size: 14px; }
+  ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 70ch; }
+  .mark { width: 96px; }
+  .icons { display: flex; gap: 16px; align-items: center; }
+  .icons img { width: 48px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="wordmark-chalk.svg" alt="Setpiece" style="width: 360px" />
+    <p style="color:#c7c7b7; margin: 12px 0 0">The stage is a clapper slate. Dimensional-tactile. Drawn from a 1992 Filmklappe, two wooden lay figures, a pencil storyboard page and a tennis ball on a C-stand.</p>
+  </header>
+
+  <section>
+    <h2>Palette</h2>
+    <div class="row">
+      <div class="sw" style="background:#3f4044">slate #3f4044</div>
+      <div class="sw" style="background:#1e232b">slate shadow #1e232b</div>
+      <div class="sw" style="background:#f6f7ef;color:#1e232b">chalk #f6f7ef</div>
+      <div class="sw" style="background:#c7c7b7;color:#1e232b">chalk dust #c7c7b7</div>
+      <div class="sw" style="background:#6f6c6b">chalk haze #6f6c6b</div>
+      <div class="sw" style="background:#f5f6e5;color:#1e232b">paper #f5f6e5</div>
+      <div class="sw" style="background:#585752">pencil #585752</div>
+      <div class="sw" style="background:#d9ac8b;color:#1e232b">wood light #d9ac8b</div>
+      <div class="sw" style="background:#a37a60">wood #a37a60</div>
+      <div class="sw" style="background:#64453e">wood dark #64453e</div>
+      <div class="sw" style="background:#d6e13c;color:#1e232b">optic yellow #d6e13c</div>
+      <div class="sw" style="background:#e0352b">tally red #e0352b</div>
+    </div>
+  </section>
+
+  <section class="two">
+    <div>
+      <h2>Type</h2>
+      <div class="spec">
+        <div class="d">Block the shot</div>
+        <div class="l">Big Shoulders Stencil 900, the one loud line</div>
+        <div class="field"><b>LENS</b><span class="v">35 mm</span></div>
+        <div class="field"><b>EYELINE A</b><span class="v">look up 28 deg, eye 1.7 m above, 3.2 m away</span></div>
+        <div class="field"><b>SHOTS</b><span class="v">3 of 6</span></div>
+        <div class="l">Stencil 700 labels, Big Shoulders 500 values, scale 1.333</div>
+      </div>
+    </div>
+    <div>
+      <h2>Mark and device</h2>
+      <img class="mark" src="mark.svg" alt="The mark: the stem of the i as the stand, the dot as the eyeline ball" />
+      <p style="color:#c7c7b7">The dot of the i is the tennis ball on its stand. Reads at 16 px as a yellow ball over a chalk stem.</p>
+      <div class="stripe"></div>
+      <p style="color:#c7c7b7">The clapper stripe: once per screen, under the loud line, along the front edge of the stage.</p>
+    </div>
+  </section>
+
+  <section class="two">
+    <div class="on-slate">
+      <h2>Anchor on slate</h2>
+      <img src="art/anchor.png" alt="Chalk drawing of a film camera on a tripod, a tennis ball on a stand and a clapperboard" />
+    </div>
+    <div class="on-paper">
+      <h2 style="color:#585752">Anchor on paper</h2>
+      <img src="art/anchor-paper.png" alt="The same drawing in pencil on aged paper" />
+    </div>
+  </section>
+
+  <section>
+    <h2>Voice</h2>
+    <p>A first assistant camera who has slated a thousand takes, talking to a director at the table.</p>
+    <p>Block the shot on your kitchen table. / Snap frame. / No frames yet. Move the camera, then snap. / The table did not scan. Grab the plate and set it down where you want it. / Board sent. Six frames, three lenses, two eyelines.</p>
+  </section>
+
+  <section>
+    <h2>Charter, the short form</h2>
+    <ol>
+      <li>Chalk is the only text colour on slate. Yellow and red are never text.</li>
+      <li>Titles carry no full stop and no comma.</li>
+      <li>One loud stencil line per screen; stencil otherwise only for field labels and frame numbers.</li>
+      <li>A field is a stencil label left and a value right, on one line.</li>
+      <li>The clapper stripe appears exactly once per screen.</li>
+      <li>Nothing on the stage pretends to be the finished image.</li>
+      <li>Optic yellow marks the eyeline ball, the selected lens and a stage that is good to go.</li>
+      <li>Tally red only while something records.</li>
+      <li>The monitor is the only bordered object.</li>
+      <li>Chalk haze on every slate surface, never over text.</li>
+      <li>One filled button per screen.</li>
+      <li>Numbers in fixed columns with fixed precision; a missing value is a word.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

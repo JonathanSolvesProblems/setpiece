@@ -57,3 +57,8 @@ opencode.json
 artifacts/
 
 .vercel
+
+# Design working files too heavy or not mine to publish: generated art variants, reference photos
+.design/brand/art/
+.design/refs/*.jpg
+.design/comfy-start.log

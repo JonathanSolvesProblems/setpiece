@@ -16,4 +16,14 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Controls Panel',
   },
+  'chalk-haze': {
+    url: publicAssetUrl('textures/chalk-haze.png'),
+    type: AssetType.Texture,
+    name: 'Chalk haze',
+  },
+  paper: {
+    url: publicAssetUrl('textures/paper.png'),
+    type: AssetType.Texture,
+    name: 'Paper',
+  },
 });

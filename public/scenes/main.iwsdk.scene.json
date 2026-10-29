@@ -15,7 +15,7 @@
       "id": "stage",
       "name": "Stage",
       "metadata": { "iwsdk.validation": { "allowFloating": true } },
-      "content": { "type": "asset", "asset": "stage" },
+      "content": { "type": "asset", "asset": "stage", "receiveShadow": true },
       "transform": { "position": [0, 0.75, -0.55] },
       "components": {
         "SetPiece": { "role": "stage", "label": "Stage", "eyeHeight": 0 },
@@ -28,8 +28,8 @@
           "id": "actor-a",
           "name": "Actor A",
           "metadata": { "iwsdk.validation": { "allowFloating": true } },
-          "content": { "type": "asset", "asset": "actor-a" },
-          "transform": { "position": [-0.08, 0, 0.05], "rotationDeg": [0, -35, 0] },
+          "content": { "type": "asset", "asset": "actor-a", "castShadow": true, "receiveShadow": true },
+          "transform": { "position": [-0.06, 0, -0.03], "rotationDeg": [0, 55, 0] },
           "components": {
             "SetPiece": { "role": "actor", "label": "A", "eyeHeight": 0.16 },
             "RayInteractable": {},
@@ -40,8 +40,8 @@
           "id": "actor-b",
           "name": "Actor B",
           "metadata": { "iwsdk.validation": { "allowFloating": true } },
-          "content": { "type": "asset", "asset": "actor-b" },
-          "transform": { "position": [0.04, 0, -0.05], "rotationDeg": [0, -20, 0] },
+          "content": { "type": "asset", "asset": "actor-b", "castShadow": true, "receiveShadow": true },
+          "transform": { "position": [0.08, 0, -0.1], "rotationDeg": [0, 30, 0] },
           "components": {
             "SetPiece": { "role": "actor", "label": "B", "eyeHeight": 0.155 },
             "RayInteractable": {},
@@ -52,8 +52,8 @@
           "id": "creature",
           "name": "Creature",
           "metadata": { "iwsdk.validation": { "allowFloating": true } },
-          "content": { "type": "asset", "asset": "creature" },
-          "transform": { "position": [0.18, 0, -0.13], "rotationDeg": [0, 150, 0] },
+          "content": { "type": "asset", "asset": "creature", "castShadow": true, "receiveShadow": true },
+          "transform": { "position": [0.2, 0, 0.12], "rotationDeg": [0, 150, 0] },
           "components": {
             "SetPiece": { "role": "creature", "label": "Creature", "eyeHeight": 0.33 },
             "RayInteractable": {},
@@ -64,14 +64,30 @@
           "id": "camera-rig",
           "name": "Camera Rig",
           "metadata": { "iwsdk.validation": { "allowFloating": true } },
-          "content": { "type": "asset", "asset": "camera-rig" },
-          "transform": { "position": [-0.24, 0, 0.18], "rotationDeg": [0, -50, 0] },
+          "content": { "type": "asset", "asset": "camera-rig", "castShadow": true, "receiveShadow": true },
+          "transform": { "position": [-0.24, 0, 0.18], "rotationDeg": [0, -45, 0] },
           "components": {
             "SetPiece": { "role": "camera", "label": "Camera", "eyeHeight": 0.118 },
             "ShotCamera": { "lensMm": 35 },
             "AudioSource": { "src": "./audio/chime.mp3", "maxInstances": 2, "playbackMode": "restart" },
             "RayInteractable": {},
             "DistanceGrabbable": { "movementMode": "MoveAtSource", "translate": true, "rotate": true, "scale": false }
+          }
+        },
+        {
+          "id": "key-light",
+          "name": "Key light",
+          "transform": { "position": [-0.45, 0.72, 0.42] },
+          "components": {
+            "com.iwsdk.components.PointLight": {
+              "color": [1, 0.93, 0.82, 1],
+              "intensity": 5.5,
+              "distance": 4,
+              "decay": 2,
+              "castShadow": true,
+              "shadowMapSize": "1024",
+              "shadowBias": -0.0004
+            }
           }
         }
       ]
@@ -83,7 +99,7 @@
       "transform": { "position": [-0.46, 1.02, -0.62], "rotationDeg": [0, 34, 0], "scale": 0.13 },
       "components": {
         "RayInteractable": {},
-        "ScreenSpace": { "top": "16px", "left": "16px", "width": "22vw", "height": "78%" }
+        "ScreenSpace": { "top": "88px", "left": "16px", "width": "15vw", "height": "80%" }
       }
     }
   ]

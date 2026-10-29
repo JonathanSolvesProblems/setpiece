@@ -1,103 +1,165 @@
 <!--
-  Setpiece control panel. Panel, Divider, Button, ButtonIcon and ButtonLabel come
-  from the bundled Horizon kit; Camera and RectangleGoggles are bundled Lucide icons.
+  The slate panel: field labels in the stencil on the left, values on the right,
+  chalk on slate. Fonts ship with the app (OFL, see fonts/OFL.txt).
 -->
 <style>
-  .panel-root {
+  @font-face { font-family: "Shoulders"; src: url("fonts/BigShoulders-Medium.ttf"); font-weight: 500; }
+  @font-face { font-family: "Shoulders"; src: url("fonts/BigShoulders-Bold.ttf"); font-weight: 700; }
+  @font-face { font-family: "Stencil"; src: url("fonts/BigShouldersStencil-Bold.ttf"); font-weight: 700; }
+  @font-face { font-family: "StencilBlack"; src: url("fonts/BigShouldersStencil-Black.ttf"); font-weight: 900; }
+  @font-face { font-family: "Grotesk"; src: url("fonts/SchibstedGrotesk-Medium.ttf"); font-weight: 500; }
+  @font-face { font-family: "Grotesk"; src: url("fonts/SchibstedGrotesk-SemiBold.ttf"); font-weight: 600; }
+
+  .slate {
     flex-direction: column;
-    width: 270px;
+    width: 280px;
+    background-color: #3f4044;
+    border-radius: 2px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    padding-left: 18px;
+    padding-right: 18px;
+    gap: 8px;
   }
-  .content {
-    flex-direction: column;
-    padding-top: 12px;
-    padding-left: 16px;
-    padding-right: 16px;
-    padding-bottom: 12px;
-    gap: 6px;
+  .title {
+    font-family: "StencilBlack";
+    font-weight: 900;
+    font-size: 34px;
+    line-height: 34px;
+    color: #f6f7ef;
   }
-  .heading {
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 26px;
-    color: #272727;
-  }
+  .rule { height: 2px; width: 100%; background-color: #6f6c6b; margin-top: 2px; margin-bottom: 2px; }
+  .field { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
   .label {
-    font-size: 11px;
+    font-family: "Shoulders";
     font-weight: 700;
-    letter-spacing: 1px;
-    color: #5a5f68;
-    margin-top: 6px;
-  }
-  .row {
-    flex-direction: row;
-    gap: 6px;
-  }
-  .lens {
-    width: 54px;
-    justify-content: center;
-  }
-  .wide {
-    justify-content: center;
-    margin-top: 6px;
-  }
-  .line {
     font-size: 12px;
-    line-height: 16px;
-    color: #272727;
-  }
-  .shot {
-    font-size: 11px;
     line-height: 15px;
-    color: #272727;
+    color: #c7c7b7;
+    width: 72px;
+  }
+  .value {
+    font-family: "Grotesk";
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 18px;
+    color: #f6f7ef;
+    flex-grow: 1;
   }
   .status {
-    font-size: 12px;
-    line-height: 16px;
-    color: #272727;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    font-family: "Grotesk";
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 18px;
+    color: #f6f7ef;
+    flex-grow: 1;
+    padding-left: 8px;
+    border-left-width: 3px;
+    border-color: #6f6c6b;
+  }
+  .lenses { flex-direction: row; gap: 6px; flex-grow: 1; justify-content: flex-start; }
+  .lens {
+    font-family: "Shoulders";
+    font-weight: 700;
+    font-size: 17px;
+    line-height: 20px;
+    color: #f6f7ef;
+    width: 42px;
+    height: 34px;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    border-bottom-width: 2px;
+    border-color: #3f4044;
+    cursor: pointer;
+  }
+  .word {
+    font-family: "Grotesk";
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 18px;
+    color: #f6f7ef;
+    height: 34px;
+    justify-content: center;
+    align-items: center;
     padding-left: 10px;
     padding-right: 10px;
-    border-radius: 8px;
-    background-color: #e6e8ec;
+    border-bottom-width: 2px;
+    border-color: #6f6c6b;
+    cursor: pointer;
   }
+  .primary {
+    font-family: "Grotesk";
+    font-weight: 600;
+    font-size: 17px;
+    line-height: 22px;
+    color: #1e232b;
+    background-color: #f6f7ef;
+    height: 44px;
+    justify-content: center;
+    align-items: center;
+    border-radius: 2px;
+    margin-top: 4px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .line {
+    font-family: "Grotesk";
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 17px;
+    color: #f6f7ef;
+  }
+  .shot {
+    font-family: "Grotesk";
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
+    color: #f6f7ef;
+  }
+  .muted { color: #c7c7b7; }
 </style>
-<Panel class="panel-root">
-  <div class="content">
-    <div class="heading">Setpiece</div>
-    <Divider></Divider>
+<div id="panel-root" class="slate">
+  <div id="panel-title" class="title">SETPIECE</div>
+  <div class="rule"></div>
+  <div class="field">
     <div class="label">STAGE</div>
     <div id="stage-status" class="status">Floating in front of you. Grab the plate to move the set.</div>
-    <Button id="btn-reset-stage" class="wide">
-      <ButtonLabel>Reset stage position</ButtonLabel>
-    </Button>
-    <div class="label">LENS (MM)</div>
-    <div class="row">
-      <Button id="lens-24" class="lens"><ButtonLabel>24</ButtonLabel></Button>
-      <Button id="lens-35" class="lens"><ButtonLabel>35</ButtonLabel></Button>
-      <Button id="lens-50" class="lens"><ButtonLabel>50</ButtonLabel></Button>
-      <Button id="lens-85" class="lens"><ButtonLabel>85</ButtonLabel></Button>
-    </div>
-    <Button id="btn-snap" class="wide">
-      <ButtonIcon><Camera></Camera></ButtonIcon>
-      <ButtonLabel>Snap frame</ButtonLabel>
-    </Button>
-    <div class="label">EYELINES TO CREATURE</div>
-    <div id="eyeline-a" class="line">A: place the creature and an actor</div>
-    <div id="eyeline-b" class="line"> </div>
-    <div class="label">SHOT LIST</div>
-    <div id="shot-1" class="shot">No frames yet. Move the camera, then snap.</div>
-    <div id="shot-2" class="shot"> </div>
-    <div id="shot-3" class="shot"> </div>
-    <div id="shot-4" class="shot"> </div>
-    <div id="shot-5" class="shot"> </div>
-    <div id="shot-6" class="shot"> </div>
-    <Button id="xr-button" class="wide">
-      <ButtonIcon><RectangleGoggles></RectangleGoggles></ButtonIcon>
-      <ButtonLabel>Enter XR</ButtonLabel>
-    </Button>
-    <Button id="exit-button" class="wide" style="display: none">
-      <ButtonLabel>Exit to Browser</ButtonLabel>
-    </Button>
   </div>
-</Panel>
+  <div class="field">
+    <div class="label"> </div>
+    <div id="btn-reset-stage" class="word">Reset stage</div>
+  </div>
+  <div class="field">
+    <div class="label">LENS</div>
+    <div class="lenses">
+      <div id="lens-24" class="lens">24</div>
+      <div id="lens-35" class="lens">35</div>
+      <div id="lens-50" class="lens">50</div>
+      <div id="lens-85" class="lens">85</div>
+    </div>
+  </div>
+  <div id="btn-snap" class="primary">Snap frame</div>
+  <div class="rule"></div>
+  <div class="field">
+    <div class="label">EYELINE</div>
+    <div id="eyeline-a" class="line">A: place the creature and an actor</div>
+  </div>
+  <div class="field">
+    <div class="label"> </div>
+    <div id="eyeline-b" class="line"> </div>
+  </div>
+  <div class="rule"></div>
+  <div class="field">
+    <div class="label">SHOTS</div>
+    <div id="shot-1" class="shot">No frames yet. Move the camera, then snap.</div>
+  </div>
+  <div class="field"><div class="label"> </div><div id="shot-2" class="shot"> </div></div>
+  <div class="field"><div class="label"> </div><div id="shot-3" class="shot"> </div></div>
+  <div class="field"><div class="label"> </div><div id="shot-4" class="shot"> </div></div>
+  <div class="field"><div class="label"> </div><div id="shot-5" class="shot"> </div></div>
+  <div class="field"><div class="label"> </div><div id="shot-6" class="shot"> </div></div>
+  <div class="rule"></div>
+  <div id="xr-button" class="primary">Enter XR</div>
+  <div id="exit-button" class="word" style="display: none">Exit to browser</div>
+</div>

@@ -4,8 +4,10 @@ import { StageStatus } from './placement.js';
 
 const LENSES = [24, 35, 50, 85];
 const SHOT_ROWS = 6;
-const STATUS_PLACED = '#cfead7';
-const STATUS_IDLE = '#e6e8ec';
+// Optic yellow marks the selected lens and a stage that is good to go (charter law 7).
+const OPTIC_YELLOW = '#d6e13c';
+const SLATE = '#3f4044';
+const CHALK_HAZE = '#6f6c6b';
 const PLACED_STATUSES = new Set<string>([StageStatus.Table, StageStatus.Restored, StageStatus.Manual]);
 
 type Globals = {
@@ -23,6 +25,13 @@ export class ControlsSystem extends createSystem({}) {
     const panel = this.world.getSceneObject<UIKitMLAsset>('controls-panel');
     if (panel == null) return;
     const g = this.globals as Globals;
+    // The whole panel belongs to the headset; the page has its own controls.
+    const root = panel.getElementById('panel-root');
+    this.cleanupFuncs.push(
+      this.world.visibilityState.subscribe((state) => {
+        root?.setProperties({ display: state === VisibilityState.NonImmersive ? 'none' : 'flex' });
+      }),
+    );
 
     for (const mm of LENSES) {
       const button = panel.getElementById(`lens-${mm}`);
@@ -37,7 +46,7 @@ export class ControlsSystem extends createSystem({}) {
       g.lensMm.subscribe((mm) => {
         for (const l of LENSES) {
           panel.getElementById(`lens-${l}`)?.setProperties({
-            backgroundColor: l === mm ? '#ffb020' : '#e6e8ec',
+            borderColor: l === mm ? OPTIC_YELLOW : SLATE,
           });
         }
       }),
@@ -48,7 +57,7 @@ export class ControlsSystem extends createSystem({}) {
       g.stageStatus.subscribe((text) => {
         stageStatus?.setProperties({
           text,
-          backgroundColor: PLACED_STATUSES.has(text) ? STATUS_PLACED : STATUS_IDLE,
+          borderColor: PLACED_STATUSES.has(text) ? OPTIC_YELLOW : CHALK_HAZE,
         });
       }),
     );
@@ -82,12 +91,16 @@ export class ControlsSystem extends createSystem({}) {
       }),
     );
 
+    // In the page, the wordmark and the Enter XR button already exist outside
+    // the viewport, so the panel shows neither; in the headset it shows both.
+    const title = panel.getElementById('panel-title');
     const xrButton = panel.getElementById('xr-button');
     const exitButton = panel.getElementById('exit-button');
     if (xrButton == null || exitButton == null) return;
     if (!this.world.xrEnabled) {
       xrButton.setProperties({ display: 'none' });
       exitButton.setProperties({ display: 'none' });
+      title?.setProperties({ display: 'none' });
       return;
     }
     const launchXR = () => this.world.launchXR();
@@ -99,7 +112,8 @@ export class ControlsSystem extends createSystem({}) {
       () => exitButton.removeEventListener('click', exitXR),
       this.world.visibilityState.subscribe((state) => {
         const is2D = state === VisibilityState.NonImmersive;
-        xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
+        title?.setProperties({ display: is2D ? 'none' : 'flex' });
+        xrButton.setProperties({ display: 'none' });
         exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
       }),
     );

@@ -1,16 +1,99 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
-    />
-    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Setpiece</title>
+    <meta name="description" content="Block a VFX shot on your kitchen table with your hands. A 1:10 set on a slate, a 35 mm camera, lenses, eyelines, and a storyboard at the end." />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#3f4044" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f6e5" media="(prefers-color-scheme: light)" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <meta property="og:title" content="Setpiece" />
+    <meta property="og:description" content="Block the shot on your kitchen table. Wooden stand-ins, a tennis ball where the creature will be, a 35 mm camera you move with your hands." />
+    <meta property="og:image" content="https://setpiece-xr.vercel.app/og.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preload" href="/ui/fonts/BigShouldersStencil.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="/ui/fonts/SchibstedGrotesk.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/page.css" />
   </head>
-  <body style="margin: 0">
-    <div id="scene-container"></div>
+  <body>
+    <svg class="haze" aria-hidden="true" focusable="false">
+      <filter id="chalk">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="23" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+      <rect width="100%" height="100%" filter="url(#chalk)" />
+    </svg>
+
+    <header class="top">
+      <a class="wordmark" href="/" aria-label="Setpiece, home">
+        <img src="/wordmark.svg" alt="" width="301" height="100" />
+      </a>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-heading">
+        <h1 id="hero-heading">Block the shot on<br />your kitchen table</h1>
+        <div class="copy">
+          <p class="lede">
+            A 1:10 film set on a slate, placed on your own table. You move wooden stand-ins and a
+            35 mm camera with your hands, look through the lens, snap, and leave with the storyboard
+            and the shot list.
+          </p>
+          <div class="actions">
+            <button id="enter-xr" class="primary" type="button">Enter XR</button>
+            <p class="hint">Open this page in the Meta Quest Browser, sit at a table, and the set lands on it.</p>
+          </div>
+        </div>
+        <p class="try">
+          Try it here first: drag a figure, pick a lens, snap a frame. The eyeline from each actor to
+          the creature's eyes updates as you move them, in degrees and in metres on the real set.
+        </p>
+        <div class="slate-frame" aria-label="The stage, running in this page">
+          <div class="stripe" aria-hidden="true"></div>
+          <div id="scene-container"></div>
+          <div class="strip" role="group" aria-label="Lens, frames and eyeline">
+            <div class="field">
+              <span class="label" id="lens-label">Lens</span>
+              <div class="lenses" role="group" aria-labelledby="lens-label">
+                <button class="lens" type="button" data-lens="24">24</button>
+                <button class="lens" type="button" data-lens="35" aria-pressed="true">35</button>
+                <button class="lens" type="button" data-lens="50">50</button>
+                <button class="lens" type="button" data-lens="85">85</button>
+              </div>
+            </div>
+            <div class="field"><span class="label">Frames</span><span class="value" id="f-shot" aria-live="polite">0 of 6</span></div>
+            <div class="field"><span class="label">Eyeline</span><span class="value" id="f-eyeline" aria-live="polite">place an actor</span></div>
+            <div class="strip-actions">
+              <button id="page-snap" class="snap" type="button">Snap frame</button>
+              <button id="page-reset" class="reset" type="button">Reset</button>
+            </div>
+          </div>
+        </div>
+        <ol class="board" id="board" aria-label="Storyboard, the last six frames">
+          <li><span class="n">1</span></li>
+          <li><span class="n">2</span></li>
+          <li><span class="n">3</span></li>
+          <li><span class="n">4</span></li>
+          <li><span class="n">5</span></li>
+          <li><span class="n">6</span></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        Built for the Meta VR Start Developer Competition 2026 by Jonathan Andrei, who once shot a creature
+        short with nothing for the actor to look at. More of what I build at
+        <a href="https://jonathansolvesproblems.com">jonathansolvesproblems.com</a>.
+      </p>
+      <p class="small">Type: Big Shoulders Stencil by Patric King and Schibsted Grotesk by Schibsted, both under the SIL Open Font License.</p>
+    </footer>
+
     <script type="module" src="/src/index.ts"></script>
   </body>
 </html>

@@ -1,0 +1,16 @@
+{
+  "allow_fonts": ["Big Shoulders Stencil", "Big Shoulders"],
+  "banned_fonts": [],
+  "banned_words": ["immersive", "seamless", "experience", "intuitive", "powerful", "next-generation", "unlock", "elevate", "effortless", "revolutionary"],
+  "banned_hex": ["#ffffff", "#000000", "#0b0d12", "#0d1117", "#5b8cff", "#ec6a45", "#7c3aed"],
+  "allow_hex": [],
+  "title_punctuation": "forbid",
+  "max_tracked_caps_rules": 2,
+  "allow_long_dashes": false,
+  "forbid_regex": [
+    {"pattern": "class=\"[^\"]*eyebrow", "why": "no eyebrow labels above titles (law 4)"},
+    {"pattern": "border-radius:\\s*(1[2-9]|[2-9]\\d)px", "why": "slate edges are square or barely eased (law 9)"},
+    {"pattern": "box-shadow:[^;]*rgba?\\([^)]*,\\s*0?\\.[5-9]", "why": "no heavy shadow; the slate is matte (law 10)"},
+    {"pattern": "\\b(Lucide|lucide-react|feather-icons|heroicons|phosphor)\\b", "why": "icons are drawn in the chalk hand (kit)"}
+  ]
+}

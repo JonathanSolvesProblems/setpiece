@@ -8,6 +8,7 @@ import {
   createSystem,
   Entity,
   Grabbed,
+  VisibilityState,
   Quaternion,
   setWorldPosition,
   setWorldQuaternion,
@@ -66,8 +67,9 @@ export class PlacementSystem extends createSystem({
   init(): void {
     const g = this.globals as Globals;
     this.cleanupFuncs.push(
-      this.world.visibilityState.subscribe(() => {
+      this.world.visibilityState.subscribe((state) => {
         this.sessionElapsed = 0;
+        this.onVisibility(state);
       }),
       this.queries.heldStages.subscribe('qualify', (stage) => {
         stage.setValue(StageAnchor, 'placement', Placement.Manual);
@@ -141,7 +143,29 @@ export class PlacementSystem extends createSystem({
     if (stage.getValue(StageAnchor, 'persist') && !stage.hasComponent(XRAnchor)) {
       stage.addComponent(XRAnchor);
     }
-    if (!this.tryRestore(stage, false)) this.status(StageStatus.Floating);
+    this.status(StageStatus.Floating);
+  }
+
+  /**
+   * The 2D page is a preview and always shows the authored composition. A saved
+   * pose is restored only inside an XR session: through the anchor when one
+   * attaches, or directly on devices that never attach one.
+   */
+  private onVisibility(state: VisibilityState): void {
+    const stage = this.firstStage();
+    if (stage?.object3D == null || !this.stageReady) return;
+    if (state === VisibilityState.NonImmersive) {
+      this.applyAuthored(stage);
+      stage.setValue(StageAnchor, 'placement', Placement.Floating);
+      this.tableDone = false;
+      this.attachedSeen = false;
+      this.candidates = [];
+      this.candidateTimer = -1;
+      this.status(StageStatus.Floating);
+    } else if (state === VisibilityState.Visible) {
+      const pose = this.load();
+      if (pose != null && !pose.anchored) this.tryRestore(stage, false);
+    }
   }
 
   /** A detected table or desk: place the stage on top of it, facing the user. */

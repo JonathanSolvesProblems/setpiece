@@ -5,7 +5,9 @@
  * real set metres (stage scale is 1:10).
  */
 import {
+  AssetManager,
   AudioUtils,
+  BoxGeometry,
   BufferGeometry,
   CanvasTexture,
   Color,
@@ -16,8 +18,12 @@ import {
   LineBasicMaterial,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
+  PCFSoftShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
+  PointLight,
+  RepeatWrapping,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
@@ -34,10 +40,24 @@ const RT_WIDTH = 640;
 const RT_HEIGHT = 360;
 const MAX_FRAMES = 6;
 const FRAME_WIDTH = 0.1;
+const FRAME_GAP = 0.011;
+const FRAME_COLUMNS = 3;
+/** The storyboard card: three frames wide, two high, the width of the monitor. */
+const CARD_WIDTH = FRAME_WIDTH * FRAME_COLUMNS + FRAME_GAP * (FRAME_COLUMNS + 1);
+const CARD_HEIGHT = ((FRAME_WIDTH * 9) / 16) * 2 + FRAME_GAP * 3;
+
 const MAX_ACTORS = 4;
 const TEXT_EVERY_N_FRAMES = 12;
 /** Monitor pose relative to the stage origin, so it travels with the stage. */
 const MONITOR_LOCAL: [number, number, number] = [0, 0.37, -0.31];
+const CARD_CENTER_Y = MONITOR_LOCAL[1] - 0.102 - CARD_HEIGHT / 2 - 0.008;
+const OPTIC_YELLOW = 0xd6e13c;
+const SLATE_SHADOW = 0x1e232b;
+const TALLY_RED = 0xe0352b;
+const MONITOR_GLOW = 0xdfe8ff;
+/** The lens aims this far below the nearest actor's eyes, so the eyes sit high in frame. */
+const AIM_BELOW_EYES = 0.012;
+const MAX_TILT = 0.6;
 
 export interface Shot {
   index: number;
@@ -53,6 +73,7 @@ type Globals = {
   snapRequested: Signal<number>;
   eyelineText: Signal<string[]>;
   shotList: Signal<string[]>;
+  shotFrames: Signal<Shot[]>;
 };
 
 type AsyncReader = WebGLRenderer & {
@@ -74,6 +95,7 @@ export class ViewfinderSystem extends createSystem({
   private lensCamera!: PerspectiveCamera;
   private monitor: Mesh | null = null;
   private stageEntity: Entity | null = null;
+  private tally: MeshStandardMaterial | null = null;
   private lines: Line[] = [];
   private frames: (Entity | null)[] = [];
   private shots: Shot[] = [];
@@ -88,6 +110,9 @@ export class ViewfinderSystem extends createSystem({
   private c = new Vector3();
 
   init(): void {
+    // The key light in the scene casts; the renderer has to be told to draw shadows.
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFSoftShadowMap;
     this.target = new WebGLRenderTarget(RT_WIDTH, RT_HEIGHT);
     this.target.texture.colorSpace = SRGBColorSpace;
     this.lensCamera = new PerspectiveCamera(40, RT_WIDTH / RT_HEIGHT, 0.02, 50);
@@ -120,6 +145,45 @@ export class ViewfinderSystem extends createSystem({
     return this.shots;
   }
 
+  /**
+   * The storyboard card before any frame is snapped: six pencil frames on
+   * paper, numbered in the stencil, so the card reads as a page and not a plank.
+   */
+  private drawCard(): CanvasTexture {
+    const W = 1024;
+    const H = Math.round((W * CARD_HEIGHT) / CARD_WIDTH);
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    const draw = (): void => {
+      const ctx = canvas.getContext('2d');
+      if (ctx == null) return;
+      ctx.fillStyle = '#f5f6e5';
+      ctx.fillRect(0, 0, W, H);
+      const px = W / CARD_WIDTH;
+      const frameW = FRAME_WIDTH * px;
+      const frameH = ((FRAME_WIDTH * 9) / 16) * px;
+      const gap = FRAME_GAP * px;
+      ctx.strokeStyle = '#87877d';
+      ctx.lineWidth = 3;
+      ctx.fillStyle = '#585752';
+      ctx.font = `700 ${Math.round(gap * 1.6)}px "Big Shoulders Stencil"`;
+      ctx.textBaseline = 'top';
+      for (let i = 0; i < MAX_FRAMES; i++) {
+        const x = gap + (i % FRAME_COLUMNS) * (frameW + gap);
+        const y = gap + Math.floor(i / FRAME_COLUMNS) * (frameH + gap);
+        ctx.strokeRect(x + 1.5, y + 1.5, frameW - 3, frameH - 3);
+        ctx.fillText(String(i + 1), x + 8, y + 5);
+      }
+      texture.needsUpdate = true;
+    };
+    draw();
+    void document.fonts.load('700 24px "Big Shoulders Stencil"').then(draw);
+    return texture;
+  }
+
   /** The monitor is a child of the stage, so it travels wherever the stage is placed. */
   private ensureMonitor(): boolean {
     if (this.monitor != null) return true;
@@ -134,8 +198,115 @@ export class ViewfinderSystem extends createSystem({
     this.world.createTransformEntity(monitor, { parent: stage });
     monitor.position.set(...MONITOR_LOCAL);
     monitor.rotation.x = -0.15;
+    // A director's monitor: the one bordered object on the stage (charter law 9).
+    const bezel = new Mesh(
+      new BoxGeometry(0.344, 0.204, 0.01),
+      new MeshStandardMaterial({ color: SLATE_SHADOW, roughness: 0.9 }),
+    );
+    bezel.name = 'Bezel';
+    bezel.position.z = -0.0055;
+    monitor.add(bezel);
+    this.tally = new MeshStandardMaterial({ color: TALLY_RED, emissive: TALLY_RED, emissiveIntensity: 0.35 });
+    const tally = new Mesh(new PlaneGeometry(0.006, 0.006), this.tally);
+    tally.name = 'Tally';
+    tally.position.set(0.164, 0.094, 0.0002);
+    monitor.add(tally);
+    // The monitor is a practical: a little cool light on whatever stands in front of it.
+    const glow = new PointLight(MONITOR_GLOW, 0.3, 0.5, 2);
+    glow.name = 'MonitorGlow';
+    glow.position.set(0, -0.03, 0.06);
+    monitor.add(glow);
+    // The frames sit on a strip of camera-report paper under the monitor.
+    const paper = AssetManager.getTexture('paper');
+    if (paper) {
+      paper.wrapS = RepeatWrapping;
+      paper.wrapT = RepeatWrapping;
+      paper.repeat.set(4, 1);
+      paper.colorSpace = SRGBColorSpace;
+    }
+    void paper;
+    const card = new Mesh(
+      new PlaneGeometry(CARD_WIDTH, CARD_HEIGHT),
+      new MeshStandardMaterial({ color: 0xffffff, map: this.drawCard(), roughness: 1 }),
+    );
+    card.name = 'StoryboardCard';
+    this.world.createTransformEntity(card, { parent: stage });
+    card.position.set(MONITOR_LOCAL[0], CARD_CENTER_Y, MONITOR_LOCAL[2] - 0.001);
+    card.rotation.x = -0.15;
+    // Chalk haze on the slate plate, cloned so the shared material stays clean.
+    const plate = stage.object3D.getObjectByName('Plate') as Mesh | undefined;
+    const haze = AssetManager.getTexture('chalk-haze');
+    if (plate && haze) {
+      haze.wrapS = RepeatWrapping;
+      haze.wrapT = RepeatWrapping;
+      haze.repeat.set(3, 2);
+      haze.colorSpace = SRGBColorSpace;
+      const material = (plate.material as MeshStandardMaterial).clone();
+      material.map = haze;
+      plate.material = material;
+    }
+    this.dressPieces();
     this.monitor = monitor;
     return true;
+  }
+
+  /** Wood grain on the lay figures and a seam on the tennis ball, drawn once. */
+  private dressPieces(): void {
+    const grain = document.createElement('canvas');
+    grain.width = 256;
+    grain.height = 256;
+    const g = grain.getContext('2d');
+    if (g) {
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, 256, 256);
+      for (let y = 0; y < 256; y += 1) {
+        const wobble = Math.sin(y * 0.09) * 6 + Math.sin(y * 0.31) * 2;
+        const shade = 190 + Math.round(Math.sin(y * 0.45 + wobble * 0.2) * 28 + Math.sin(y * 1.7) * 10);
+        g.fillStyle = `rgb(${shade}, ${shade}, ${shade})`;
+        g.fillRect(0, y, 256, 1);
+      }
+    }
+    const grainTexture = new CanvasTexture(grain);
+    grainTexture.wrapS = RepeatWrapping;
+    grainTexture.wrapT = RepeatWrapping;
+    grainTexture.repeat.set(2, 3);
+    const seam = document.createElement('canvas');
+    seam.width = 512;
+    seam.height = 256;
+    const c = seam.getContext('2d');
+    if (c) {
+      c.fillStyle = '#d6e13c';
+      c.fillRect(0, 0, 512, 256);
+      c.strokeStyle = '#f6f7ef';
+      c.lineWidth = 9;
+      c.beginPath();
+      for (let x = 0; x <= 512; x += 4) {
+        const y = 128 + Math.sin((x / 512) * Math.PI * 2) * 78;
+        if (x === 0) c.moveTo(x, y);
+        else c.lineTo(x, y);
+      }
+      c.stroke();
+    }
+    const seamTexture = new CanvasTexture(seam);
+    seamTexture.colorSpace = SRGBColorSpace;
+    for (const piece of this.queries.pieces.entities) {
+      piece.object3D?.traverse((object) => {
+        if (!(object instanceof Mesh)) return;
+        const material = object.material as MeshStandardMaterial;
+        if (object.name === 'EyelineBall') {
+          const felt = material.clone();
+          felt.map = seamTexture;
+          felt.color.set(0xffffff);
+          object.material = felt;
+        } else if (/^(Torso|Chest|Head|Leg|Arm|Hand)/.test(object.name)) {
+          const wood = material.clone();
+          wood.map = grainTexture;
+          object.material = wood;
+        }
+        object.castShadow = true;
+        object.receiveShadow = true;
+      });
+    }
   }
 
   private setLens(mm: number): void {
@@ -148,6 +319,7 @@ export class ViewfinderSystem extends createSystem({
     const cam = this.queries.cams.entities.values().next().value as Entity | undefined;
     if (cam?.object3D == null || !this.ensureMonitor()) return;
     this.updateEyelines();
+    this.aimLens();
     this.renderViewfinder();
     if (this.snapPending) {
       this.snapPending = false;
@@ -175,7 +347,7 @@ export class ViewfinderSystem extends createSystem({
     if (line == null) {
       const geometry = new BufferGeometry();
       geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(6), 3));
-      line = new Line(geometry, new LineBasicMaterial({ color: 0xffb020 }));
+      line = new Line(geometry, new LineBasicMaterial({ color: OPTIC_YELLOW }));
       line.name = `Eyeline${i + 1}`;
       line.frustumCulled = false;
       this.world.createTransformEntity(line);
@@ -209,6 +381,27 @@ export class ViewfinderSystem extends createSystem({
     }
     for (let i = this.actors.length; i < this.lines.length; i++) this.lines[i].visible = false;
     if (this.frameCount++ % TEXT_EVERY_N_FRAMES === 0) this.publishEyelineText();
+  }
+
+  /**
+   * The user aims the rig; the lens tilts on its own toward the nearest actor's
+   * eyes, the way an operator keeps the subject's eyes in the upper part of the
+   * frame. Yaw stays with the rig, so a long lens still lands on a face.
+   */
+  private aimLens(): void {
+    this.lensCamera.getWorldPosition(this.b);
+    let nearest = Infinity;
+    let pitch = 0;
+    for (const actor of this.actors) {
+      if (actor.object3D == null) continue;
+      this.eyePoint(actor, this.a);
+      const run = Math.hypot(this.a.x - this.b.x, this.a.z - this.b.z);
+      if (run < nearest) {
+        nearest = run;
+        pitch = Math.atan2(this.a.y - AIM_BELOW_EYES - this.b.y, run);
+      }
+    }
+    this.lensCamera.rotation.x = Math.max(-MAX_TILT, Math.min(MAX_TILT, pitch));
   }
 
   private eyelineDeg(i: number): number {
@@ -300,6 +493,12 @@ export class ViewfinderSystem extends createSystem({
     this.shots.push(shot);
     this.placeThumbnail(canvas, shot.index);
     AudioUtils.play(cam);
+    if (this.tally) {
+      this.tally.emissiveIntensity = 2.5;
+      setTimeout(() => {
+        if (this.tally) this.tally.emissiveIntensity = 0.35;
+      }, 240);
+    }
     g.shotList.value = this.shots
       .slice(-MAX_FRAMES)
       .map(
@@ -307,6 +506,7 @@ export class ViewfinderSystem extends createSystem({
           `${s.index}. ${s.lensMm} mm, cam ${s.cameraHeightM.toFixed(1)} m high, ` +
           `${s.distanceToCreatureM.toFixed(1)} m from creature`,
       );
+    g.shotFrames.value = this.shots.slice(-MAX_FRAMES);
   }
 
   private placeThumbnail(canvas: HTMLCanvasElement, index: number): void {
@@ -320,8 +520,12 @@ export class ViewfinderSystem extends createSystem({
     );
     mesh.name = `Frame${index}`;
     const entity = this.world.createTransformEntity(mesh, { parent: this.stageEntity ?? undefined });
-    const x = (slot - (MAX_FRAMES - 1) / 2) * (FRAME_WIDTH + 0.012);
-    mesh.position.set(MONITOR_LOCAL[0] + x, MONITOR_LOCAL[1] - 0.15, MONITOR_LOCAL[2]);
+    const column = slot % FRAME_COLUMNS;
+    const row = Math.floor(slot / FRAME_COLUMNS);
+    const frameHeight = (FRAME_WIDTH * 9) / 16;
+    const x = -CARD_WIDTH / 2 + FRAME_GAP + FRAME_WIDTH / 2 + column * (FRAME_WIDTH + FRAME_GAP);
+    const y = CARD_HEIGHT / 2 - FRAME_GAP - frameHeight / 2 - row * (frameHeight + FRAME_GAP);
+    mesh.position.set(MONITOR_LOCAL[0] + x, CARD_CENTER_Y + y, MONITOR_LOCAL[2] + 0.0005);
     mesh.rotation.x = -0.15;
     this.frames[slot] = entity;
   }
