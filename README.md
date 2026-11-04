@@ -8,7 +8,7 @@ Built for the Meta VR Start Developer Competition 2026, Productivity track, New 
 
 ## Why
 
-I wanted to be a VFX filmmaker before I switched to computer science. The short I am least embarrassed by was shot on a Canon T5i with a creature added weeks later, which meant that on the day there was nothing for the actor to look at and nothing to frame against. On a real creature shoot the stand-in is a tennis ball on a C-stand raised to the creature's eye height. Setpiece is that table, before the shoot.
+I wanted to be a VFX filmmaker before I switched to computer science. The short I am least embarrassed by was shot on a consumer DSLR with a creature added weeks later, which meant that on the day there was nothing for the actor to look at and nothing to frame against. On a real creature shoot the stand-in is a tennis ball on a C-stand raised to the creature's eye height. Setpiece is that table, before the shoot.
 
 ## What it does
 

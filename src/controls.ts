@@ -1,6 +1,26 @@
-import { createSystem, UIKit, UIKitMLAsset, VisibilityState } from '@iwsdk/core';
+import {
+  createSystem,
+  Entity,
+  Object3D,
+  Quaternion,
+  setWorldPosition,
+  setWorldQuaternion,
+  UIKit,
+  UIKitMLAsset,
+  Vector3,
+  VisibilityState,
+} from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { StageStatus } from './placement.js';
+import { SetPiece, StageAnchor } from './set-components.js';
+
+/**
+ * Where the panel sits relative to the stage, as the scene authors it: left of
+ * the slate, a little above it, turned in toward the viewer.
+ */
+const PANEL_OFFSET = new Vector3(-0.46, 0.27, -0.07);
+const PANEL_YAW = (34 * Math.PI) / 180;
+const UP = new Vector3(0, 1, 0);
 
 const LENSES = [24, 35, 50, 85];
 const SHOT_ROWS = 6;
@@ -20,8 +40,41 @@ type Globals = {
 };
 
 /** Wires the Setpiece control panel to the shared signals the viewfinder reads. */
-export class ControlsSystem extends createSystem({}) {
+export class ControlsSystem extends createSystem({
+  stages: { required: [SetPiece, StageAnchor] },
+}) {
+  private stage: Entity | null = null;
+  private panelObject: Object3D | null = null;
+  private panelPosition = new Vector3();
+  private panelQuaternion = new Quaternion();
+  private panelTurn = new Quaternion().setFromAxisAngle(UP, PANEL_YAW);
+
+  /**
+   * In the headset the panel travels with the set, so it is beside the slate
+   * wherever the table turns out to be, and inside the same narrow field of view.
+   * The page hides the panel and has its own controls.
+   */
+  update(): void {
+    if (this.world.visibilityState.peek() === VisibilityState.NonImmersive) return;
+    const stageObject = this.stage?.object3D;
+    if (stageObject == null) return;
+    if (this.panelObject == null) this.panelObject = this.scene.getObjectByName('Controls Panel') ?? null;
+    const panel = this.panelObject;
+    if (panel == null) return;
+    stageObject.updateWorldMatrix(true, false);
+    this.panelPosition.copy(PANEL_OFFSET).applyMatrix4(stageObject.matrixWorld);
+    stageObject.getWorldQuaternion(this.panelQuaternion).multiply(this.panelTurn);
+    setWorldPosition(panel, this.panelPosition);
+    setWorldQuaternion(panel, this.panelQuaternion);
+  }
+
   init(): void {
+    for (const stage of this.queries.stages.entities) this.stage = stage;
+    this.cleanupFuncs.push(
+      this.queries.stages.subscribe('qualify', (stage) => {
+        this.stage = stage;
+      }),
+    );
     const panel = this.world.getSceneObject<UIKitMLAsset>('controls-panel');
     if (panel == null) return;
     const g = this.globals as Globals;

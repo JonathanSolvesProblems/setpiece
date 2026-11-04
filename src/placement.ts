@@ -300,5 +300,13 @@ export class PlacementSystem extends createSystem({
     stage.setValue(StageAnchor, 'placement', Placement.Floating);
     this.tableDone = false;
     this.status(StageStatus.Floating);
+    // In a session, reset means back on the table: offer the surfaces the
+    // headset already reported again, and the nearest one wins as on entry.
+    if (this.world.visibilityState.peek() !== VisibilityState.NonImmersive) {
+      this.candidates = [];
+      this.candidateTimer = -1;
+      for (const mesh of this.queries.meshes.entities) this.onSurface(mesh, 'mesh');
+      for (const plane of this.queries.planes.entities) this.onSurface(plane, 'plane');
+    }
   }
 }
