@@ -57,9 +57,9 @@ For the frame rate: the monitor's second view of the set is drawn only on frames
 
 ## Where this stands
 
-Landing by pointing worked on a Quest 3S in a room with no scan. On a Quest 3S, in the Quest Browser, on Nov 5: the session starts in passthrough with both hands tracked; it holds 90 frames a second with the set standing still (median frame 11.1 ms, none over 20 ms in the sample) and measured 78 while two pieces were being carried at once, before the shadow was moved to alternate frames; picking up, carrying and turning pieces by wrist, tilting the camera, and snapping frames onto the board all work on real hands.
+Landing by pointing worked on a Quest 3S in a room with no scan, and with the car, fire, smoke and water all on the slate it measured 74 frames a second against 76 just before they were added. On a Quest 3S, in the Quest Browser, on Nov 5: the session starts in passthrough with both hands tracked; it holds 90 frames a second with the set standing still (median frame 11.1 ms, none over 20 ms in the sample) and measured 78 while two pieces were being carried at once, before the shadow was moved to alternate frames; picking up, carrying and turning pieces by wrist, tilting the camera, and snapping frames onto the board all work on real hands.
 
-Checked only in the IWSDK emulator so far, each step by state: the set following its user, the take recorder and its layering, going back to a frame's setup, the tray, poses and looks, formats, the drone, and the briefs. Not yet measured on a headset: anchors across a relaunch, and the frame rate with effects running or a take playing. Those go here when they exist.
+Checked only in the IWSDK emulator so far, each step by state: the set following its user, the take recorder and its layering, going back to a frame's setup, poses and looks, formats, the drone, and the briefs. Not yet measured on a headset: anchors across a relaunch, and the frame rate while a take plays. Those go here when they exist.
 
 ## Type, art and sound
 
