@@ -9,7 +9,10 @@
  *  3. the user holds the slate by its striped front edge and carries the set
  *     there, turning it with the wrist.
  *
- * Until one of those happens the set floats in front of the user. Wherever it
+ * First of all, though, the set waits out of sight while an outline of it lies
+ * on whatever real surface the hand points at, and a pinch sets it down there
+ * (src/landing.ts). That needs no room scan. Only if the headset finds no
+ * surface at all does the set float in front of the user. Wherever it
  * ends up it is parked on a room anchor and its pose is saved, so the set is
  * back where it was left on the next launch.
  *
@@ -45,6 +48,7 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { HandTurn } from './hand-turn.js';
+import { LandingGuide } from './landing.js';
 import { STAGE_DEPTH, STAGE_WIDTH } from './scene-assets/rig.scene-asset.js';
 import { Placement, SetPiece, StageAnchor } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
@@ -70,7 +74,7 @@ const FLOAT_BELOW = 0.34;
 const FLOAT_DELAY = 0.3;
 const FLOAT_GIVE_UP = 1.5;
 /** A pinch places the set only when the fingertip is down at a surface, within reach, and still. */
-const TOUCH_MIN_DROP = 0.2;
+const TOUCH_MIN_DROP = 0.08;
 const TOUCH_MAX_REACH = 0.9;
 const TOUCH_MAX_SECONDS = 1.2;
 const TOUCH_MAX_DRIFT = 0.05;
@@ -123,7 +127,7 @@ type Candidate = { x: number; top: number; z: number };
 export const StageStatus = {
   Floating: 'Floating. Not on your table yet.',
   Table: 'On your table.',
-  Touch: 'On your table, where you touched it.',
+  Touch: 'On your table, where you chose.',
   Manual: 'Moved by hand. Position saved.',
   Restored: 'Back where you left it.',
 } as const;
@@ -140,6 +144,8 @@ type Globals = {
 type RoomCapture = XRSession & { initiateRoomCapture?: () => Promise<void> };
 /** Seconds to give the headset to report the room it already knows before offering to scan it. */
 const SCAN_OFFER_AFTER = 3;
+/** Seconds to wait for the headset to report any surface before the set floats instead. */
+const AIM_GIVE_UP = 6;
 type NativePlane = { orientation?: string; semanticLabel?: string };
 type Side = 'left' | 'right';
 type Pinch = {
@@ -176,6 +182,11 @@ export class PlacementSystem extends createSystem({
   pieces: { required: [SetPiece] },
 }) {
   private grab: GrabSystem | undefined;
+  private landing: LandingGuide | null = null;
+  /** The set is out of sight while its outline looks for a surface. */
+  private aiming = false;
+  private aimElapsed = 0;
+  private inputs: Record<Side, XRInputSource | null> = { left: null, right: null };
   private turn = new HandTurn();
   private handleGlow: Mesh | null = null;
   private labelTexture: CanvasTexture | null = null;
@@ -272,6 +283,7 @@ export class PlacementSystem extends createSystem({
         this.holdEnded = true;
       }),
       () => this.labelTexture?.dispose(),
+      () => this.landing?.dispose(),
       this.queries.meshes.subscribe('qualify', (mesh) => this.onSurface(mesh, 'mesh')),
       this.queries.planes.subscribe('qualify', (plane) => this.onSurface(plane, 'plane')),
       g.resetStageRequested.subscribe((n) => {
@@ -320,7 +332,7 @@ export class PlacementSystem extends createSystem({
         // start again from the tables the headset has reported, or float.
         stage.setValue(StageAnchor, 'placement', Placement.Floating);
         this.tableDone = false;
-        this.floatPending = true;
+        this.beginLanding(stage);
         this.status(StageStatus.Floating);
         this.offerKnownSurfaces();
       }
@@ -337,7 +349,8 @@ export class PlacementSystem extends createSystem({
       }
     }
     // The set is out of sight only until it has somewhere to be.
-    if (!this.floatPending && !object.visible) object.visible = true;
+    if (!this.floatPending && !this.aiming && !object.visible) object.visible = true;
+    if (this.aiming) this.updateAiming(stage, delta);
     if (this.holding) {
       if (!this.turn.active) {
         const side = this.grab?.getHolderHand(stage);
@@ -383,6 +396,64 @@ export class PlacementSystem extends createSystem({
 
   private firstStage(): Entity | undefined {
     return this.queries.stages.entities.values().next().value as Entity | undefined;
+  }
+
+  /** Whether this session can look for real surfaces. */
+  private canAim(): boolean {
+    const session = this.world.session as (XRSession & { enabledFeatures?: string[] }) | undefined;
+    return session?.enabledFeatures?.includes('hit-test') === true;
+  }
+
+  /** Nothing is placed yet: look for a surface with the outline, or float if this session cannot. */
+  private beginLanding(stage: Entity): void {
+    if (!this.canAim()) {
+      this.floatPending = true;
+      return;
+    }
+    if (this.aiming) return;
+    this.landing ??= new LandingGuide(this.world);
+    this.aiming = true;
+    this.aimElapsed = 0;
+    this.floatPending = false;
+    stage.object3D!.visible = false;
+    this.setInteractive(false);
+    this.landing.everHit = false;
+    this.landing.show(true);
+  }
+
+  private endLanding(stage: Entity): void {
+    if (!this.aiming) return;
+    this.aiming = false;
+    this.landing?.show(false);
+    this.setInteractive(true);
+    if (stage.object3D) stage.object3D.visible = true;
+  }
+
+  private updateAiming(stage: Entity, delta: number): void {
+    const landing = this.landing!;
+    this.aimElapsed += delta;
+    const xr = this.input.xr;
+    const controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
+    this.inputs.left = xr.getPrimaryInputSource('left') ?? null;
+    this.inputs.right = xr.getPrimaryInputSource('right') ?? null;
+    landing.update(delta, this.player.head, this.player.raySpaces, this.inputs, controllers);
+    // The headset reported no surface at all: float the set and let a touch or a hand land it.
+    if (!landing.everHit && this.aimElapsed >= AIM_GIVE_UP) {
+      this.endLanding(stage);
+      this.floatPending = true;
+      stage.object3D!.visible = false;
+    }
+  }
+
+  /** While the set is out of sight nothing of it may catch a ray: three.js rays do not skip hidden objects. */
+  private setInteractive(on: boolean): void {
+    const value = on ? undefined : 'none';
+    const quiet = (object: Object3D | null | undefined): void => {
+      if (object != null) (object as Object3D & { pointerEvents?: string }).pointerEvents = value;
+    };
+    for (const piece of this.queries.pieces.entities) quiet(piece.object3D);
+    quiet(this.scene.getObjectByName('StoryboardCard'));
+    quiet(this.scene.getObjectByName('Controls Panel'));
   }
 
   private status(text: string): void {
@@ -524,6 +595,13 @@ export class PlacementSystem extends createSystem({
       pinch.begun = false;
       (byHand ? this.player.indexTipSpaces[side] : this.player.raySpaces[side]).getWorldPosition(pinch.start);
       handSpace.getWorldPosition(pinch.hand);
+      // The outline is on a surface: this pinch sets the set down there.
+      if (this.aiming && this.landing?.hasHit && this.guard <= 0) {
+        const point = this.landing.pointFor(side);
+        pinch.claimed = true;
+        this.placeAt(stage, point.x, point.y, point.z, Placement.Touch, StageStatus.Touch);
+        return;
+      }
     }
     pinch.seconds += delta;
     // Holding the slate's own edge is not a claim: a touch under a floating set often catches it.
@@ -587,6 +665,7 @@ export class PlacementSystem extends createSystem({
     if (stage?.object3D == null || !this.stageReady) return;
     if (state === VisibilityState.NonImmersive) {
       this.entered = false;
+      this.endLanding(stage);
       stage.object3D.visible = true;
       this.applyAuthored(stage);
       stage.setValue(StageAnchor, 'placement', Placement.Floating);
@@ -602,10 +681,10 @@ export class PlacementSystem extends createSystem({
       if (stage.getValue(StageAnchor, 'placement') !== Placement.Floating) return;
       const pose = this.load();
       if (pose != null && !pose.anchored && this.tryRestore(stage, false)) return;
-      this.floatPending = true;
       // Where the page drew the set is not where the wearer is: keep it out of
-      // sight for the moment it takes to know where their head is.
+      // sight until it has somewhere to be.
       stage.object3D.visible = false;
+      this.beginLanding(stage);
     }
   }
 
@@ -674,6 +753,7 @@ export class PlacementSystem extends createSystem({
   /** Put the stage on a surface at this point, turned to face the user, and keep it there. */
   private placeAt(stage: Entity, x: number, top: number, z: number, placement: string, status: string): void {
     const object = stage.object3D!;
+    this.endLanding(stage);
     this.player.head.getWorldPosition(this.head);
     const yaw = Math.atan2(this.head.x - x, this.head.z - z);
     this.corner.set(x, top + STAGE_LIFT, z);
@@ -726,6 +806,7 @@ export class PlacementSystem extends createSystem({
     const session = this.world.session as RoomCapture | undefined;
     const offered =
       inSession &&
+      !this.aiming &&
       !this.scanUsed &&
       !this.tableDone &&
       this.candidates.length === 0 &&
@@ -746,6 +827,7 @@ export class PlacementSystem extends createSystem({
     const follows = placement === Placement.Floating || placement === Placement.Manual;
     const busy =
       this.floatPending ||
+      this.aiming ||
       this.holding ||
       this.glide > 0 ||
       this.queries.grabbed.entities.size > 0 ||
@@ -815,6 +897,7 @@ export class PlacementSystem extends createSystem({
     if (pose.position.length !== 3 || pose.quaternion.length !== 4) return false;
     object.position.fromArray(pose.position);
     object.quaternion.fromArray(pose.quaternion);
+    this.endLanding(stage);
     stage.setValue(StageAnchor, 'placement', Placement.Restored);
     this.tableDone = true;
     this.floatPending = false;
@@ -833,10 +916,10 @@ export class PlacementSystem extends createSystem({
       this.applyAuthored(stage);
       return;
     }
-    // In a session, reset means back on the table: offer the surfaces the
-    // headset already reported again, and the nearest one wins as on entry.
-    // With none, the set floats in front of the user for a touch or a grab.
-    this.floatInFront(stage);
+    // In a session, reset means choosing the surface again: the outline comes
+    // back, and a surface the headset has labelled as a table still wins by itself.
+    if (this.canAim()) this.beginLanding(stage);
+    else this.floatInFront(stage);
     this.offerKnownSurfaces();
   }
 
