@@ -7,6 +7,7 @@
 import {
   AssetManager,
   AudioUtils,
+  BackSide,
   BoxGeometry,
   BufferGeometry,
   CanvasTexture,
@@ -27,6 +28,7 @@ import {
   RepeatWrapping,
   Sprite,
   SpriteMaterial,
+  SphereGeometry,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
@@ -34,6 +36,7 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { SetPiece, SetRole, ShotCamera } from './set-components.js';
+import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
 /** One miniature metre on the stage is ten real metres on set. */
 export const SET_SCALE = 10;
@@ -43,11 +46,19 @@ const RT_WIDTH = 640;
 const RT_HEIGHT = 360;
 const MAX_FRAMES = 6;
 const FRAME_WIDTH = 0.1;
+const FRAME_HEIGHT = (FRAME_WIDTH * 9) / 16;
 const FRAME_GAP = 0.011;
 const FRAME_COLUMNS = 3;
+/** Two lines under each frame: the lens and camera, then each actor's eyeline. */
+const CAPTION_HEIGHT = 0.019;
 /** The storyboard card: three frames wide, two high, the width of the monitor. */
 const CARD_WIDTH = FRAME_WIDTH * FRAME_COLUMNS + FRAME_GAP * (FRAME_COLUMNS + 1);
-const CARD_HEIGHT = ((FRAME_WIDTH * 9) / 16) * 2 + FRAME_GAP * 3;
+const CARD_HEIGHT = (FRAME_HEIGHT + CAPTION_HEIGHT) * 2 + FRAME_GAP * 3;
+const CARD_PIXELS = 2048;
+const PAPER = '#f5f6e5';
+const PENCIL = '#87877d';
+const INK = '#1e232b';
+const INK_SOFT = '#585752';
 
 const MAX_ACTORS = 4;
 const TEXT_EVERY_N_FRAMES = 12;
@@ -61,6 +72,14 @@ const MONITOR_GLOW = 0xdfe8ff;
 /** The lens aims this far below the nearest actor's eyes, so the eyes sit high in frame. */
 const AIM_BELOW_EYES = 0.012;
 const MAX_TILT = 0.6;
+/** The studio the shot lens sees around the set: 25 m away at the set's scale. */
+const BACKDROP_RADIUS = 2.5;
+/**
+ * Frames to keep drawing the shadows and the monitor after the set last
+ * changed, and after the page or a session starts while textures arrive.
+ */
+const LIVE_AFTER_CHANGE = 3;
+const LIVE_AT_START = 90;
 const TAG_WIDTH = 0.07;
 const TAG_LIFT = 0.028;
 
@@ -70,8 +89,13 @@ export interface Shot {
   cameraHeightM: number;
   distanceToCreatureM: number;
   eyelineDeg: number;
+  /** Every actor's eyeline when the frame was taken, as the crew reads it: "A up 30° · B up 35°". */
+  eyelines: string;
   dataUrl: string;
 }
+
+/** The board as it is kept between visits: the frames on the card and how many were ever taken. */
+type SavedBoard = { taken: number; shots: Shot[] };
 
 type Globals = {
   lensMm: Signal<number>;
@@ -79,6 +103,7 @@ type Globals = {
   eyelineText: Signal<string[]>;
   shotList: Signal<string[]>;
   shotFrames: Signal<Shot[]>;
+  newBoardRequested: Signal<number>;
 };
 
 type AsyncReader = WebGLRenderer & {
@@ -99,24 +124,42 @@ export class ViewfinderSystem extends createSystem({
   private target!: WebGLRenderTarget;
   private lensCamera!: PerspectiveCamera;
   private monitor: Mesh | null = null;
+  private backdrop: Mesh | null = null;
   private stageEntity: Entity | null = null;
   private tally: MeshStandardMaterial | null = null;
   private lines: Line[] = [];
   /**
-   * Name tags and eyelines are for the viewer, not the shot. They are hidden for
-   * the lens pass rather than put on a render layer: in WebXR three.js gives the
-   * left and right eye cameras only layers 0 to 2, and layers 1 and 2 are one eye each.
+   * Name tags, eyelines, the storyboard card, the control panel and the user's
+   * own hands are for the viewer, not the shot. They are hidden for the lens
+   * pass rather than put on a render layer: in WebXR three.js gives the left and
+   * right eye cameras only layers 0 to 2, and layers 1 and 2 are one eye each.
    */
   private overlays: Object3D[] = [];
+  private panelHidden = false;
   /** Each overlay's visibility before the lens pass, reused every frame. */
   private overlayShown: boolean[] = [];
-  private frames: (Entity | null)[] = [];
+  /** The frames on the card, oldest first, six at most, and the picture drawn for each. */
   private shots: Shot[] = [];
+  private thumbs: CanvasImageSource[] = [];
+  /** How many frames this board has ever taken; a frame keeps its number when older ones drop off. */
+  private taken = 0;
+  private boardCanvas!: HTMLCanvasElement;
+  private boardTexture!: CanvasTexture;
+  private boardSeen = 0;
   private actors: Entity[] = [];
   private rises = new Float32Array(MAX_ACTORS);
   private runs = new Float32Array(MAX_ACTORS);
   private frameCount = 0;
   private snapPending = false;
+  /**
+   * The key light's shadow is six passes and the monitor is a second view of
+   * the whole set. Neither changes while the set is still, so both are drawn
+   * only on frames where a piece, the stage or the lens has moved.
+   */
+  private liveFrames = LIVE_AT_START;
+  private lastSignature = Number.NaN;
+  /** How many times the monitor has been drawn; a test reads it to see the saving. */
+  lensPasses = 0;
   private prevClear = new Color();
   private a = new Vector3();
   private b = new Vector3();
@@ -126,6 +169,7 @@ export class ViewfinderSystem extends createSystem({
     // The key light in the scene casts; the renderer has to be told to draw shadows.
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
     this.target = new WebGLRenderTarget(RT_WIDTH, RT_HEIGHT);
     this.target.texture.colorSpace = SRGBColorSpace;
     this.lensCamera = new PerspectiveCamera(40, RT_WIDTH / RT_HEIGHT, 0.02, 50);
@@ -150,8 +194,29 @@ export class ViewfinderSystem extends createSystem({
       g.snapRequested.subscribe((n) => {
         if (n > 0) this.snapPending = true;
       }),
+      g.newBoardRequested.subscribe((n) => {
+        if (n > this.boardSeen) {
+          this.boardSeen = n;
+          this.clearBoard();
+        }
+      }),
+      this.world.visibilityState.subscribe(() => {
+        this.liveFrames = LIVE_AT_START;
+      }),
       () => this.target.dispose(),
+      () => this.boardTexture.dispose(),
     );
+    this.boardCanvas = document.createElement('canvas');
+    this.boardCanvas.width = CARD_PIXELS;
+    this.boardCanvas.height = Math.round((CARD_PIXELS * CARD_HEIGHT) / CARD_WIDTH);
+    this.boardTexture = new CanvasTexture(this.boardCanvas);
+    this.boardTexture.colorSpace = SRGBColorSpace;
+    this.drawBoard();
+    void document.fonts
+      .load('700 24px "Big Shoulders Stencil"')
+      .then(() => document.fonts.load('700 24px "Big Shoulders"'))
+      .then(() => this.drawBoard());
+    this.restoreBoard();
   }
 
   getShots(): readonly Shot[] {
@@ -159,42 +224,119 @@ export class ViewfinderSystem extends createSystem({
   }
 
   /**
-   * The storyboard card before any frame is snapped: six pencil frames on
-   * paper, numbered in the stencil, so the card reads as a page and not a plank.
+   * The storyboard card: six frames on paper, numbered in the stencil. An empty
+   * slot is a pencil outline; a taken frame carries its lens, camera height,
+   * distance and every actor's eyeline underneath, so the card can be read on
+   * its own in the headset.
    */
-  private drawCard(): CanvasTexture {
-    const W = 1024;
-    const H = Math.round((W * CARD_HEIGHT) / CARD_WIDTH);
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = SRGBColorSpace;
-    const draw = (): void => {
-      const ctx = canvas.getContext('2d');
-      if (ctx == null) return;
-      ctx.fillStyle = '#f5f6e5';
-      ctx.fillRect(0, 0, W, H);
-      const px = W / CARD_WIDTH;
-      const frameW = FRAME_WIDTH * px;
-      const frameH = ((FRAME_WIDTH * 9) / 16) * px;
-      const gap = FRAME_GAP * px;
-      ctx.strokeStyle = '#87877d';
-      ctx.lineWidth = 3;
-      ctx.fillStyle = '#585752';
-      ctx.font = `700 ${Math.round(gap * 1.6)}px "Big Shoulders Stencil"`;
-      ctx.textBaseline = 'top';
-      for (let i = 0; i < MAX_FRAMES; i++) {
-        const x = gap + (i % FRAME_COLUMNS) * (frameW + gap);
-        const y = gap + Math.floor(i / FRAME_COLUMNS) * (frameH + gap);
-        ctx.strokeRect(x + 1.5, y + 1.5, frameW - 3, frameH - 3);
-        ctx.fillText(String(i + 1), x + 8, y + 5);
+  private drawBoard(): void {
+    const canvas = this.boardCanvas;
+    const ctx = canvas.getContext('2d');
+    if (ctx == null) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    const px = W / CARD_WIDTH;
+    const frameW = FRAME_WIDTH * px;
+    const frameH = FRAME_HEIGHT * px;
+    const gap = FRAME_GAP * px;
+    const caption = CAPTION_HEIGHT * px;
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = 'alphabetic';
+    for (let i = 0; i < MAX_FRAMES; i++) {
+      const x = gap + (i % FRAME_COLUMNS) * (frameW + gap);
+      const y = gap + Math.floor(i / FRAME_COLUMNS) * (frameH + caption + gap);
+      const shot = this.shots[i];
+      const thumb = this.thumbs[i];
+      if (shot == null || thumb == null) {
+        ctx.strokeStyle = PENCIL;
+        ctx.lineWidth = 5;
+        ctx.strokeRect(x + 2.5, y + 2.5, frameW - 5, frameH - 5);
+        ctx.fillStyle = INK_SOFT;
+        ctx.font = `700 ${Math.round(gap * 1.5)}px "Big Shoulders Stencil"`;
+        ctx.fillText(String(i + 1), x + 18, y + gap * 1.5 + 6);
+        continue;
       }
-      texture.needsUpdate = true;
-    };
-    draw();
-    void document.fonts.load('700 24px "Big Shoulders Stencil"').then(draw);
-    return texture;
+      ctx.drawImage(thumb, x, y, frameW, frameH);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x + 2, y + 2, frameW - 4, frameH - 4);
+      // The frame number on a slate tab, so it reads over any picture.
+      const tab = Math.round(gap * 1.5);
+      ctx.fillStyle = INK;
+      ctx.fillRect(x, y, tab * 1.25, tab * 1.2);
+      ctx.fillStyle = PAPER;
+      ctx.font = `700 ${tab}px "Big Shoulders Stencil"`;
+      ctx.textAlign = 'center';
+      ctx.fillText(String(shot.index), x + tab * 0.62, y + tab * 0.98);
+      ctx.textAlign = 'left';
+      const line = Math.round(caption * 0.4);
+      this.fitText(
+        ctx,
+        `${shot.lensMm} mm · ${shot.cameraHeightM.toFixed(1)} m high · ${shot.distanceToCreatureM.toFixed(1)} m away`,
+        x + 2,
+        y + frameH + line * 1.05,
+        frameW - 4,
+        line,
+        INK,
+      );
+      this.fitText(ctx, shot.eyelines, x + 2, y + frameH + line * 2.15, frameW - 4, line, INK_SOFT);
+    }
+    this.boardTexture.needsUpdate = true;
+  }
+
+  /** One caption line, shrunk until it fits the frame's width. */
+  private fitText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    width: number,
+    size: number,
+    colour: string,
+  ): void {
+    let px = size;
+    ctx.font = `700 ${px}px "Big Shoulders"`;
+    while (px > size * 0.6 && ctx.measureText(text).width > width) {
+      px -= 2;
+      ctx.font = `700 ${px}px "Big Shoulders"`;
+    }
+    ctx.fillStyle = colour;
+    ctx.fillText(text, x, y);
+  }
+
+  private publishBoard(): void {
+    const g = this.globals as Globals;
+    g.shotList.value = this.shots.map(
+      (s) =>
+        `${s.index}. ${s.lensMm} mm, cam ${s.cameraHeightM.toFixed(1)} m high, ` +
+        `${s.distanceToCreatureM.toFixed(1)} m from creature`,
+    );
+    g.shotFrames.value = this.shots.slice();
+  }
+
+  /** The board from the last visit, if this browser kept one. */
+  private restoreBoard(): void {
+    const saved = loadJson<SavedBoard>(StoreKey.Board);
+    if (saved == null || !Array.isArray(saved.shots) || saved.shots.length === 0) return;
+    this.shots = saved.shots.slice(-MAX_FRAMES);
+    this.taken = Math.max(saved.taken ?? 0, this.shots.length);
+    this.thumbs = this.shots.map((shot) => {
+      const image = new Image();
+      image.onload = () => this.drawBoard();
+      image.src = shot.dataUrl;
+      return image;
+    });
+    this.publishBoard();
+  }
+
+  private clearBoard(): void {
+    this.shots = [];
+    this.thumbs = [];
+    this.taken = 0;
+    clearKey(StoreKey.Board);
+    this.drawBoard();
+    this.publishBoard();
   }
 
   /** The monitor is a child of the stage, so it travels wherever the stage is placed. */
@@ -240,12 +382,13 @@ export class ViewfinderSystem extends createSystem({
     void paper;
     const card = new Mesh(
       new PlaneGeometry(CARD_WIDTH, CARD_HEIGHT),
-      new MeshStandardMaterial({ color: 0xffffff, map: this.drawCard(), roughness: 1 }),
+      new MeshStandardMaterial({ color: 0xffffff, map: this.boardTexture, roughness: 1 }),
     );
     card.name = 'StoryboardCard';
     this.world.createTransformEntity(card, { parent: stage });
     card.position.set(MONITOR_LOCAL[0], CARD_CENTER_Y, MONITOR_LOCAL[2] - 0.001);
     card.rotation.x = -0.15;
+    this.overlays.push(card, this.player);
     // Chalk haze on the slate plate, cloned so the shared material stays clean.
     const plate = stage.object3D.getObjectByName('Plate') as Mesh | undefined;
     const haze = AssetManager.getTexture('chalk-haze');
@@ -259,8 +402,43 @@ export class ViewfinderSystem extends createSystem({
       plate.material = material;
     }
     this.dressPieces();
+    this.backdrop = this.makeBackdrop();
+    stage.object3D.add(this.backdrop);
     this.monitor = monitor;
     return true;
+  }
+
+  /**
+   * In the headset the room is the camera feed, which the shot lens cannot see,
+   * so a frame would be figures on flat black. The lens gets a studio instead: a
+   * dark wall above the set's floor line and a warmer floor below it, drawn for
+   * the lens pass only and never for the viewer.
+   */
+  private makeBackdrop(): Mesh {
+    const canvas = document.createElement('canvas');
+    canvas.width = 4;
+    canvas.height = 256;
+    const g = canvas.getContext('2d');
+    if (g) {
+      const gradient = g.createLinearGradient(0, 0, 0, 256);
+      gradient.addColorStop(0, '#1a1d23');
+      gradient.addColorStop(0.46, '#2a2d33');
+      gradient.addColorStop(0.5, '#3a3936');
+      gradient.addColorStop(1, '#45423f');
+      g.fillStyle = gradient;
+      g.fillRect(0, 0, 4, 256);
+    }
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    const backdrop = new Mesh(
+      new SphereGeometry(BACKDROP_RADIUS, 24, 16),
+      new MeshBasicMaterial({ map: texture, side: BackSide, toneMapped: false, depthWrite: false }),
+    );
+    backdrop.name = 'LensBackdrop';
+    backdrop.renderOrder = -1;
+    backdrop.visible = false;
+    backdrop.raycast = () => {};
+    return backdrop;
   }
 
   /** Wood grain on the lay figures and a seam on the tennis ball, drawn once. */
@@ -372,12 +550,45 @@ export class ViewfinderSystem extends createSystem({
     const cam = this.queries.cams.entities.values().next().value as Entity | undefined;
     if (cam?.object3D == null || !this.ensureMonitor()) return;
     this.updateEyelines();
-    this.aimLens();
-    this.renderViewfinder();
+    const signature = this.signature();
+    if (signature !== this.lastSignature) {
+      this.lastSignature = signature;
+      this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
+    }
+    if (this.liveFrames > 0 || this.snapPending) {
+      this.liveFrames = Math.max(0, this.liveFrames - 1);
+      this.renderer.shadowMap.needsUpdate = true;
+      this.aimLens();
+      this.renderViewfinder();
+      this.lensPasses++;
+    }
     if (this.snapPending) {
       this.snapPending = false;
       void this.captureFrame(cam);
     }
+  }
+
+  /**
+   * One number that changes when anything the lens or the shadows depend on
+   * changes: every piece's pose on the stage, the stage's own pose and scale,
+   * and the lens. The stage's turn in the room is rounded, so the small
+   * corrections a room anchor makes every frame do not count as movement.
+   */
+  private signature(): number {
+    let s = this.lensCamera.fov * 17.3;
+    for (const piece of this.queries.pieces.entities) {
+      const object = piece.object3D;
+      if (object == null) continue;
+      const p = object.position;
+      const q = object.quaternion;
+      s += p.x * 1.1 + p.y * 2.3 + p.z * 3.7 + q.x * 5.3 + q.y * 7.1 + q.z * 11.3 + q.w * 13.7 + object.scale.x * 19.1;
+    }
+    const stage = this.stageEntity?.object3D;
+    if (stage) {
+      const e = stage.matrixWorld.elements;
+      s += Math.round(e[0] * 400) * 23.9 + Math.round(e[8] * 400) * 29.3;
+    }
+    return s;
   }
 
   private findRole(role: string): Entity | undefined {
@@ -493,6 +704,15 @@ export class ViewfinderSystem extends createSystem({
 
     const monitor = this.monitor!;
     monitor.visible = false;
+    if (this.backdrop) this.backdrop.visible = true;
+    if (!this.panelHidden) {
+      // The panel arrives with the level, after this system starts.
+      const panel = this.scene.getObjectByName('Controls Panel');
+      if (panel) {
+        this.overlays.push(panel);
+        this.panelHidden = true;
+      }
+    }
     const overlays = this.overlays;
     const shown = this.overlayShown;
     for (let i = 0; i < overlays.length; i++) {
@@ -514,6 +734,7 @@ export class ViewfinderSystem extends createSystem({
     renderer.shadowMap.autoUpdate = shadowAutoUpdate;
     xr.enabled = xrWasEnabled;
     monitor.visible = true;
+    if (this.backdrop) this.backdrop.visible = false;
     for (let i = 0; i < overlays.length; i++) overlays[i].visible = shown[i];
   }
 
@@ -548,16 +769,29 @@ export class ViewfinderSystem extends createSystem({
       distance = Math.hypot(this.b.x - this.a.x, this.b.z - this.a.z);
     }
     const g = this.globals as Globals;
+    let eyelines = '';
+    for (let i = 0; i < this.actors.length; i++) {
+      const label = this.actors[i].getValue(SetPiece, 'label') || `Actor ${i + 1}`;
+      const deg = this.eyelineDeg(i);
+      eyelines += `${i > 0 ? ' · ' : ''}${label} ${deg >= 0 ? 'up' : 'down'} ${Math.abs(deg).toFixed(0)}°`;
+    }
+    this.taken += 1;
     const shot: Shot = {
-      index: this.shots.length + 1,
+      index: this.taken,
       lensMm: g.lensMm.peek(),
       cameraHeightM: (this.a.y - stageY) * SET_SCALE,
       distanceToCreatureM: distance * SET_SCALE,
       eyelineDeg: this.actors.length > 0 ? this.eyelineDeg(0) : 0,
-      dataUrl: canvas.toDataURL('image/png'),
+      eyelines: eyelines || 'no actor on the set',
+      dataUrl: canvas.toDataURL('image/jpeg', 0.86),
     };
     this.shots.push(shot);
-    this.placeThumbnail(canvas, shot.index);
+    this.thumbs.push(canvas);
+    if (this.shots.length > MAX_FRAMES) {
+      this.shots.shift();
+      this.thumbs.shift();
+    }
+    this.drawBoard();
     AudioUtils.play(cam);
     if (this.tally) {
       this.tally.emissiveIntensity = 2.5;
@@ -565,34 +799,8 @@ export class ViewfinderSystem extends createSystem({
         if (this.tally) this.tally.emissiveIntensity = 0.35;
       }, 240);
     }
-    g.shotList.value = this.shots
-      .slice(-MAX_FRAMES)
-      .map(
-        (s) =>
-          `${s.index}. ${s.lensMm} mm, cam ${s.cameraHeightM.toFixed(1)} m high, ` +
-          `${s.distanceToCreatureM.toFixed(1)} m from creature`,
-      );
-    g.shotFrames.value = this.shots.slice(-MAX_FRAMES);
-  }
-
-  private placeThumbnail(canvas: HTMLCanvasElement, index: number): void {
-    const slot = (index - 1) % MAX_FRAMES;
-    this.frames[slot]?.dispose();
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = SRGBColorSpace;
-    const mesh = new Mesh(
-      new PlaneGeometry(FRAME_WIDTH, (FRAME_WIDTH * 9) / 16),
-      new MeshBasicMaterial({ map: texture, toneMapped: false }),
-    );
-    mesh.name = `Frame${index}`;
-    const entity = this.world.createTransformEntity(mesh, { parent: this.stageEntity ?? undefined });
-    const column = slot % FRAME_COLUMNS;
-    const row = Math.floor(slot / FRAME_COLUMNS);
-    const frameHeight = (FRAME_WIDTH * 9) / 16;
-    const x = -CARD_WIDTH / 2 + FRAME_GAP + FRAME_WIDTH / 2 + column * (FRAME_WIDTH + FRAME_GAP);
-    const y = CARD_HEIGHT / 2 - FRAME_GAP - frameHeight / 2 - row * (frameHeight + FRAME_GAP);
-    mesh.position.set(MONITOR_LOCAL[0] + x, CARD_CENTER_Y + y, MONITOR_LOCAL[2] + 0.0005);
-    mesh.rotation.x = -0.15;
-    this.frames[slot] = entity;
+    // Kept for the next visit. A browser with no storage keeps it for this one only.
+    saveJson(StoreKey.Board, { taken: this.taken, shots: this.shots } satisfies SavedBoard);
+    this.publishBoard();
   }
 }

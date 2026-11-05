@@ -110,13 +110,6 @@
     line-height: 17px;
     color: #f6f7ef;
   }
-  .shot {
-    font-family: "Grotesk";
-    font-weight: 500;
-    font-size: 12px;
-    line-height: 16px;
-    color: #f6f7ef;
-  }
   .muted { color: #c7c7b7; }
 </style>
 <div id="panel-root" class="slate">
@@ -124,7 +117,7 @@
   <div class="rule"></div>
   <div class="field">
     <div class="label">STAGE</div>
-    <div id="stage-status" class="status">Floating in front of you. Grab the plate to move the set.</div>
+    <div id="stage-status" class="status">Floating. Touch your table and pinch to land it.</div>
   </div>
   <div class="field">
     <div class="label"> </div>
@@ -151,14 +144,13 @@
   </div>
   <div class="rule"></div>
   <div class="field">
-    <div class="label">SHOTS</div>
-    <div id="shot-1" class="shot">No frames yet. Move the camera, then snap.</div>
+    <div class="label">BOARD</div>
+    <div id="board-count" class="line">No frames yet</div>
   </div>
-  <div class="field"><div class="label"> </div><div id="shot-2" class="shot"> </div></div>
-  <div class="field"><div class="label"> </div><div id="shot-3" class="shot"> </div></div>
-  <div class="field"><div class="label"> </div><div id="shot-4" class="shot"> </div></div>
-  <div class="field"><div class="label"> </div><div id="shot-5" class="shot"> </div></div>
-  <div class="field"><div class="label"> </div><div id="shot-6" class="shot"> </div></div>
+  <div class="field">
+    <div class="label"> </div>
+    <div id="btn-new-board" class="word">New board</div>
+  </div>
   <div class="rule"></div>
   <div id="xr-button" class="primary">Enter XR</div>
   <div id="exit-button" class="word" style="display: none">Exit to browser</div>

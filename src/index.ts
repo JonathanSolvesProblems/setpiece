@@ -1,8 +1,10 @@
-import { World } from '@iwsdk/core';
+import { VisibilityState, World } from '@iwsdk/core';
 import { signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';
 import projectOptions from 'virtual:iwsdk-project';
+import { CoachSystem } from './coach.js';
 import { ControlsSystem } from './controls.js';
+import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SlateSystem } from './slate.js';
@@ -24,12 +26,16 @@ World.create(
   globals.shotFrames = signal<Shot[]>([]);
   globals.stageStatus = signal<string>(StageStatus.Floating);
   globals.resetStageRequested = signal(0);
+  globals.newBoardRequested = signal(0);
+  globals.coachLine = signal('');
 
   world
     .registerSystem(PlacementSystem, { priority: 10 })
+    .registerSystem(PiecesSystem, { priority: 12 })
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })
+    .registerSystem(CoachSystem, { priority: 28 })
     .registerSystem(ControlsSystem, { priority: 30 });
 
   // The page's own controls: Enter XR, lenses, snap and reset, wired to the
@@ -46,9 +52,43 @@ World.create(
     enter.dataset.mode = 'copy';
     if (hint) hint.textContent = 'This browser cannot run the headset session. Paste the link into the Meta Quest Browser, sit at a table, and the set lands on it.';
   });
+  // Starting a session can stop on a question only the person in the headset can
+  // answer: the first time, the headset asks whether this browser may use the
+  // room's layout. Until they answer, nothing else happens, so the page says so.
+  const restingHint = hint?.textContent ?? '';
+  let waiting: number | undefined;
+  const watchRequest = (): void => {
+    if (enter == null) return;
+    window.clearInterval(waiting);
+    enter.setAttribute('aria-busy', 'true');
+    enter.textContent = 'Waiting for the headset';
+    if (hint) {
+      hint.textContent =
+        'If the headset asks to use spatial data, choose Allow: that is how the set finds your table. ' +
+        'If you would rather not, the set floats in front of you and you place it by touch.';
+    }
+    waiting = window.setInterval(() => {
+      if (world.sessionRequestPending) return;
+      window.clearInterval(waiting);
+      enter.removeAttribute('aria-busy');
+      enter.textContent = 'Enter XR';
+      if (world.session != null) {
+        if (hint) hint.textContent = restingHint;
+        return;
+      }
+      if (hint) hint.textContent = 'The session did not start. Put the headset on, then press Enter XR again.';
+    }, 400);
+  };
+  world.visibilityState.subscribe((state) => {
+    if (state === VisibilityState.NonImmersive && hint && !world.sessionRequestPending && enter?.dataset.mode !== 'copy') {
+      hint.textContent = restingHint;
+    }
+  });
   enter?.addEventListener('click', async () => {
     if (enter.dataset.mode !== 'copy') {
+      if (world.sessionRequestPending || world.session != null) return;
       world.launchXR();
+      watchRequest();
       return;
     }
     try {
@@ -60,7 +100,7 @@ World.create(
   });
   const lensMm = globals.lensMm as Signal<number>;
   const snapRequested = globals.snapRequested as Signal<number>;
-  const resetStageRequested = globals.resetStageRequested as Signal<number>;
+  const newBoardRequested = globals.newBoardRequested as Signal<number>;
   const shotFrames = globals.shotFrames as Signal<Shot[]>;
   const eyelineText = globals.eyelineText as Signal<string[]>;
   const lensButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.lenses .lens'));
@@ -72,8 +112,9 @@ World.create(
   document.getElementById('page-snap')?.addEventListener('click', () => {
     snapRequested.value += 1;
   });
+  // On the page the stage never moves, so starting over means the board and the blocking.
   document.getElementById('page-reset')?.addEventListener('click', () => {
-    resetStageRequested.value += 1;
+    newBoardRequested.value += 1;
   });
   const fieldShot = document.getElementById('f-shot');
   const fieldEyeline = document.getElementById('f-eyeline');
@@ -136,5 +177,5 @@ World.create(
   });
 
   // Debug and test hook: lets scripts drive the app from the page.
-  (globalThis as Record<string, unknown>).setpiece = { world };
+  (globalThis as Record<string, unknown>).setpiece = { world, viewfinder: world.getSystem(ViewfinderSystem) };
 });

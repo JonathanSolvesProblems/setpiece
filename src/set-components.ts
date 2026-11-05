@@ -27,6 +27,7 @@ export const SetPiece = createComponent('SetPiece', {
 export const Placement = {
   Floating: 'floating',
   Table: 'table',
+  Touch: 'touch',
   Manual: 'manual',
   Restored: 'restored',
 } as const;
@@ -35,6 +36,16 @@ export const Placement = {
 export const StageAnchor = createComponent('StageAnchor', {
   placement: { type: Types.Enum, enum: Placement, default: Placement.Floating },
   persist: { type: Types.Boolean, default: true },
+});
+
+export const Cue = {
+  Pick: 'pick',
+  Place: 'place',
+} as const;
+
+/** A sound the stage makes: a piece lifted off the slate, or set back down. */
+export const SoundCue = createComponent('SoundCue', {
+  cue: { type: Types.Enum, enum: Cue, default: Cue.Pick },
 });
 
 /** The shot camera. lensMm is a full-frame focal length; the viewfinder is a 16:9 crop. */

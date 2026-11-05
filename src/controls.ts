@@ -18,17 +18,22 @@ import { SetPiece, StageAnchor } from './set-components.js';
  * Where the panel sits relative to the stage, as the scene authors it: left of
  * the slate, a little above it, turned in toward the viewer.
  */
-const PANEL_OFFSET = new Vector3(-0.46, 0.27, -0.07);
+const PANEL_OFFSET = new Vector3(-0.46, 0.32, -0.07);
 const PANEL_YAW = (34 * Math.PI) / 180;
 const UP = new Vector3(0, 1, 0);
 
 const LENSES = [24, 35, 50, 85];
-const SHOT_ROWS = 6;
+const BOARD_SLOTS = 6;
 // Optic yellow marks the selected lens and a stage that is good to go (charter law 7).
 const OPTIC_YELLOW = '#d6e13c';
 const SLATE = '#3f4044';
 const CHALK_HAZE = '#6f6c6b';
-const PLACED_STATUSES = new Set<string>([StageStatus.Table, StageStatus.Restored, StageStatus.Manual]);
+const PLACED_STATUSES = new Set<string>([
+  StageStatus.Table,
+  StageStatus.Touch,
+  StageStatus.Restored,
+  StageStatus.Manual,
+]);
 
 type Globals = {
   lensMm: Signal<number>;
@@ -37,6 +42,7 @@ type Globals = {
   shotList: Signal<string[]>;
   stageStatus: Signal<string>;
   resetStageRequested: Signal<number>;
+  newBoardRequested: Signal<number>;
 };
 
 /** Wires the Setpiece control panel to the shared signals the viewfinder reads. */
@@ -121,6 +127,13 @@ export class ControlsSystem extends createSystem({
     resetStage?.addEventListener('click', requestReset);
     this.cleanupFuncs.push(() => resetStage?.removeEventListener('click', requestReset));
 
+    const newBoard = panel.getElementById('btn-new-board');
+    const requestNewBoard = () => {
+      g.newBoardRequested.value = g.newBoardRequested.value + 1;
+    };
+    newBoard?.addEventListener('click', requestNewBoard);
+    this.cleanupFuncs.push(() => newBoard?.removeEventListener('click', requestNewBoard));
+
     const snap = panel.getElementById('btn-snap');
     const requestSnap = () => {
       g.snapRequested.value = g.snapRequested.value + 1;
@@ -130,17 +143,17 @@ export class ControlsSystem extends createSystem({
 
     const eyeA = panel.getElementById<UIKit.Text>('eyeline-a');
     const eyeB = panel.getElementById<UIKit.Text>('eyeline-b');
+    const boardCount = panel.getElementById<UIKit.Text>('board-count');
     this.cleanupFuncs.push(
       g.eyelineText.subscribe((lines) => {
         eyeA?.setProperties({ text: lines[0] ?? 'A: place the creature and an actor' });
         eyeB?.setProperties({ text: lines[1] ?? '' });
       }),
+      // The card under the monitor is the shot list; the panel only keeps count.
       g.shotList.subscribe((lines) => {
-        for (let i = 0; i < SHOT_ROWS; i++) {
-          const row = panel.getElementById<UIKit.Text>(`shot-${i + 1}`);
-          const fallback = i === 0 ? 'No frames yet. Move the camera, then snap.' : '';
-          row?.setProperties({ text: lines[i] ?? fallback });
-        }
+        boardCount?.setProperties({
+          text: lines.length === 0 ? 'No frames yet' : `${lines.length} of ${BOARD_SLOTS} frames, on the card`,
+        });
       }),
     );
 

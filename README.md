@@ -2,9 +2,28 @@
 
 Block a VFX shot on your kitchen table with your hands. A 1:10 film set on a slate lands on your real table; you move wooden stand-ins, a tennis ball where the creature's eyes will be, and a 35 mm camera; you look through the lens, snap, and leave with the storyboard, the shot list and the eyeline for each actor.
 
-Live: https://setpiece-xr.vercel.app (open it in the Meta Quest Browser and press Enter XR; it also runs flat in a desktop browser).
+Live: https://setpiece-xr.vercel.app
 
 Built for the Meta VR Start Developer Competition 2026, Productivity track, New Experience. Hands only, seated, no controller needed.
+
+## How to run it
+
+On a Meta Quest 3 or 3S, nothing to install:
+
+1. Open https://setpiece-xr.vercel.app in the Meta Quest Browser, sitting at a table.
+2. Pinch **Enter XR**. The first time, the headset asks whether the browser may use spatial data. Allow it and the set finds your table by itself. If you would rather not, or the room was never scanned, the set floats in front of you: touch your table with a fingertip and pinch, and it lands there.
+3. Follow the line above the monitor. It asks for one thing at a time and moves on when you have done it.
+
+The same address runs flat in a desktop browser: drag a figure, pick a lens, snap a frame.
+
+From a clone (Node 20.19 or newer):
+
+```
+npm install
+npm run dev
+```
+
+`npm run dev` opens a managed browser with the Immersive Web SDK emulator. `npm run typecheck` checks types. `npm run build` writes `dist/` for any static host. `node tools/make-audio.mjs` regenerates the four sounds.
 
 ## Why
 
@@ -12,28 +31,31 @@ I wanted to be a VFX filmmaker before I switched to computer science. The short 
 
 ## What it does
 
-- The stage is a clapper slate at 1:10 (60 by 40 cm, a 6 by 4 m set). It drops onto the first table or desk the headset reports and turns to face you; grab the plate to move the whole set.
-- Actors are wooden lay figures; the creature is a tennis ball on a stand at its eye height. The eyeline from each actor to the ball is drawn live and reported in degrees and in metres on the real set.
-- The camera is a 35 mm film camera with a magazine. A director's monitor above the stage shows what its lens sees, at 24, 35, 50 or 85 mm (full frame, 16:9).
-- Snap writes a frame to a six-frame storyboard card and a row to the shot list: lens, camera height and distance to the creature, in set metres.
-- The set is parked on a room anchor and its pose is saved, so the next session opens with it where you left it.
+- **The stage is a clapper slate at 1:10** (60 by 40 cm, a 6 by 4 m set). It lands on your table one of three ways, whichever your room allows: on the nearest table or desk the headset reports; where you touch the table with a fingertip and pinch, which needs hand tracking and nothing else; or where you carry it by the plate.
+- **Actors are wooden lay figures; the creature is a tennis ball on a stand** at its eye height. Point at a piece, pinch, and move your hand. Let go and it stands itself up on the slate. The camera keeps the height you gave it, because a high or a low angle is a choice.
+- **The eyeline from each actor to the ball is drawn live** and reported in degrees and in metres on the real set.
+- **The camera is a 35 mm film camera.** A director's monitor above the stage shows what its lens sees, at 24, 35, 50 or 85 mm (full frame, 16:9). The lens sees the set and nothing else: not the panel, not the card, not your hands.
+- **Snap claps the sticks and puts a frame on the storyboard card**: six frames, each with its lens, camera height, distance to the creature and every actor's eyeline written under it, so the card is the shot list and can be read in the headset on its own.
+- **It is all still there next time.** The set is parked on a room anchor; where each piece stands and the whole board are kept in the browser. The next session opens with the set where you left it and says so only when that is true.
+- **One line of guidance** above the monitor: land the set, block it, frame it, snap. Each step ends on the thing it asked for, never on a timer, and the line goes away when the board is full.
+
+## What it does not do
+
+Every number on the board is measured from where the pieces stand at the moment of the frame. Nothing on it is estimated or generated. Setpiece does not choose a lens for you, it does not know the real location, and a frame is a blocking diagram with wooden figures, not a render of the finished shot.
 
 ## Built on
 
-Immersive Web SDK (WebXR, three.js): hand tracking with ray-and-pinch distance grab on every piece and on the stage plate, scene understanding (planes and labelled room meshes), persistent spatial anchors, passthrough, spatial UI (UIKitML), and the IWSDK CLI and emulator for the build loop.
+Immersive Web SDK (WebXR, three.js): hand tracking with ray-and-pinch distance grab on every piece and on the stage plate, the fingertip pose for landing the set by touch, scene understanding (planes and labelled room meshes), persistent spatial anchors, passthrough, spatial UI (UIKitML), positional audio, and the IWSDK CLI and emulator for the build loop.
 
-## Run it
+For the frame rate: the key light's shadow and the monitor's second view of the set are drawn only on frames where a piece, the stage or the lens has moved, so a set that is standing still costs one view per eye.
 
-```
-npm install
-npm run dev
-```
+## Where this stands
 
-The managed browser opens with the emulator. `npm run build` writes `dist/` for any static host.
+Checked in the IWSDK emulator with hands as the only input, each step by state: landing by table and by touch, grab, settle, snap, the board and the pieces kept across a reload, a refused session request. Not measured yet on a headset: frame rate in a session, real table detection, anchors across a relaunch. Those numbers go here when they exist.
 
-## Type and art
+## Type, art and sound
 
-Big Shoulders Stencil by Patric King and Schibsted Grotesk by Schibsted, both under the SIL Open Font License (`public/ui/fonts/OFL.txt`). The chalk drawings were generated on my own machine from a written art direction and keyed by hand; the mark, the wordmark and every number were set, not generated.
+Big Shoulders Stencil by Patric King and Schibsted Grotesk by Schibsted, both under the SIL Open Font License (`public/ui/fonts/OFL.txt`). The chalk drawings were generated on my own machine from a written art direction and keyed by hand; the mark, the wordmark and every number were set, not generated. The four sounds (the clap, a piece lifted, a piece set down, the slate landing) are synthesised by `tools/make-audio.mjs` from sine partials and filtered noise; nothing is sampled.
 
 ## Licence
 

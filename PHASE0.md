@@ -131,6 +131,38 @@ Still unproven, and only the device can prove it: frame rate on a Quest 3S, real
 
 Dates, revised: device run Nov 4 or 5. Pinch-to-place fallback, first-run guidance, frame and shot persistence, the board readable in the headset, and the clap on Snap by Nov 8. Headline number on device Nov 9. Three outside testers Nov 12. Video Nov 14. Pre-submit gate Nov 16. Submit Nov 17, a day before the Nov 18 12:00 PT deadline.
 
+## Validation on Nov 5: first hours on the Quest 3S, the winners Meta is showing this year, and the build that followed
+
+On the device. The Quest 3S is set up, in developer mode and visible to adb. Setpiece loads in the Quest Browser with no console errors, and the flat page holds 72 fps (108 draw calls, 11,264 triangles). Enter XR has not produced a session yet, and the cause is found: Horizon OS is waiting on its spatial data permission prompt (`SpatialPermissionExplainerActivity`, raised for `com.oculus.browser`; `USE_SCENE` is not granted, `USE_ANCHOR_API` and `HAND_TRACKING` are). `requestSession` stays pending until the person wearing the headset answers, and the page said nothing while it waited, so the button looked dead. The page now says what the headset is asking and what happens either way, ignores a second press while it waits, and says so when a request ends without a session. The prompt is the wearer's to answer; it is not automated. Field 12 is still not met: there has been no session on the device.
+
+The winners, read from their Devpost pages. Meta's 2026 trailer names six as "previous winner": Hand Survivor (Best Implementation of Hand Interactions), Saber Punks (Best Social Game), Little Critters (Best Casual Game runner-up), DreamSpace (Best Entertainment Experience), Compile Crops (Best Immersive Experience Built with Spatial SDK, shown under the word Productivity) and Le Dino Labo (Best Casual Game honourable mention). The nearest neighbour to Setpiece by stack and format is HandCraft XR: Winter Edition (Judge's Choice): Immersive Web SDK, the Quest Browser, hands only, a miniature built on a table.
+
+What those winners have, against Setpiece this morning, and what was done about it today:
+
+- Field 2 holds. Their users end holding a thing they made: a village, a skeleton, a farm that runs on their code. Setpiece's user ends holding a board.
+- HandCraft XR "automatically saves and loads." Setpiece kept only the stage. Now every piece's place and the whole board are kept, in the headset and on the page.
+- HandCraft XR snaps pieces onto the table; Le Dino Labo names "snap cues, highlights, soft audio." Setpiece's pieces could be left floating or lying down, and it had one chime. Now a piece stands itself up on the slate when let go, and there are four sounds: the clap, a piece lifted, a piece set down, the slate landing.
+- HandCraft XR's author found that "standard materials and shadows were too heavy" in WebXR on a Quest and moved to "an adaptive, on-demand shadow system." Setpiece redrew a six-pass point-light shadow and a second view of the set every frame. Now both are drawn only when a piece, the stage or the lens has moved: 0 monitor passes in 332 still frames, measured in the emulator.
+- Compile Crops opens with "Place your plot on your desk or floor." Setpiece could only land on a surface the headset had labelled Table or Desk. Now a fingertip on the table and a pinch lands the set there, with hand tracking and nothing else, so a room that was never scanned, or a judge who refuses room data, still gets the set on the table.
+- Le Dino Labo ends by "revealing the full-scale skeleton"; Pocket Lands opens "a diorama the size of your lap to the whole living room floor." Setpiece has no moment like it. The candidate is standing in the shot at life size, at the camera's position. Not built; decided after the device run, because it is worth nothing if the core does not hold 60 fps.
+- Depth. HandCraft XR has a paged library of blocks, Hand Survivor three maps, Saber Punks twelve characters. Setpiece has four pieces and four lenses against field 7's targets of twelve and six. Not built.
+- Every winner's video is captured inside the headset, in a real room, with real hands on the thing.
+
+Fields 4 to 7 re-run against the code, as the halfway check asks:
+
+- Field 5. The board can now be read in the headset by itself: each frame on the card carries its lens, camera height, distance and every actor's eyeline. The set, the pieces and the board persist. The phone hand-off is not built, and the Oct 24 plan for it was wrong: a QR code drawn inside a headset cannot be scanned by the phone of the person wearing it. The replacement is a short link opened on the phone that carries the blocking, with the page redrawing the frames from it; it is decided after the device run. Until then the board's destinations are the card in the headset and the same board on the page in the same browser, which is short of what this field asks.
+- Field 6. The number still does not exist. The app now times headset-on to a full board and shows it when the sixth frame lands; that is a display, and the grader stays the clock in an unbroken recording.
+- Field 7. In use: hand tracking (ray-and-pinch grab, fingertip pose), scene understanding, persistent anchors, passthrough, spatial UI, positional audio. Gaze was dropped on Oct 29. Pieces 4 of 12, lenses 4 of 6, exports 0 of 2.
+- Field 4. Unchanged: no model, and no agent is described.
+
+Also fixed today: the paper storyboard card stood behind the set and appeared inside every shot; the lens now sees the set and nothing else (not the card, the panel or the user's hands), and in the headset, where the room is a camera feed the lens cannot see, it gets a dark studio backdrop so a frame is not figures on flat black. The control panel had grown until its lowest button sat under the table top; the six shot rows it repeated from the card are gone and it sits 5 cm higher. A pose saved without an anchor and then discarded when an anchor attached left the set floating for good; it now goes back to the table.
+
+Proven today in the emulator, hands only, by state: a fresh visitor with no room data gets the set floating 0.55 m ahead and 0.34 m below the head; a pinch with the fingertip at table height lands it there; a pinch on an actor moves it and it settles upright at slate level; the camera keeps a raised height; a pinch on Snap takes a frame with "A up 39° · B up 35°" under it; after a reload the set, the pieces and the frames are back; New board clears the frames and puts the pieces back; with room data on, the set lands on the table by itself; a session request that hangs, then is refused, then is retried reads correctly on the page each time. Typecheck and the production build pass.
+
+Not proven, and only the headset can: a session at all, 60 fps in it, the fingertip pose and the pinch on real hands, real table detection, anchors across a relaunch, how the sounds and the panel sit in a real room.
+
+Dates: the device run happens the next time I am in the headset, and nothing below outranks it. Life-size view and more pieces by Nov 9 if the frame rate allows. Headline number on device Nov 9. Phone link Nov 10. Three outside testers Nov 12. Video Nov 14. Pre-submit gate Nov 16. Submit Nov 17.
+
 ## Build dates
 
 - Oct 24: headset ordered, rename, card committed. Oct 25: headset delivered.

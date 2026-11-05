@@ -20,6 +20,7 @@
       "components": {
         "SetPiece": { "role": "stage", "label": "Stage", "eyeHeight": 0 },
         "StageAnchor": { "placement": "floating", "persist": true },
+        "AudioSource": { "src": "./audio/land.wav", "maxInstances": 2, "playbackMode": "restart" },
         "RayInteractable": {},
         "DistanceGrabbable": { "movementMode": "MoveAtSource", "translate": true, "rotate": false, "scale": false }
       },
@@ -69,9 +70,27 @@
           "components": {
             "SetPiece": { "role": "camera", "label": "Camera", "eyeHeight": 0.118 },
             "ShotCamera": { "lensMm": 35 },
-            "AudioSource": { "src": "./audio/chime.mp3", "maxInstances": 2, "playbackMode": "restart" },
+            "AudioSource": { "src": "./audio/clap.wav", "maxInstances": 2, "playbackMode": "restart" },
             "RayInteractable": {},
             "DistanceGrabbable": { "movementMode": "MoveAtSource", "translate": true, "rotate": true, "scale": false }
+          }
+        },
+        {
+          "id": "cue-pick",
+          "name": "Cue pick",
+          "transform": { "position": [0, 0.05, 0] },
+          "components": {
+            "SoundCue": { "cue": "pick" },
+            "AudioSource": { "src": "./audio/pick.wav", "volume": 0.7, "maxInstances": 3, "playbackMode": "overlap" }
+          }
+        },
+        {
+          "id": "cue-place",
+          "name": "Cue place",
+          "transform": { "position": [0, 0.05, 0] },
+          "components": {
+            "SoundCue": { "cue": "place" },
+            "AudioSource": { "src": "./audio/place.wav", "volume": 0.7, "maxInstances": 3, "playbackMode": "overlap" }
           }
         },
         {
