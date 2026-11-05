@@ -12,7 +12,6 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
-  Object3D,
   Quaternion,
   SphereGeometry,
   Vector3,
@@ -27,6 +26,7 @@ const woodDark = new MeshStandardMaterial({ color: 0x64453e, roughness: 0.7 });
 const slateShadow = new MeshStandardMaterial({ color: 0x1e232b, roughness: 0.9 });
 const steel = new MeshStandardMaterial({ color: 0x6f6c6b, roughness: 0.5, metalness: 0.6 });
 const felt = new MeshStandardMaterial({ color: 0xd6e13c, roughness: 1 });
+const hairDark = new MeshStandardMaterial({ color: 0x2a211d, roughness: 0.85 });
 
 /** A capsule whose axis runs from a to b. */
 function limb(a: Vector3, b: Vector3, r: number, material: MeshStandardMaterial, name: string): Mesh {
@@ -51,7 +51,15 @@ function ball(at: Vector3, r: number, material: MeshStandardMaterial, name: stri
  * rehearsal: one arm pointing at the mark, a hand on the hip, a step forward.
  * The figure's front is +z.
  */
-export type Stance = { pointing?: 'L' | 'R'; akimbo?: 'L' | 'R'; step?: 'L' | 'R' };
+export type Stance = {
+  pointing?: 'L' | 'R';
+  akimbo?: 'L' | 'R';
+  step?: 'L' | 'R';
+  /** Both arms up: a surrender, or a hand against the light. */
+  armsUp?: boolean;
+  /** Mid-stride with the arms driving. */
+  running?: boolean;
+};
 
 export function layFigure(name: string, realHeightM: number, stance: Stance = {}): Group {
   const h = realHeightM * SCALE;
@@ -77,13 +85,26 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
     const tag = side < 0 ? 'L' : 'R';
     const stepping = stance.step === tag;
     const hip = new Vector3(side * 0.07 * h, hipY - 0.02 * h, 0);
-    const knee = new Vector3(side * 0.075 * h, stepping ? 0.28 * h : 0.27 * h, stepping ? 0.07 * h : 0.01 * h);
-    const ankle = new Vector3(side * 0.075 * h, 0.05 * h, stepping ? 0.09 * h : 0);
+    let knee = new Vector3(side * 0.075 * h, stepping ? 0.28 * h : 0.27 * h, stepping ? 0.07 * h : 0.01 * h);
+    let ankle = new Vector3(side * 0.075 * h, 0.05 * h, stepping ? 0.09 * h : 0);
+    if (stance.running) {
+      // One leg driving forward, the other trailing off the ground.
+      const fore = side > 0;
+      knee = new Vector3(side * 0.075 * h, fore ? 0.36 * h : 0.26 * h, fore ? 0.17 * h : -0.08 * h);
+      ankle = new Vector3(side * 0.075 * h, fore ? 0.14 * h : 0.2 * h, fore ? 0.14 * h : -0.26 * h);
+    }
     g.add(
       limb(hip, knee, 0.05 * h, wood, `Leg${tag}Upper`),
       ball(knee, 0.052 * h, woodDark, `Knee${tag}`),
       limb(knee, ankle, 0.042 * h, wood, `Leg${tag}Lower`),
-      ball(new Vector3(side * 0.075 * h, 0.035 * h, (stepping ? 0.11 : 0.02) * h), 0.04 * h, woodDark, `Foot${tag}`),
+      ball(
+        stance.running
+          ? ankle.clone().add(new Vector3(0, -0.015 * h, 0.03 * h))
+          : new Vector3(side * 0.075 * h, 0.035 * h, (stepping ? 0.11 : 0.02) * h),
+        0.04 * h,
+        woodDark,
+        `Foot${tag}`,
+      ),
     );
     const shoulder = new Vector3(side * 0.16 * h, 0.8 * h, 0);
     let elbow = new Vector3(side * 0.19 * h, 0.62 * h, -0.01 * h);
@@ -95,6 +116,13 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
     } else if (stance.akimbo === tag) {
       elbow = new Vector3(side * 0.25 * h, 0.64 * h, -0.03 * h);
       wrist = new Vector3(side * 0.12 * h, 0.5 * h, 0.03 * h);
+    } else if (stance.armsUp) {
+      elbow = new Vector3(side * 0.25 * h, 0.9 * h, 0.02 * h);
+      wrist = new Vector3(side * 0.2 * h, 1.04 * h, 0.05 * h);
+    } else if (stance.running) {
+      const fore = side < 0;
+      elbow = new Vector3(side * 0.2 * h, 0.66 * h, fore ? 0.1 * h : -0.12 * h);
+      wrist = new Vector3(side * 0.16 * h, fore ? 0.74 * h : 0.6 * h, fore ? 0.22 * h : -0.06 * h);
     }
     g.add(
       ball(shoulder, 0.05 * h, woodDark, `Shoulder${tag}`),
@@ -125,9 +153,30 @@ export function eyelineStand(eyeHeight: number): Group {
   return g;
 }
 
-const _keep: Object3D[] = [];
-void _keep;
+/**
+ * One stand-in with several poses, of which one shows. A hair cap sits with each
+ * pose and stays hidden until a look asks for it.
+ */
+function castFigure(name: string, realHeightM: number, stances: Stance[]): Group {
+  const g = new Group();
+  g.name = name;
+  const h = realHeightM * SCALE;
+  stances.forEach((stance, i) => {
+    const pose = layFigure(`Pose${i}`, realHeightM, stance);
+    const hair = ball(new Vector3(0, 0.945 * h, -0.008 * h), 0.08 * h, hairDark, 'Hair');
+    hair.scale.set(1, 0.8, 1.02);
+    hair.visible = false;
+    pose.add(hair);
+    pose.visible = i === 0;
+    g.add(pose);
+  });
+  return g;
+}
 
-export const actorA = layFigure('ActorA', 1.7, { pointing: 'R' });
-export const actorB = layFigure('ActorB', 1.65, { akimbo: 'L', step: 'R' });
+const neutral: Stance = {};
+const armsUp: Stance = { armsUp: true };
+const running: Stance = { running: true };
+
+export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running]);
+export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running]);
 export const creature = eyelineStand(0.33);

@@ -44,6 +44,10 @@ const GRAB_VOLUME: Record<string, [number, number]> = {
   [SetRole.Actor]: [0.04, 0.2],
   [SetRole.Creature]: [0.035, 0.36],
   [SetRole.Camera]: [0.045, 0.19],
+  Car: [0.13, 0.16],
+  Fire: [0.06, 0.18],
+  Smoke: [0.08, 0.3],
+  Water: [0.1, 0.16],
 };
 /** A wrist turns about a quarter turn in comfort; this makes that most of a half turn. */
 const TURN_GAIN = 1.8;
@@ -70,7 +74,15 @@ const NO_RAYCAST = (): void => {};
 /** Position then quaternion, in the stage's own space. */
 type Pose = number[];
 type SavedPieces = Record<string, Pose>;
-type Globals = { newBoardRequested: Signal<number>; coachTarget: Signal<string>; setupRecalled: Signal<number> };
+type Globals = {
+  newBoardRequested: Signal<number>;
+  coachTarget: Signal<string>;
+  setupRecalled: Signal<number>;
+  cameraRig: Signal<string>;
+};
+/** A flown camera stays where it is let go, between these heights. */
+const DRONE_MIN_HEIGHT = 0.2;
+const DRONE_MAX_HEIGHT = 1.1;
 /** The ring under the piece the call sheet is asking for breathes this much, this fast. */
 const BECKON_SWELL = 0.22;
 const BECKON_RATE = 5;
@@ -209,7 +221,8 @@ export class PiecesSystem extends createSystem({
   /** The unseen cylinder that makes a piece easy to catch, and the ring that says it is caught. */
   private dress(piece: Entity): void {
     const object = piece.object3D!;
-    const size = GRAB_VOLUME[piece.getValue(SetPiece, 'role') as string];
+    const size =
+      GRAB_VOLUME[piece.getValue(SetPiece, 'role') as string] ?? GRAB_VOLUME[piece.getValue(SetPiece, 'label') as string];
     if (size == null) return;
     const [radius, height] = size;
     const volume = new Mesh(new CylinderGeometry(radius, radius, height, 14, 1), this.volumeMaterial);
@@ -282,7 +295,11 @@ export class PiecesSystem extends createSystem({
     object.quaternion.copy(this.upright.setFromAxisAngle(UP, Math.atan2(this.forward.x, this.forward.z)));
     if (piece.getValue(SetPiece, 'role') === SetRole.Camera) {
       const y = object.position.y;
-      object.position.y = y < CAMERA_FLOOR_SNAP ? 0 : Math.min(y, CAMERA_MAX_HEIGHT);
+      if ((this.globals as Globals).cameraRig.peek() === 'drone') {
+        object.position.y = Math.max(DRONE_MIN_HEIGHT, Math.min(y, DRONE_MAX_HEIGHT));
+      } else {
+        object.position.y = y < CAMERA_FLOOR_SNAP ? 0 : Math.min(y, CAMERA_MAX_HEIGHT);
+      }
     } else {
       object.position.y = 0;
     }

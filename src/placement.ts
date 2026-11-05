@@ -425,8 +425,8 @@ export class PlacementSystem extends createSystem({
     if (!this.aiming) return;
     this.aiming = false;
     this.landing?.show(false);
-    this.setInteractive(true);
     if (stage.object3D) stage.object3D.visible = true;
+    this.setInteractive(true);
   }
 
   private updateAiming(stage: Entity, delta: number): void {
@@ -449,7 +449,8 @@ export class PlacementSystem extends createSystem({
   private setInteractive(on: boolean): void {
     const value = on ? undefined : 'none';
     const quiet = (object: Object3D | null | undefined): void => {
-      if (object != null) (object as Object3D & { pointerEvents?: string }).pointerEvents = value;
+      // A prop still in the tray stays out of reach when the set comes back.
+      if (object != null && (!on || object.visible)) (object as Object3D & { pointerEvents?: string }).pointerEvents = value;
     };
     for (const piece of this.queries.pieces.entities) quiet(piece.object3D);
     quiet(this.scene.getObjectByName('StoryboardCard'));
@@ -596,7 +597,7 @@ export class PlacementSystem extends createSystem({
       (byHand ? this.player.indexTipSpaces[side] : this.player.raySpaces[side]).getWorldPosition(pinch.start);
       handSpace.getWorldPosition(pinch.hand);
       // The outline is on a surface: this pinch sets the set down there.
-      if (this.aiming && this.landing?.hasHit && this.guard <= 0) {
+      if (this.aiming && this.landing?.canLand(side) && this.guard <= 0) {
         const point = this.landing.pointFor(side);
         pinch.claimed = true;
         this.placeAt(stage, point.x, point.y, point.z, Placement.Touch, StageStatus.Touch);

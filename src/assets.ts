@@ -1,5 +1,7 @@
 import { AssetType, defineAssets } from '@iwsdk/core';
 import { actorA, actorB, creature } from './scene-assets/figures.scene-asset.js';
+import { fireEffect, smokeEffect, waterEffect } from './scene-assets/effects.scene-asset.js';
+import { carProp } from './scene-assets/props.scene-asset.js';
 import { cameraRigModel, stagePlate } from './scene-assets/rig.scene-asset.js';
 
 const publicAssetUrl = (filePath: string): string =>
@@ -11,6 +13,10 @@ export default defineAssets({
   'actor-b': actorB,
   creature: creature,
   'camera-rig': cameraRigModel,
+  car: carProp,
+  fire: fireEffect,
+  smoke: smokeEffect,
+  water: waterEffect,
   'controls-panel': {
     url: publicAssetUrl('ui/controls.uikitml'),
     type: AssetType.UIKitML,

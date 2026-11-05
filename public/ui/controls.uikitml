@@ -57,8 +57,27 @@
     border-left-width: 3px;
     border-color: #6f6c6b;
   }
-  .lenses { flex-direction: row; gap: 6px; flex-grow: 1; justify-content: flex-start; }
-  .takes { flex-direction: row; gap: 6px; flex-grow: 1; justify-content: flex-start; }
+  .lenses { flex-direction: row; gap: 2px; flex-grow: 1; justify-content: flex-start; }
+  .takes { flex-direction: row; gap: 4px; flex-grow: 1; justify-content: flex-start; }
+  .tabs { flex-direction: row; gap: 4px; width: 100%; justify-content: space-between; }
+  .tab {
+    font-family: "Grotesk";
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 18px;
+    color: #f6f7ef;
+    flex-grow: 1;
+    height: 34px;
+    justify-content: center;
+    align-items: center;
+    border-bottom-width: 3px;
+    border-color: #6f6c6b;
+    cursor: pointer;
+  }
+  .page { flex-direction: column; gap: 8px; width: 100%; }
+  .short { width: 38px; }
+  .wide { width: 100%; }
+  .strong { font-weight: 600; font-size: 15px; }
   .stage-actions { flex-direction: row; gap: 6px; width: 100%; justify-content: flex-end; }
   .lens {
     font-family: "Shoulders";
@@ -66,7 +85,7 @@
     font-size: 17px;
     line-height: 20px;
     color: #f6f7ef;
-    width: 42px;
+    width: 31px;
     height: 34px;
     justify-content: center;
     align-items: center;
@@ -125,40 +144,94 @@
     <div id="btn-find-table" class="word" style="display: none">Find my table</div>
     <div id="btn-reset-stage" class="word">Reset stage</div>
   </div>
-  <div class="field">
-    <div class="label">LENS</div>
-    <div class="lenses">
-      <div id="lens-24" class="lens">24</div>
-      <div id="lens-35" class="lens">35</div>
-      <div id="lens-50" class="lens">50</div>
-      <div id="lens-85" class="lens">85</div>
-    </div>
-  </div>
   <div id="btn-snap" class="primary">Snap frame</div>
-  <div class="field">
-    <div class="label">TAKE</div>
-    <div class="takes">
-      <div id="btn-record" class="word">Record</div>
-      <div id="btn-play" class="word" style="display: none">Play</div>
+  <div class="tabs">
+    <div id="tab-shoot" class="tab">Shoot</div>
+    <div id="tab-camera" class="tab">Camera</div>
+    <div id="tab-set" class="tab">Set</div>
+    <div id="tab-briefs" class="tab">Briefs</div>
+  </div>
+  <div id="page-shoot" class="page">
+    <div class="field">
+      <div class="label short">LENS</div>
+      <div class="lenses">
+        <div id="lens-18" class="lens">18</div>
+        <div id="lens-24" class="lens">24</div>
+        <div id="lens-35" class="lens">35</div>
+        <div id="lens-50" class="lens">50</div>
+        <div id="lens-85" class="lens">85</div>
+        <div id="lens-135" class="lens">135</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="label">TAKE</div>
+      <div class="takes">
+        <div id="btn-record" class="word">Record</div>
+        <div id="btn-play" class="word" style="display: none">Play</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="label">EYELINE</div>
+      <div id="eyeline-a" class="line">A: place the creature and an actor</div>
+    </div>
+    <div class="field">
+      <div class="label"> </div>
+      <div id="eyeline-b" class="line"> </div>
+    </div>
+    <div class="field">
+      <div class="label">BOARD</div>
+      <div id="board-count" class="line">No frames yet</div>
+    </div>
+    <div class="field">
+      <div class="label"> </div>
+      <div id="btn-new-board" class="word">New board</div>
     </div>
   </div>
-  <div class="rule"></div>
-  <div class="field">
-    <div class="label">EYELINE</div>
-    <div id="eyeline-a" class="line">A: place the creature and an actor</div>
+  <div id="page-camera" class="page" style="display: none">
+    <div class="field">
+      <div class="label">FORMAT</div>
+      <div id="btn-format" class="word">Full frame</div>
+    </div>
+    <div class="field">
+      <div class="label">RIG</div>
+      <div id="btn-rig" class="word">Tripod</div>
+    </div>
+    <div class="line muted">Same lens, smaller format: a tighter picture. On the drone, carry the camera as high as you can reach, up to 11 m on the real set.</div>
   </div>
-  <div class="field">
-    <div class="label"> </div>
-    <div id="eyeline-b" class="line"> </div>
+  <div id="page-set" class="page" style="display: none">
+    <div class="field">
+      <div class="label short">ADD</div>
+      <div class="takes">
+        <div id="tray-Car" class="word">Car</div>
+        <div id="tray-Fire" class="word">Fire</div>
+        <div id="tray-Smoke" class="word">Smoke</div>
+        <div id="tray-Water" class="word">Water</div>
+      </div>
+    </div>
+    <div class="line muted">Stand-ins for placing an effect in the frame, not simulations.</div>
+    <div class="rule"></div>
+    <div class="field">
+      <div class="label">ACTOR</div>
+      <div id="cast-line" class="line">A: Blocking, Wood</div>
+    </div>
+    <div class="field">
+      <div class="label"> </div>
+      <div class="takes">
+        <div id="btn-pose" class="word">Pose</div>
+        <div id="btn-look" class="word">Look</div>
+      </div>
+    </div>
+    <div class="line muted">Changes the actor you last picked up.</div>
   </div>
-  <div class="rule"></div>
-  <div class="field">
-    <div class="label">BOARD</div>
-    <div id="board-count" class="line">No frames yet</div>
-  </div>
-  <div class="field">
-    <div class="label"> </div>
-    <div id="btn-new-board" class="word">New board</div>
+  <div id="page-briefs" class="page" style="display: none">
+    <div id="brief-count" class="label wide">SHOT 1 OF 9</div>
+    <div id="brief-title" class="line strong">Wide establishing shot</div>
+    <div id="brief-ask" class="line">Everyone and the creature in frame.</div>
+    <div class="line muted">Frame it and press Snap. A frame that meets the brief is stamped PRINT.</div>
+    <div class="field">
+      <div class="label"> </div>
+      <div id="btn-skip-brief" class="word">Next shot</div>
+    </div>
   </div>
   <div class="rule"></div>
   <div id="xr-button" class="primary">Enter XR</div>

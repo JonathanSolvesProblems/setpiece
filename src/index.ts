@@ -9,6 +9,8 @@ import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SlateSystem } from './slate.js';
 import { TakeState, TakeSystem } from './take.js';
+import { TraySystem } from './tray.js';
+import { Rig } from './camera-formats.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import type { Shot } from './viewfinder.js';
 
@@ -36,6 +38,19 @@ World.create(
   globals.coachTarget = signal('');
   // A line the call sheet shows for a few seconds, as "LABEL | words"; and a count of setups recalled from the card.
   globals.coachNote = signal('');
+  // The tray, the cast and the camera kit.
+  globals.trayToggle = signal('');
+  globals.trayOn = signal<string[]>([]);
+  globals.effectsOn = signal(0);
+  globals.poseRequested = signal(0);
+  globals.lookRequested = signal(0);
+  globals.castLine = signal('');
+  globals.sensorIndex = signal(0);
+  globals.cameraRig = signal<string>(Rig.Tripod);
+  // The shot briefs: which one is up, how many are printed.
+  globals.briefIndex = signal(0);
+  globals.briefPrinted = signal(0);
+  globals.briefSkip = signal(0);
   globals.setupRecalled = signal(0);
   // The take: what it is doing, how far in it is, and how long it runs, in seconds.
   globals.takeState = signal<string>(TakeState.Idle);
@@ -48,6 +63,7 @@ World.create(
     .registerSystem(PlacementSystem, { priority: 10 })
     .registerSystem(PiecesSystem, { priority: 12 })
     .registerSystem(TakeSystem, { priority: 14 })
+    .registerSystem(TraySystem, { priority: 15 })
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })

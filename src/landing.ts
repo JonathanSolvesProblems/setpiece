@@ -50,6 +50,8 @@ const MAX_REACH = 1.6;
 const AIM_MOVED = 0.004;
 const FOLLOW_RATE = 18;
 const SIGN_RATE = 7;
+/** The outline has to rest on a surface this long before a pinch lands the set, so a stray press cannot. */
+const STEADY_SECONDS = 0.4;
 const SIGN_AHEAD = 0.75;
 const SIGN_ABOVE_OUTLINE = 0.12;
 const EDGE = 0.006;
@@ -75,6 +77,17 @@ export class LandingGuide {
   hasHit = false;
   /** Where the outline is now. */
   at = new Vector3();
+  private held = 0;
+
+  /** The outline has been on a surface long enough for the wearer to have seen it. */
+  get ready(): boolean {
+    return this.hasHit && this.held >= STEADY_SECONDS;
+  }
+
+  /** This hand can land the set: it is the aiming hand, or nothing but the head is aiming. */
+  canLand(side: Side): boolean {
+    return this.ready && this.active != null && (this.active.side === side || this.active.side === 'head');
+  }
 
   constructor(private world: World) {
     const material = new MeshBasicMaterial({ color: OPTIC_YELLOW, side: DoubleSide, toneMapped: false });
@@ -192,6 +205,7 @@ export class LandingGuide {
     const aim = this.active;
     const had = this.hasHit;
     this.hasHit = aim != null;
+    this.held = this.hasHit ? this.held + seconds : 0;
     this.outline.visible = this.hasHit;
     if (aim != null) {
       this.everHit = true;

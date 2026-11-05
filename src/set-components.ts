@@ -5,6 +5,7 @@ export const SetRole = {
   Creature: 'creature',
   Camera: 'camera',
   Stage: 'stage',
+  Prop: 'prop',
 } as const;
 
 /**

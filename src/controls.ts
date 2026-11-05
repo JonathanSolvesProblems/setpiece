@@ -11,6 +11,8 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { BRIEFS } from './briefs.js';
+import { LENSES, Rig, SENSORS } from './camera-formats.js';
 import { StageStatus } from './placement.js';
 import { SetPiece, StageAnchor } from './set-components.js';
 
@@ -22,7 +24,6 @@ const PANEL_OFFSET = new Vector3(-0.4, 0.3, -0.16);
 const PANEL_YAW = (34 * Math.PI) / 180;
 const UP = new Vector3(0, 1, 0);
 
-const LENSES = [24, 35, 50, 85];
 const BOARD_SLOTS = 6;
 // Optic yellow marks the selected lens and a stage that is good to go (charter law 7).
 const OPTIC_YELLOW = '#d6e13c';
@@ -50,7 +51,19 @@ type Globals = {
   roomScanOffered: Signal<boolean>;
   recordRequested: Signal<number>;
   playRequested: Signal<number>;
+  trayToggle: Signal<string>;
+  trayOn: Signal<string[]>;
+  poseRequested: Signal<number>;
+  lookRequested: Signal<number>;
+  castLine: Signal<string>;
+  sensorIndex: Signal<number>;
+  cameraRig: Signal<string>;
+  briefIndex: Signal<number>;
+  briefPrinted: Signal<number>;
+  briefSkip: Signal<number>;
 };
+const TABS = ['shoot', 'camera', 'set', 'briefs'] as const;
+const TRAY = ['Car', 'Fire', 'Smoke', 'Water'] as const;
 /** The tally's red: the record button wears it while a take is being recorded. */
 const TALLY_RED = '#e0352b';
 const CHALK = '#f6f7ef';
@@ -168,6 +181,76 @@ export class ControlsSystem extends createSystem({
     };
     newBoard?.addEventListener('click', requestNewBoard);
     this.cleanupFuncs.push(() => newBoard?.removeEventListener('click', requestNewBoard));
+
+    // Tabs keep a panel this size on the table: one page shows, Snap frame is always there.
+    const wire = (id: string, run: () => void): void => {
+      const element = panel.getElementById(id);
+      element?.addEventListener('click', run);
+      this.cleanupFuncs.push(() => element?.removeEventListener('click', run));
+    };
+    const showTab = (tab: string): void => {
+      for (const name of TABS) {
+        panel.getElementById(`page-${name}`)?.setProperties({ display: name === tab ? 'flex' : 'none' });
+        panel.getElementById(`tab-${name}`)?.setProperties({ borderColor: name === tab ? OPTIC_YELLOW : CHALK_HAZE });
+      }
+    };
+    for (const name of TABS) wire(`tab-${name}`, () => showTab(name));
+    showTab('shoot');
+
+    // The camera kit.
+    wire('btn-format', () => {
+      g.sensorIndex.value = (g.sensorIndex.peek() + 1) % SENSORS.length;
+    });
+    wire('btn-rig', () => {
+      g.cameraRig.value = g.cameraRig.peek() === Rig.Drone ? Rig.Tripod : Rig.Drone;
+    });
+    const format = panel.getElementById<UIKit.Text>('btn-format');
+    const rig = panel.getElementById<UIKit.Text>('btn-rig');
+    this.cleanupFuncs.push(
+      g.sensorIndex.subscribe((i) => format?.setProperties({ text: SENSORS[i]?.name ?? '' })),
+      g.cameraRig.subscribe((value) => rig?.setProperties({ text: value === Rig.Drone ? 'Drone' : 'Tripod' })),
+    );
+
+    // The tray and the cast.
+    for (const label of TRAY) {
+      wire(`tray-${label}`, () => {
+        g.trayToggle.value = label;
+      });
+    }
+    wire('btn-pose', () => {
+      g.poseRequested.value = g.poseRequested.peek() + 1;
+    });
+    wire('btn-look', () => {
+      g.lookRequested.value = g.lookRequested.peek() + 1;
+    });
+    const cast = panel.getElementById<UIKit.Text>('cast-line');
+    this.cleanupFuncs.push(
+      g.trayOn.subscribe((on) => {
+        for (const label of TRAY) {
+          panel.getElementById(`tray-${label}`)?.setProperties({ borderColor: on.includes(label) ? OPTIC_YELLOW : CHALK_HAZE });
+        }
+      }),
+      g.castLine.subscribe((line) => {
+        if (line !== '') cast?.setProperties({ text: line });
+      }),
+    );
+
+    // The shot briefs.
+    wire('btn-skip-brief', () => {
+      g.briefSkip.value = g.briefSkip.peek() + 1;
+    });
+    const briefCount = panel.getElementById<UIKit.Text>('brief-count');
+    const briefTitle = panel.getElementById<UIKit.Text>('brief-title');
+    const briefAsk = panel.getElementById<UIKit.Text>('brief-ask');
+    const showBrief = (): void => {
+      const index = g.briefIndex.peek();
+      const brief = BRIEFS[index];
+      const printed = g.briefPrinted.peek();
+      briefCount?.setProperties({ text: `${printed} OF ${BRIEFS.length} PRINTED` });
+      briefTitle?.setProperties({ text: brief ? brief.title : 'That is a wrap' });
+      briefAsk?.setProperties({ text: brief ? brief.ask : 'Every shot on the list is printed.' });
+    };
+    this.cleanupFuncs.push(g.briefIndex.subscribe(showBrief), g.briefPrinted.subscribe(showBrief));
 
     // A take: Record starts and stops a pass, Play loops what has been recorded.
     const record = panel.getElementById<UIKit.Text>('btn-record');

@@ -19,6 +19,7 @@ import {
 import type { Signal } from '@preact/signals-core';
 import { Placement, SetPiece, SetRole, StageAnchor } from './set-components.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
+import { BRIEFS } from './briefs.js';
 import { TAKE_MAX_SECONDS, TakeState } from './take.js';
 
 const W = 1536;
@@ -59,9 +60,10 @@ type Globals = {
   takeLength: Signal<number>;
   roomScanOffered: Signal<boolean>;
   coachNote: Signal<string>;
+  briefIndex: Signal<number>;
 };
-/** Seconds a passing note stays on the sheet. */
-const NOTE_SECONDS = 4;
+/** Seconds a passing note stays on the sheet: long enough to read a reason and act on it. */
+const NOTE_SECONDS = 6;
 /** The thing each step asks the wearer to put a hand on; it is marked on the set while the step is up. */
 const TARGET: Partial<Record<StepId, string>> = { [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
 type CoachState = { done: boolean };
@@ -101,6 +103,7 @@ export class CoachSystem extends createSystem({
   private note = '';
   private noteLeft = 0;
   private drawnNote = '';
+  private drawnBrief = -1;
   /** While a take records or plays, the sheet is its clock. */
   private take: string = TakeState.Idle;
   private takeSeconds = 0;
@@ -190,6 +193,7 @@ export class CoachSystem extends createSystem({
       this.controllers !== this.drawnControllers ||
       this.scanOffered !== this.drawnScanOffered ||
       this.note !== this.drawnNote ||
+      g.briefIndex.peek() !== this.drawnBrief ||
       this.take !== this.drawnTake ||
       (onTake && this.takeSeconds !== this.drawnTakeSeconds)
     ) {
@@ -199,6 +203,7 @@ export class CoachSystem extends createSystem({
       this.drawnControllers = this.controllers;
       this.drawnScanOffered = this.scanOffered;
       this.drawnNote = this.note;
+      this.drawnBrief = g.briefIndex.peek();
       this.drawnTake = this.take;
       this.drawnTakeSeconds = this.takeSeconds;
       this.draw();
@@ -337,14 +342,7 @@ export class CoachSystem extends createSystem({
             : 'Pinch Snap frame, on the panel to your left.',
         ];
       case Step.Fill:
-        return [
-          `FRAME ${this.shots} OF ${BOARD_SLOTS}`,
-          this.shots === BOARD_SLOTS - 1
-            ? 'One more: move the camera and snap.'
-            : this.shots === 2
-              ? 'Pinch a frame on the board to go back to its setup.'
-              : 'Move the camera or change the lens, and snap again.',
-        ];
+        return this.fillLine();
       case Step.Done: {
         const s = Math.round(this.doneSeconds);
         const took = s > 0 ? ` in ${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s` : '';
@@ -361,6 +359,14 @@ export class CoachSystem extends createSystem({
       default:
         return ['', ''];
     }
+  }
+
+  /** After the first frame the sheet is the shot list: what the director wants next. */
+  private fillLine(): [string, string] {
+    const brief = BRIEFS[(this.globals as Globals).briefIndex.peek()];
+    if (this.shots === 2) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Pinch a frame on the board to go back to its setup.'];
+    if (brief == null) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Every shot is printed. Shoot what you like.'];
+    return [`NEXT: ${brief.title.toUpperCase()}`, brief.ask];
   }
 
   private draw(): void {

@@ -37,13 +37,14 @@ import {
   WebGLRenderTarget,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { BRIEFS } from './briefs.js';
+import type { Measure, PieceInFrame } from './briefs.js';
+import { SENSORS } from './camera-formats.js';
 import { CAMERA_TILT_LIMIT, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
 /** One miniature metre on the stage is ten real metres on set. */
 export const SET_SCALE = 10;
-/** Vertical sensor size of a 36 mm wide full-frame sensor cropped to 16:9. */
-const SENSOR_HEIGHT_MM = 20.25;
 const RT_WIDTH = 640;
 const RT_HEIGHT = 360;
 const MAX_FRAMES = 6;
@@ -52,7 +53,7 @@ const FRAME_HEIGHT = (FRAME_WIDTH * 9) / 16;
 const FRAME_GAP = 0.011;
 const FRAME_COLUMNS = 3;
 /** Meshes other systems hang on the pieces to make them easy to pick up. */
-const HELPER_NAMES = new Set(['GrabVolume', 'HoverRing', 'StageHandle', 'HandleGlow', 'HandleLabel']);
+const HELPER_NAMES = new Set(['GrabVolume', 'HoverRing', 'StageHandle', 'HandleGlow', 'HandleLabel', 'EffectParticles']);
 /** Two lines under each frame: the lens and camera, then each actor's eyeline. */
 const CAPTION_HEIGHT = 0.019;
 /** The storyboard card: three frames wide, two high, the width of the monitor. */
@@ -106,6 +107,10 @@ export interface Shot {
   dataUrl: string;
   /** Where everything stood when the frame was taken, so the set can go back to it. */
   setup?: Setup;
+  /** The brief this frame met, stamped on the board. */
+  printed?: string;
+  /** The format, when it is not full frame. */
+  format?: string;
 }
 
 /** The blocking behind a frame: each piece's pose on the slate, the lens, and the camera head's tilt. */
@@ -114,6 +119,8 @@ export interface Setup {
   lensMm: number;
   tilt: number;
   aimed: boolean;
+  sensor?: number;
+  rig?: string;
 }
 
 /** The board as it is kept between visits: the frames on the card and how many were ever taken. */
@@ -129,7 +136,16 @@ type Globals = {
   takeState: Signal<string>;
   setupRecalled: Signal<number>;
   coachNote: Signal<string>;
+  sensorIndex: Signal<number>;
+  cameraRig: Signal<string>;
+  effectsOn: Signal<number>;
+  briefIndex: Signal<number>;
+  briefPrinted: Signal<number>;
+  briefSkip: Signal<number>;
 };
+type SavedBriefs = { index: number; printed: string[] };
+/** While an effect runs, the monitor is redrawn on one frame in this many. */
+const EFFECT_LENS_EVERY = 3;
 /** What a pointer event on the card carries that is used here. */
 type CardEvent = { point?: Vector3; stopPropagation?: () => void };
 type CardTarget = { addEventListener(type: string, listener: (event: CardEvent) => void): void };
@@ -192,10 +208,14 @@ export class ViewfinderSystem extends createSystem({
   private liveFrames = LIVE_AT_START;
   private lastSignature = Number.NaN;
   private shadowTick = false;
+  private effectTick = 0;
+  /** The briefs met so far, by title. */
+  private printed: string[] = [];
   /** The frame the set stands at now: the one last snapped or sent back to, until something moves. */
   private recalledIndex = -1;
   private recalledSignature = Number.NaN;
   private tallyBlinking = false;
+  private skipSeen = 0;
   /** The tally is held bright for a moment after a snap. */
   private snapFlash = false;
   /** How many times the monitor has been drawn; a test reads it to see the saving. */
@@ -277,10 +297,29 @@ export class ViewfinderSystem extends createSystem({
       .then(() => document.fonts.load('700 24px "Big Shoulders"'))
       .then(() => this.drawBoard());
     this.restoreBoard();
+    const briefs = loadJson<SavedBriefs>(StoreKey.Briefs);
+    if (briefs != null && Number.isInteger(briefs.index) && Array.isArray(briefs.printed)) {
+      this.printed = briefs.printed.slice(0, BRIEFS.length);
+      g.briefPrinted.value = this.printed.length;
+      g.briefIndex.value = Math.min(briefs.index, BRIEFS.length);
+    }
+    this.cleanupFuncs.push(
+      g.sensorIndex.subscribe(() => this.setLens(g.lensMm.peek())),
+      g.briefSkip.subscribe((n) => {
+        if (n <= this.skipSeen) return;
+        this.skipSeen = n;
+        this.setBrief((g.briefIndex.peek() + 1) % BRIEFS.length);
+      }),
+    );
   }
 
   getShots(): readonly Shot[] {
     return this.shots;
+  }
+
+  /** Something changed that the pose of a piece does not show: draw the monitor again. */
+  refresh(): void {
+    this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
   }
 
   /** For the other systems: something the viewer sees and the shot lens must not. */
@@ -342,10 +381,17 @@ export class ViewfinderSystem extends createSystem({
       ctx.textAlign = 'center';
       ctx.fillText(String(shot.index), x + tab * 0.62, y + tab * 0.98);
       ctx.textAlign = 'left';
+      if (shot.printed) {
+        // A printed take: the stamp a script supervisor puts on the good one.
+        const stamp = Math.round(gap * 1.05);
+        ctx.fillStyle = '#d6e13c';
+        ctx.fillRect(x, y + frameH - stamp * 1.5, frameW, stamp * 1.5);
+        this.fitText(ctx, `PRINT · ${shot.printed}`, x + 10, y + frameH - stamp * 0.4, frameW - 20, stamp, INK);
+      }
       const line = Math.round(caption * 0.4);
       this.fitText(
         ctx,
-        `${shot.lensMm} mm · ${shot.cameraHeightM.toFixed(1)} m high · ${shot.distanceToCreatureM.toFixed(1)} m away`,
+        `${shot.lensMm} mm${shot.format ? ` ${shot.format}` : ''} · ${shot.cameraHeightM.toFixed(1)} m high · ${shot.distanceToCreatureM.toFixed(1)} m away`,
         x + 2,
         y + frameH + line * 1.05,
         frameW - 4,
@@ -423,6 +469,7 @@ export class ViewfinderSystem extends createSystem({
     const setup = shot.setup;
     const g = this.globals as Globals;
     if (setup == null || g.takeState.peek() !== 'idle') return false;
+    if (setup.rig) g.cameraRig.value = setup.rig;
     for (const piece of this.queries.pieces.entities) {
       const object = piece.object3D;
       const pose = setup.pieces[`${piece.getValue(SetPiece, 'role')}:${piece.getValue(SetPiece, 'label')}`];
@@ -435,6 +482,7 @@ export class ViewfinderSystem extends createSystem({
       cam.setValue(ShotCamera, 'aimed', setup.aimed);
     }
     g.lensMm.value = setup.lensMm;
+    if (setup.sensor != null) g.sensorIndex.value = setup.sensor;
     this.recalledIndex = shot.index;
     this.recalledSignature = Number.NaN;
     this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
@@ -459,7 +507,95 @@ export class ViewfinderSystem extends createSystem({
       lensMm: (this.globals as Globals).lensMm.peek(),
       tilt: cam.getValue(ShotCamera, 'tilt') ?? 0,
       aimed: cam.getValue(ShotCamera, 'aimed') === true,
+      sensor: (this.globals as Globals).sensorIndex.peek(),
+      rig: (this.globals as Globals).cameraRig.peek(),
     };
+  }
+
+  /** Where this point falls in the frame, or null behind the lens. */
+  private inFrame(world: Vector3, out: Vector3): Vector3 | null {
+    out.copy(world).applyMatrix4(this.lensCamera.matrixWorldInverse);
+    if (out.z >= 0) return null;
+    return out.applyMatrix4(this.lensCamera.projectionMatrix);
+  }
+
+  /** What the lens saw, in the terms a brief is written in. */
+  private measure(cam: Entity): Measure {
+    const g = this.globals as Globals;
+    const lens = this.lensCamera;
+    lens.updateMatrixWorld(true);
+    const at = lens.getWorldPosition(new Vector3());
+    const stageY = this.stageEntity?.object3D?.getWorldPosition(new Vector3()).y ?? at.y;
+    const p = new Vector3();
+    const q = new Vector3();
+    const inside = (v: Vector3 | null): boolean => v != null && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
+    const actors: PieceInFrame[] = [];
+    for (const actor of this.actors) {
+      if (actor.object3D == null) continue;
+      this.eyePoint(actor, this.a);
+      const eyes = this.inFrame(this.a, p);
+      const eyeX = eyes ? eyes.x : 9;
+      const eyeY = eyes ? eyes.y : 9;
+      const eyesIn = inside(eyes);
+      let headSize = 0;
+      if (eyes != null) {
+        const eyeNdcY = eyes.y;
+        const top = this.inFrame(this.c.copy(this.a).setY(this.a.y + 0.016), q);
+        if (top != null) headSize = Math.abs(top.y - eyeNdcY) * 1.6;
+      }
+      actor.object3D.getWorldPosition(this.b);
+      const feet = inside(this.inFrame(this.b, q));
+      actors.push({
+        label: String(actor.getValue(SetPiece, 'label') ?? ''),
+        whole: eyesIn && feet,
+        eyesIn,
+        eyeX,
+        eyeY,
+        headSize,
+        distanceM: Math.hypot(this.a.x - at.x, this.a.z - at.z) * SET_SCALE,
+        eyeAboveLensM: (this.a.y - at.y) * SET_SCALE,
+      });
+    }
+    const creature = this.findRole(SetRole.Creature);
+    let creatureIn = false;
+    if (creature != null) {
+      this.eyePoint(creature, this.a);
+      creatureIn = inside(this.inFrame(this.a, p));
+    }
+    return {
+      lensMm: g.lensMm.peek(),
+      rig: g.cameraRig.peek(),
+      heightM: (at.y - stageY) * SET_SCALE,
+      tiltDeg: ((this.cameraHead?.rotation.x ?? 0) * 180) / Math.PI,
+      actors,
+      creatureIn,
+    };
+  }
+
+  /** The current brief, judged on this frame. A frame is kept either way; only a pass is stamped. */
+  private judge(cam: Entity, shot: Shot): void {
+    const g = this.globals as Globals;
+    const index = g.briefIndex.peek();
+    const brief = BRIEFS[index];
+    if (brief == null) return;
+    const reason = brief.test(this.measure(cam));
+    if (reason != null) {
+      g.coachNote.value = `NOT YET: ${brief.title.toUpperCase()} | ${reason}`;
+      return;
+    }
+    shot.printed = brief.title;
+    this.printed.push(brief.title);
+    g.briefPrinted.value = this.printed.length;
+    const next = BRIEFS[index + 1];
+    g.coachNote.value = next
+      ? `PRINT IT · ${this.printed.length} OF ${BRIEFS.length} | Next: ${next.title}. ${next.ask}`
+      : `THAT'S A WRAP | All ${BRIEFS.length} shots printed. Your coverage is complete.`;
+    this.setBrief(index + 1);
+  }
+
+  private setBrief(index: number): void {
+    (this.globals as Globals).briefIndex.value = index;
+    saveJson(StoreKey.Briefs, { index, printed: this.printed } satisfies SavedBriefs);
   }
 
   private clearBoard(): void {
@@ -687,7 +823,8 @@ export class ViewfinderSystem extends createSystem({
   }
 
   private setLens(mm: number): void {
-    this.lensCamera.fov = (2 * Math.atan(SENSOR_HEIGHT_MM / (2 * mm)) * 180) / Math.PI;
+    const sensor = SENSORS[(this.globals as Globals).sensorIndex.peek()] ?? SENSORS[0];
+    this.lensCamera.fov = (2 * Math.atan(sensor.heightMm / (2 * mm)) * 180) / Math.PI;
     this.lensCamera.updateProjectionMatrix();
     for (const cam of this.queries.cams.entities) cam.setValue(ShotCamera, 'lensMm', mm);
   }
@@ -716,6 +853,13 @@ export class ViewfinderSystem extends createSystem({
         this.recalledIndex = -1;
         this.drawBoard();
       }
+    }
+    // An effect moves on its own, so the monitor keeps up with it, at a rate the headset can spare.
+    this.effectTick = (this.effectTick + 1) % EFFECT_LENS_EVERY;
+    if (this.liveFrames === 0 && !this.snapPending && this.effectTick === 0 && (this.globals as Globals).effectsOn.peek() > 0) {
+      this.aimLens(cam);
+      this.renderViewfinder();
+      this.lensPasses++;
     }
     if (this.liveFrames > 0 || this.snapPending) {
       this.liveFrames = Math.max(0, this.liveFrames - 1);
@@ -967,6 +1111,9 @@ export class ViewfinderSystem extends createSystem({
       dataUrl: canvas.toDataURL('image/jpeg', 0.86),
       setup: this.readSetup(cam),
     };
+    const sensor = SENSORS[g.sensorIndex.peek()];
+    if (sensor && g.sensorIndex.peek() !== 0) shot.format = sensor.short;
+    this.judge(cam, shot);
     // A new frame is where the set is now.
     this.recalledIndex = shot.index;
     this.recalledSignature = Number.NaN;

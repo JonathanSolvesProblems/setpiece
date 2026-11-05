@@ -125,7 +125,41 @@ function filmCamera(): Group {
   const tally = new Mesh(new SphereGeometry(0.0028, 8, 6), tallyRed);
   tally.name = 'Tally';
   tally.position.set(-0.012, 0.142, -0.02);
-  g.add(base, post, head, body, lens, ring, matteBox, eyepiece, tally);
+  g.add(base, post, head, body, lens, ring, matteBox, eyepiece, tally, droneFrame());
+  return g;
+}
+
+/**
+ * The same camera flown instead of stood: a quadcopter frame above the body,
+ * hidden until the rig is switched. Its rotors are named so they can spin.
+ */
+function droneFrame(): Group {
+  const g = new Group();
+  g.name = 'DroneFrame';
+  g.position.y = 0.176;
+  g.visible = false;
+  const plate = new Mesh(new CylinderGeometry(0.022, 0.026, 0.01, 16), slateShadow);
+  plate.name = 'DronePlate';
+  const mast = new Mesh(new CylinderGeometry(0.003, 0.003, 0.012, 8), chrome);
+  mast.name = 'DroneMast';
+  mast.position.y = -0.011;
+  g.add(plate, mast);
+  const reach = 0.078;
+  const blade = new BoxGeometry(0.075, 0.0012, 0.007);
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 + (i * Math.PI) / 2;
+    const arm = new Mesh(new BoxGeometry(reach, 0.0045, 0.008), slateShadow);
+    arm.name = `DroneArm${i + 1}`;
+    arm.position.set((Math.cos(a) * reach) / 2, 0, (Math.sin(a) * reach) / 2);
+    arm.rotation.y = -a;
+    const motor = new Mesh(new CylinderGeometry(0.0075, 0.0085, 0.011, 12), chrome);
+    motor.name = `DroneMotor${i + 1}`;
+    motor.position.set(Math.cos(a) * reach, 0.005, Math.sin(a) * reach);
+    const rotor = new Mesh(blade, slateShadow);
+    rotor.name = `DroneRotor${i + 1}`;
+    rotor.position.set(Math.cos(a) * reach, 0.0125, Math.sin(a) * reach);
+    g.add(arm, motor, rotor);
+  }
   return g;
 }
 
