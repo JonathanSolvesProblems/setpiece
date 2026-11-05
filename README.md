@@ -31,27 +31,32 @@ I wanted to be a VFX filmmaker before I switched to computer science. The short 
 
 ## What it does
 
-- **The stage is a clapper slate at 1:10** (60 by 40 cm, a 6 by 4 m set). It lands on your table one of three ways, whichever your room allows: on the nearest table or desk the headset reports; where you touch the table with a fingertip and pinch, which needs hand tracking and nothing else; or where you carry it by the plate.
-- **Actors are wooden lay figures; the creature is a tennis ball on a stand** at its eye height. Point at a piece, pinch, and move your hand. Let go and it stands itself up on the slate. The camera keeps the height you gave it, because a high or a low angle is a choice.
+- **The stage is a clapper slate at 1:10** (60 by 40 cm, a 6 by 4 m set). It lands on your table one of three ways, whichever your room allows: on the nearest table or desk the headset reports (and if it knows of none, Find my table starts the headset's own room scan); where you touch the table with a fingertip and pinch, which needs hand tracking and nothing else; or where you carry it by its striped front edge. Until it is on a table it floats in front of you and comes with you when you walk away, sit down or turn round.
+- **Actors are wooden lay figures; the creature is a tennis ball on a stand** at its eye height. Pinch a piece, with your fingers on it or from a distance, and move your hand; turn your wrist and it turns. A ring lights under the piece your hand is on. Let go and it stands itself up on the slate. The camera keeps the height you gave it, because a high or a low angle is a choice.
+- **Only the striped edge moves the set.** Hold it and the whole slate follows your hand and turns with your wrist. The slate's top, the monitor and the board do not move it, so a pinch that misses an actor does not carry the set away.
+- **Hands or controllers.** Everything a pinch does, a trigger does; the guidance says trigger when controllers are in your hands.
 - **The eyeline from each actor to the ball is drawn live** and reported in degrees and in metres on the real set.
-- **The camera is a 35 mm film camera.** A director's monitor above the stage shows what its lens sees, at 24, 35, 50 or 85 mm (full frame, 16:9). The lens sees the set and nothing else: not the panel, not the card, not your hands.
-- **Snap claps the sticks and puts a frame on the storyboard card**: six frames, each with its lens, camera height, distance to the creature and every actor's eyeline written under it, so the card is the shot list and can be read in the headset on its own.
+- **The camera is a 35 mm film camera.** A director's monitor above the stage shows what its lens sees, at 24, 35, 50 or 85 mm (full frame, 16:9). Turn your wrist to pan it and tip your wrist to tilt its head on the tripod. Until you tilt it yourself it tilts itself at the nearest actor's eyes. The lens sees the set and nothing else: not the panel, not the card, not your hands.
+- **Snap claps the sticks and puts a frame on the storyboard card**: six frames, each with its lens, camera height, distance to the creature and every actor's eyeline written under it, so the card is the shot list and can be read in the headset on its own. **Pinch a frame and the set goes back to it**: every piece to its mark, the lens on, the camera tilted as it was.
+- **Record a take.** Press Record, walk an actor across the slate or pan the camera, press Stop, and the move plays back in a loop on the set and on the monitor. Record again and what is in the take plays while you carry another piece, so the actor's walk goes down first and the camera's move is laid over it. A take is up to twelve seconds, and it is kept with the board.
 - **It is all still there next time.** The set is parked on a room anchor; where each piece stands and the whole board are kept in the browser. The next session opens with the set where you left it and says so only when that is true.
-- **One line of guidance** above the monitor: land the set, block it, frame it, snap. Each step ends on the thing it asked for, never on a timer, and the line goes away when the board is full.
+- **One line of guidance** above the monitor: land the set, block it, frame it, snap. Each step ends on the thing it asked for, never on a timer, it marks the piece or the button it is asking for, and it goes away when the board is full. During a take it is the take's clock.
 
 ## What it does not do
 
-Every number on the board is measured from where the pieces stand at the moment of the frame. Nothing on it is estimated or generated. Setpiece does not choose a lens for you, it does not know the real location, and a frame is a blocking diagram with wooden figures, not a render of the finished shot.
+Every number on the board is measured from where the pieces stand at the moment of the frame. Nothing on it is estimated or generated. A take is the poses your own hands gave the pieces, thirty times a second, and it can only replay those: nothing in it is animated for you. Setpiece does not choose a lens for you, it does not know the real location, and a frame is a blocking diagram with wooden figures, not a render of the finished shot.
 
 ## Built on
 
-Immersive Web SDK (WebXR, three.js): hand tracking with ray-and-pinch distance grab on every piece and on the stage plate, the fingertip pose for landing the set by touch, scene understanding (planes and labelled room meshes), persistent spatial anchors, passthrough, spatial UI (UIKitML), positional audio, and the IWSDK CLI and emulator for the build loop.
+Immersive Web SDK (WebXR, three.js): hand tracking with pinch grab on every piece and on the slate's edge, each with a grab zone wider than the piece so a near miss still picks it up; the wrist's own rotation for turning a piece and tilting the camera; the fingertip pose for landing the set by touch; scene understanding (planes and labelled room meshes) and the Quest Browser's room capture; persistent spatial anchors; passthrough in an unbounded session; spatial UI (UIKitML); positional audio; and the IWSDK CLI and emulator for the build loop.
 
-For the frame rate: the key light's shadow and the monitor's second view of the set are drawn only on frames where a piece, the stage or the lens has moved, so a set that is standing still costs one view per eye.
+For the frame rate: the monitor's second view of the set is drawn only on frames where a piece, the stage or the lens has moved, and the key light's six-pass shadow on every other one of those, so a set that is standing still costs one view per eye.
 
 ## Where this stands
 
-Checked in the IWSDK emulator with hands as the only input, each step by state: landing by table and by touch, grab, settle, snap, the board and the pieces kept across a reload, a refused session request. Not measured yet on a headset: frame rate in a session, real table detection, anchors across a relaunch. Those numbers go here when they exist.
+On a Quest 3S, in the Quest Browser, on Nov 5: the session starts in passthrough with both hands tracked; it holds 90 frames a second with the set standing still (median frame 11.1 ms, none over 20 ms in the sample) and measured 78 while two pieces were being carried at once, before the shadow was moved to alternate frames; picking up, carrying and turning pieces by wrist, tilting the camera, and snapping frames onto the board all work on real hands.
+
+Checked only in the IWSDK emulator so far, each step by state: landing by table and by touch, the set following its user, the take recorder and its layering, going back to a frame's setup, the same steps with controllers, and the board, pieces and take kept across a reload. Not yet measured on a headset: landing on a real table, anchors across a relaunch, and the frame rate while a take plays. Those go here when they exist.
 
 ## Type, art and sound
 

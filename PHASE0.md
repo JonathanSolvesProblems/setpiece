@@ -163,6 +163,34 @@ Not proven, and only the headset can: a session at all, 60 fps in it, the finger
 
 Dates: the device run happens the next time I am in the headset, and nothing below outranks it. Life-size view and more pieces by Nov 9 if the frame rate allows. Headline number on device Nov 9. Phone link Nov 10. Three outside testers Nov 12. Video Nov 14. Pre-submit gate Nov 16. Submit Nov 17.
 
+## Device session on Nov 5: the first real run, what it broke, and what was built from it
+
+Field 12 is met, a week late. On the Quest 3S, in the Quest Browser, the session started once the wearer answered the browser's own prompt ("Allow setpiece-xr.vercel.app to open immersive experiences that use spatial tracking?") and the headset's notice about enhanced spatial services. Passthrough, both hands tracked, 90 Hz. The whole loop ran on real hands: pieces picked up and moved, three frames snapped onto the card, the board kept.
+
+Measured on the device: 90 fps with the set standing still (median frame 11.1 ms, p95 13.1 ms, none over 20 ms in 720 frames); 78 fps (median 12.7 ms, two frames over 20 ms in 392) while two pieces were carried at once, before the six-pass shadow was moved to alternate frames. 109 draw calls, about 11,500 triangles. No console errors in any session.
+
+What the device showed that the emulator had not:
+
+- The set appeared at the page's authored pose, at head height and in the wearer's face, and reported "Moved by hand" before it was touched: the pinch that answered the prompt was still closed when the session appeared and it caught the slate. Now the set is out of sight until it has floated to 0.48 m ahead and 0.34 m below the head, and a grab in the first 0.8 s of a session is let go at once.
+- A lay figure took several pinches to pick up, and a pinch that missed it carried the whole set away, because the slate's top, the monitor and the card all moved the set. Now every piece carries an unseen grab zone 4 cm in radius (Meta's own grab detector is a 5 cm sphere), a ring lights under the piece a hand is on, and only the striped front edge moves the set.
+- Nothing could be turned. The SDK's "move with the hand" grab mode never applies rotation, so the camera could be slid but not aimed. Now a held piece turns with the wrist (yaw, amplified because a wrist turns about 57 degrees), the camera's head tilts with the wrist as well, and the slate turns when held by its edge. Seen working on the device: an actor turned from 30 to 122 degrees, the camera head from 67 degrees up to 33 down.
+- A set floated while the wearer stood was left hanging above them when they sat. Now a set that is not on a table follows its user after 2.5 s of walking away, sitting or standing, or turning round. The session also asks for the unbounded feature, which the headset granted; whether that stops the boundary from ending the session when the wearer walks off is not yet confirmed by the wearer.
+- The empty storyboard read as broken ("snapshots all white"). Empty slots are now slate, numbered, and say what fills them.
+- The headset knew of no table (the room was never scanned). The panel now offers Find my table, which starts the Quest Browser's room capture.
+
+Built the same day, from the wearer's requests and Meta's hand design pages: controllers alongside hands (verified in the emulator only); a take recorder, up to twelve seconds, layered pass over pass, replayed on the set and the monitor; going back to any frame's setup by pinching it on the card; guidance that marks the piece or button it is asking for.
+
+Fields re-run against the code:
+
+- Field 2. Still "make": the user leaves holding a board, and now a take.
+- Field 5. Unchanged and still short: the board and the take live in the headset's browser. The phone link is not built.
+- Field 6. The number still does not exist. The device run that measures it has not been done.
+- Field 7. In use on the device: hand tracking, passthrough, anchors (one tracked), spatial UI, audio. Scene understanding is granted and coded but has not landed a set on a real table: the room has no scan. That is the biggest unproven claim, because the judging text names it: "anchoring content to detected planes" and "holding up in rooms the developer never tested." Pieces 4 of 12, lenses 4 of 6, exports 0 of 2, takes 1.
+
+Not proven on the device yet: landing by touch on a real table, landing from a room scan, anchors across a relaunch, the take recorder, the follow, the recall, controllers, and the frame rate while a take plays.
+
+Next, in order: land the set on a real table both ways and relaunch to prove the anchor; record a take on the device; then depth (props and effects, sensor formats, a drone above crane height), a call sheet of shot briefs checked from the geometry, the headline number, the phone link, three outside testers, the video.
+
 ## Build dates
 
 - Oct 24: headset ordered, rename, card committed. Oct 25: headset delivered.
