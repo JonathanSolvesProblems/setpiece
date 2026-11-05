@@ -92,6 +92,22 @@ const MOVED_DISTANCE = 0.015;
 const MOVED_TURN = 0.05;
 /** The parts of the slate that a hand can hold. Everything else on it lets a ray through. */
 const HANDLE_NAMES = new Set(['ClapperStripe', 'StageHandle']);
+/**
+ * A set that is not on a table belongs with its user. When they have walked
+ * away from it, sat down or stood up under it, or turned their back on it, and
+ * stayed that way this long, it comes back to in front of them.
+ */
+const AWAY_SECONDS = 2.5;
+/** Walked away: this far from the slate along the floor. A set moved by hand is given more room. */
+const AWAY_DISTANCE = 1.1;
+const AWAY_DISTANCE_MANUAL = 1.6;
+/** Sat down or stood up: the slate should sit between this far and this far below the eyes. */
+const AWAY_TOO_HIGH = 0.05;
+const AWAY_TOO_LOW = 0.95;
+/** Turned away: the slate is further than this from straight ahead, as a cosine (about 80 degrees). */
+const AWAY_BEHIND = 0.17;
+/** The set glides to its new place over this long, so the eye can follow it. */
+const GLIDE_SECONDS = 0.45;
 const OPTIC_YELLOW = 0xd6e13c;
 const NO_RAYCAST = (): void => {};
 const silence = (object: Object3D): void => {
@@ -113,7 +129,7 @@ export const StageStatus = {
 } as const;
 
 type SavedPose = { anchored: boolean; position: number[]; quaternion: number[] };
-type Globals = { stageStatus: Signal<string>; resetStageRequested: Signal<number> };
+type Globals = { stageStatus: Signal<string>; resetStageRequested: Signal<number>; takeState?: Signal<string> };
 type NativePlane = { orientation?: string; semanticLabel?: string };
 type Side = 'left' | 'right';
 type Pinch = {
@@ -180,6 +196,14 @@ export class PlacementSystem extends createSystem({
   private tableDone = false;
   private floatPending = false;
   private settle = 0;
+  /** Seconds the wearer has been away from a set that follows them. */
+  private away = 0;
+  private glide = 0;
+  private glideFromPosition = new Vector3();
+  private glideToPosition = new Vector3();
+  private glideFromQuaternion = new Quaternion();
+  private glideToQuaternion = new Quaternion();
+  private toStage = new Vector3();
   private resetSeen = 0;
   private candidates: Candidate[] = [];
   private candidateTimer = -1;
@@ -318,6 +342,15 @@ export class PlacementSystem extends createSystem({
       this.settle = Math.max(0, this.settle - delta);
       const t = 1 - this.settle / SETTLE_SECONDS;
       object.scale.setScalar(SETTLE_FROM + (1 - SETTLE_FROM) * (1 - (1 - t) * (1 - t)));
+    }
+    if (inSession) this.followWearer(stage, delta);
+    if (this.glide > 0) {
+      this.glide = Math.max(0, this.glide - delta);
+      const t = 1 - this.glide / GLIDE_SECONDS;
+      const eased = 1 - (1 - t) * (1 - t);
+      this.corner.lerpVectors(this.glideFromPosition, this.glideToPosition, eased);
+      setWorldPosition(object, this.corner);
+      setWorldQuaternion(object, this.yawQuaternion.slerpQuaternions(this.glideFromQuaternion, this.glideToQuaternion, eased));
     }
     object.updateWorldMatrix(true, false);
     object.getWorldPosition(this.lastWorldPosition);
@@ -632,8 +665,11 @@ export class PlacementSystem extends createSystem({
     this.save(stage);
   }
 
-  /** Nothing to land on yet: hold the set in front of the user, where they are looking. */
-  private floatInFront(stage: Entity): void {
+  /**
+   * Nothing to land on yet: hold the set in front of the user, where they are
+   * looking. With `glide` it travels there instead of appearing there.
+   */
+  private floatInFront(stage: Entity, glide = false): void {
     const object = stage.object3D!;
     this.player.head.getWorldPosition(this.head);
     const forward = this.headForward();
@@ -642,8 +678,66 @@ export class PlacementSystem extends createSystem({
       this.head.y - FLOAT_BELOW,
       this.head.z + forward.z * FLOAT_AHEAD,
     );
+    this.yawQuaternion.setFromAxisAngle(UP, Math.atan2(-forward.x, -forward.z));
+    this.away = 0;
+    if (glide && object.visible) {
+      object.getWorldPosition(this.glideFromPosition);
+      object.getWorldQuaternion(this.glideFromQuaternion);
+      this.glideToPosition.copy(this.corner);
+      this.glideToQuaternion.copy(this.yawQuaternion);
+      this.glide = GLIDE_SECONDS;
+      return;
+    }
+    this.glide = 0;
     setWorldPosition(object, this.corner);
-    setWorldQuaternion(object, this.yawQuaternion.setFromAxisAngle(UP, Math.atan2(-forward.x, -forward.z)));
+    setWorldQuaternion(object, this.yawQuaternion);
+  }
+
+  /**
+   * A floating set, or one carried somewhere by hand, comes back to its user
+   * when they have left it. A set landed on a table stays on the table: that
+   * is what landing it means.
+   */
+  private followWearer(stage: Entity, delta: number): void {
+    const placement = stage.getValue(StageAnchor, 'placement');
+    const follows = placement === Placement.Floating || placement === Placement.Manual;
+    const busy =
+      this.floatPending ||
+      this.holding ||
+      this.glide > 0 ||
+      this.queries.grabbed.entities.size > 0 ||
+      this.world.visibilityState.peek() !== VisibilityState.Visible ||
+      ((this.globals as Globals).takeState?.peek() ?? 'idle') !== 'idle';
+    if (!follows || busy) {
+      this.away = 0;
+      return;
+    }
+    this.player.head.getWorldPosition(this.head);
+    if (this.head.lengthSq() < 1e-4) return;
+    const at = this.lastWorldPosition;
+    this.toStage.set(at.x - this.head.x, 0, at.z - this.head.z);
+    const distance = this.toStage.length();
+    const below = this.head.y - at.y;
+    let gone = distance > (placement === Placement.Manual ? AWAY_DISTANCE_MANUAL : AWAY_DISTANCE);
+    if (placement === Placement.Floating) {
+      // Only a set that was never put anywhere minds the wearer's height and heading.
+      if (below < AWAY_TOO_HIGH || below > AWAY_TOO_LOW) gone = true;
+      if (distance > 0.05 && this.toStage.dot(this.headForward()) / distance < AWAY_BEHIND) gone = true;
+    }
+    if (!gone) {
+      this.away = 0;
+      return;
+    }
+    this.away += delta;
+    if (this.away < AWAY_SECONDS) return;
+    if (placement === Placement.Manual) {
+      // It is no longer where the hand left it.
+      clearKey(StoreKey.Stage);
+      stage.setValue(StageAnchor, 'placement', Placement.Floating);
+      this.tableDone = false;
+      this.status(StageStatus.Floating);
+    }
+    this.floatInFront(stage, true);
   }
 
   private applyAuthored(stage: Entity): void {
