@@ -49,6 +49,22 @@ export const SoundCue = createComponent('SoundCue', {
 });
 
 /** The shot camera. lensMm is a full-frame focal length; the viewfinder is a 16:9 crop. */
+/** How far the camera head tilts on its tripod, up or down, in radians. */
+export const CAMERA_TILT_LIMIT = 1.3;
+
 export const ShotCamera = createComponent('ShotCamera', {
   lensMm: { type: Types.Float32, default: 35, min: 12, max: 200, step: 1 },
+  tilt: {
+    type: Types.Float32,
+    default: 0,
+    min: -CAMERA_TILT_LIMIT,
+    max: CAMERA_TILT_LIMIT,
+    step: 0.01,
+    help: 'Tilt of the camera head in radians, up is positive',
+  },
+  aimed: {
+    type: Types.Boolean,
+    default: false,
+    help: 'True once the tilt has been set by hand; until then the camera tilts itself at the nearest actor',
+  },
 });

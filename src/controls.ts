@@ -44,7 +44,13 @@ type Globals = {
   resetStageRequested: Signal<number>;
   newBoardRequested: Signal<number>;
   coachTarget: Signal<string>;
+  takeState: Signal<string>;
+  takeLength: Signal<number>;
+  recordRequested: Signal<number>;
+  playRequested: Signal<number>;
 };
+/** The tally's red: the record button wears it while a take is being recorded. */
+const TALLY_RED = '#e0352b';
 const CHALK = '#f6f7ef';
 /** While the call sheet asks for a frame, Snap frame flashes this many times a second. */
 const SNAP_FLASH_RATE = 1.6;
@@ -147,6 +153,39 @@ export class ControlsSystem extends createSystem({
     };
     newBoard?.addEventListener('click', requestNewBoard);
     this.cleanupFuncs.push(() => newBoard?.removeEventListener('click', requestNewBoard));
+
+    // A take: Record starts and stops a pass, Play loops what has been recorded.
+    const record = panel.getElementById<UIKit.Text>('btn-record');
+    const play = panel.getElementById<UIKit.Text>('btn-play');
+    const requestRecord = () => {
+      g.recordRequested.value = g.recordRequested.value + 1;
+    };
+    const requestPlay = () => {
+      g.playRequested.value = g.playRequested.value + 1;
+    };
+    record?.addEventListener('click', requestRecord);
+    play?.addEventListener('click', requestPlay);
+    const labelTake = () => {
+      const state = g.takeState.peek();
+      const has = g.takeLength.peek() > 0;
+      const recording = state === 'recording';
+      const playing = state === 'playing';
+      record?.setProperties({
+        text: recording ? 'Stop' : has ? 'Record over' : 'Record',
+        borderColor: recording ? TALLY_RED : CHALK_HAZE,
+      });
+      play?.setProperties({
+        display: has && !recording ? 'flex' : 'none',
+        text: playing ? 'Stop' : 'Play',
+        borderColor: playing ? OPTIC_YELLOW : CHALK_HAZE,
+      });
+    };
+    this.cleanupFuncs.push(
+      () => record?.removeEventListener('click', requestRecord),
+      () => play?.removeEventListener('click', requestPlay),
+      g.takeState.subscribe(labelTake),
+      g.takeLength.subscribe(labelTake),
+    );
 
     const snap = panel.getElementById('btn-snap');
     this.snapButton = snap ?? null;

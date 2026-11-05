@@ -58,6 +58,7 @@
     border-color: #6f6c6b;
   }
   .lenses { flex-direction: row; gap: 6px; flex-grow: 1; justify-content: flex-start; }
+  .takes { flex-direction: row; gap: 6px; flex-grow: 1; justify-content: flex-start; }
   .lens {
     font-family: "Shoulders";
     font-weight: 700;
@@ -133,6 +134,13 @@
     </div>
   </div>
   <div id="btn-snap" class="primary">Snap frame</div>
+  <div class="field">
+    <div class="label">TAKE</div>
+    <div class="takes">
+      <div id="btn-record" class="word">Record</div>
+      <div id="btn-play" class="word" style="display: none">Play</div>
+    </div>
+  </div>
   <div class="rule"></div>
   <div class="field">
     <div class="label">EYELINE</div>

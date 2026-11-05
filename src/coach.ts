@@ -19,6 +19,7 @@ import {
 import type { Signal } from '@preact/signals-core';
 import { Placement, SetPiece, SetRole, StageAnchor } from './set-components.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
+import { TAKE_MAX_SECONDS, TakeState } from './take.js';
 
 const W = 1536;
 const H = 300;
@@ -49,7 +50,14 @@ const Step = {
 } as const;
 type StepId = (typeof Step)[keyof typeof Step];
 
-type Globals = { shotFrames: Signal<unknown[]>; coachLine: Signal<string>; coachTarget: Signal<string> };
+type Globals = {
+  shotFrames: Signal<unknown[]>;
+  coachLine: Signal<string>;
+  coachTarget: Signal<string>;
+  takeState: Signal<string>;
+  takeSeconds: Signal<number>;
+  takeLength: Signal<number>;
+};
 /** The thing each step asks the wearer to put a hand on; it is marked on the set while the step is up. */
 const TARGET: Partial<Record<StepId, string>> = { [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
 type CoachState = { done: boolean };
@@ -83,6 +91,11 @@ export class CoachSystem extends createSystem({
   /** The wearer is holding controllers, so the words say trigger where they would say pinch. */
   private controllers = false;
   private drawnControllers = false;
+  /** While a take records or plays, the sheet is its clock. */
+  private take: string = TakeState.Idle;
+  private takeSeconds = 0;
+  private drawnTake: string = TakeState.Idle;
+  private drawnTakeSeconds = -1;
 
   init(): void {
     this.canvas = document.createElement('canvas');
@@ -140,9 +153,12 @@ export class CoachSystem extends createSystem({
     }
     if (this.timing && this.shots < BOARD_SLOTS) this.boardSeconds += delta;
     this.advance(delta);
-    const target = TARGET[this.step] ?? '';
+    this.take = g.takeState.peek();
+    this.takeSeconds = g.takeSeconds.peek();
+    const onTake = this.take !== TakeState.Idle;
+    const target = onTake ? '' : (TARGET[this.step] ?? '');
     if (g.coachTarget.peek() !== target) g.coachTarget.value = target;
-    sheet.visible = this.step !== Step.Hidden;
+    sheet.visible = this.step !== Step.Hidden || onTake;
     if (!sheet.visible || !this.fontsReady) return;
     const xr = this.input.xr;
     this.controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
@@ -150,12 +166,16 @@ export class CoachSystem extends createSystem({
       this.step !== this.drawnStep ||
       this.shots !== this.drawnShots ||
       this.restored !== this.drawnRestored ||
-      this.controllers !== this.drawnControllers
+      this.controllers !== this.drawnControllers ||
+      this.take !== this.drawnTake ||
+      (onTake && this.takeSeconds !== this.drawnTakeSeconds)
     ) {
       this.drawnStep = this.step;
       this.drawnShots = this.shots;
       this.drawnRestored = this.restored;
       this.drawnControllers = this.controllers;
+      this.drawnTake = this.take;
+      this.drawnTakeSeconds = this.takeSeconds;
       this.draw();
     }
   }
@@ -243,6 +263,19 @@ export class CoachSystem extends createSystem({
   }
 
   private copy(): [string, string] {
+    const length = Math.round((this.globals as Globals).takeLength.peek());
+    if (this.take === TakeState.Recording) {
+      // The first pass sets the length; later passes run to it.
+      return length > 0
+        ? [`RECORDING · ${this.takeSeconds} S OF ${length} S`, 'The take plays. Carry another piece to add its move.']
+        : [
+            `RECORDING · ${this.takeSeconds} S OF ${TAKE_MAX_SECONDS} S`,
+            'Move the actors and the camera. Stop when the move is done.',
+          ];
+    }
+    if (this.take === TakeState.Playing) {
+      return [`TAKE · ${this.takeSeconds} S OF ${length} S`, 'On the monitor. Pick up a piece to stop it.'];
+    }
     switch (this.step) {
       case Step.Land:
         return [
@@ -260,8 +293,8 @@ export class CoachSystem extends createSystem({
         return [
           '3 OF 4 · FRAME IT',
           this.controllers
-            ? 'Hold the trigger on the camera. Turn your wrist to aim it.'
-            : 'Pinch the camera. Turn your wrist to aim it.',
+            ? 'Hold the trigger on the camera. Turn and tip your wrist to aim it.'
+            : 'Pinch the camera. Turn and tip your wrist to aim it.',
         ];
       case Step.Snap:
         return [

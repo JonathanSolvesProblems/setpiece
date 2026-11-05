@@ -24,7 +24,7 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { HandTurn } from './hand-turn.js';
-import { Cue, SetPiece, SetRole, SoundCue } from './set-components.js';
+import { CAMERA_TILT_LIMIT, Cue, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 
@@ -47,6 +47,14 @@ const GRAB_VOLUME: Record<string, [number, number]> = {
 };
 /** A wrist turns about a quarter turn in comfort; this makes that most of a half turn. */
 const TURN_GAIN = 1.8;
+/** Tipping the wrist tilts the camera a little more than one for one. */
+const TILT_GAIN = 1.4;
+/**
+ * The camera tilts itself at the nearest actor until a hand tilts it. A hand
+ * has to ask for this much tilt in one hold before it takes over, so carrying
+ * the camera across the set does not switch the aim off by accident.
+ */
+const TILT_TAKEOVER = 0.1;
 /**
  * The pinch that answered the headset's own prompt is often still closed when
  * the session appears. For this long after it does, a grab is not a choice.
@@ -87,6 +95,8 @@ export class PiecesSystem extends createSystem({
   private boardSeen = 0;
   private forward = new Vector3();
   private upright = new Quaternion();
+  private right = new Vector3();
+  private rigTurn = new Quaternion();
 
   init(): void {
     const g = this.globals as Globals;
@@ -166,7 +176,22 @@ export class PiecesSystem extends createSystem({
         const side = this.grab?.getHolderHand(piece);
         if (side != null) turn.begin(this.player.gripSpaces[side]);
       }
-      if (piece.object3D != null) turn.apply(piece.object3D, delta, TURN_GAIN);
+      const object = piece.object3D;
+      if (object == null) continue;
+      if (!piece.hasComponent(ShotCamera)) {
+        turn.apply(object, delta, TURN_GAIN);
+        continue;
+      }
+      // The camera also tilts, about its own left-to-right axis.
+      this.right.set(1, 0, 0).applyQuaternion(object.getWorldQuaternion(this.rigTurn));
+      turn.apply(object, delta, TURN_GAIN, this.right, TILT_GAIN);
+      const aimed = piece.getValue(ShotCamera, 'aimed') === true;
+      if (!aimed && Math.abs(turn.tiltAsked) < TILT_TAKEOVER) continue;
+      if (!aimed) piece.setValue(ShotCamera, 'aimed', true);
+      if (turn.tiltStep !== 0) {
+        const tilt = (piece.getValue(ShotCamera, 'tilt') ?? 0) + turn.tiltStep;
+        piece.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, tilt)));
+      }
     }
   }
 
@@ -216,6 +241,13 @@ export class PiecesSystem extends createSystem({
       this.authored.set(key, [...object.position.toArray(), ...(object.quaternion.toArray() as number[])]);
       const pose = saved?.[key];
       if (isPose(pose)) this.apply(piece, pose);
+      if (piece.hasComponent(ShotCamera)) {
+        const camera = loadJson<{ tilt: number; aimed: boolean }>(StoreKey.Camera);
+        if (camera?.aimed === true && Number.isFinite(camera.tilt)) {
+          piece.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, camera.tilt)));
+          piece.setValue(ShotCamera, 'aimed', true);
+        }
+      }
       this.dress(piece);
     }
     return true;
@@ -262,6 +294,12 @@ export class PiecesSystem extends createSystem({
       const object = piece.object3D;
       if (object == null || this.isStage(piece)) continue;
       poses[this.key(piece)] = [...object.position.toArray(), ...(object.quaternion.toArray() as number[])];
+      if (piece.hasComponent(ShotCamera)) {
+        saveJson(StoreKey.Camera, {
+          tilt: piece.getValue(ShotCamera, 'tilt') ?? 0,
+          aimed: piece.getValue(ShotCamera, 'aimed') === true,
+        });
+      }
     }
     saveJson(StoreKey.Pieces, poses);
   }
@@ -269,10 +307,16 @@ export class PiecesSystem extends createSystem({
   /** A new board starts from the scene's own blocking. */
   private backToStart(): void {
     clearKey(StoreKey.Pieces);
+    clearKey(StoreKey.Camera);
     for (const piece of this.queries.pieces.entities) {
       if (this.isStage(piece) || piece.object3D == null) continue;
       const authored = this.authored.get(this.key(piece));
       if (authored) this.apply(piece, authored);
+      if (piece.hasComponent(ShotCamera)) {
+        // The camera goes back to aiming itself.
+        piece.setValue(ShotCamera, 'aimed', false);
+        piece.setValue(ShotCamera, 'tilt', 0);
+      }
     }
   }
 }

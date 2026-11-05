@@ -5,6 +5,10 @@
  * because a wrist turns comfortably through about a quarter turn and an actor
  * needs to face any way, and smoothed, because tracking noise on a held camera
  * is a shaking picture on the monitor.
+ *
+ * A camera also tilts. Given a level axis (the camera's own left-to-right), the
+ * part of the hand's rotation about that axis is read the same way, so tipping
+ * the wrist forward tips the camera down, as it would with the camera in hand.
  */
 import { Object3D, Quaternion, setWorldQuaternion, Vector3 } from '@iwsdk/core';
 
@@ -22,8 +26,13 @@ export class HandTurn {
   private turn = new Quaternion();
   private world = new Quaternion();
   private pending = 0;
+  private pendingTilt = 0;
   /** Radians turned since the hold began, for callers that ask whether it moved. */
   total = 0;
+  /** Radians to tilt this frame, when apply was given an axis to tilt about. */
+  tiltStep = 0;
+  /** Radians the wrist has asked to tilt since the hold began, before smoothing. */
+  tiltAsked = 0;
 
   get active(): boolean {
     return this.space != null;
@@ -34,17 +43,27 @@ export class HandTurn {
     this.space = space;
     space.getWorldQuaternion(this.previous);
     this.pending = 0;
+    this.pendingTilt = 0;
     this.total = 0;
+    this.tiltStep = 0;
+    this.tiltAsked = 0;
   }
 
   end(): void {
     this.space = null;
     this.pending = 0;
+    this.pendingTilt = 0;
+    this.tiltStep = 0;
   }
 
-  /** Turn the object about the vertical by what the wrist did this frame. */
-  apply(object: Object3D, seconds: number, gain: number): void {
+  /**
+   * Turn the object about the vertical by what the wrist did this frame. With
+   * a tilt axis, also work out this frame's tilt about it and leave it in
+   * `tiltStep` for the caller, who knows what tilts.
+   */
+  apply(object: Object3D, seconds: number, gain: number, tiltAxis?: Vector3, tiltGain = 0): void {
     const space = this.space;
+    this.tiltStep = 0;
     if (space == null) return;
     space.getWorldQuaternion(this.now);
     this.delta.copy(this.previous).invert().premultiply(this.now);
@@ -58,7 +77,21 @@ export class HandTurn {
     }
     const yaw = 2 * Math.atan2(y, w);
     if (Math.abs(yaw) < MAX_STEP) this.pending += yaw * gain;
-    const step = this.pending * (1 - Math.exp(-CATCH_UP * seconds));
+    const ease = 1 - Math.exp(-CATCH_UP * seconds);
+    if (tiltAxis != null) {
+      // The twist of the same rotation about the level axis.
+      const d = this.delta;
+      let along = d.x * tiltAxis.x + d.y * tiltAxis.y + d.z * tiltAxis.z;
+      if (d.w < 0) along = -along;
+      const tilt = 2 * Math.atan2(along, w);
+      if (Math.abs(tilt) < MAX_STEP) {
+        this.pendingTilt += tilt * tiltGain;
+        this.tiltAsked += tilt * tiltGain;
+      }
+      this.tiltStep = this.pendingTilt * ease;
+      this.pendingTilt -= this.tiltStep;
+    }
+    const step = this.pending * ease;
     if (Math.abs(step) < 1e-5) return;
     this.pending -= step;
     this.total += step;

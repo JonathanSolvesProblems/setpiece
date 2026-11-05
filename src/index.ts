@@ -8,6 +8,7 @@ import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SlateSystem } from './slate.js';
+import { TakeState, TakeSystem } from './take.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import type { Shot } from './viewfinder.js';
 
@@ -30,10 +31,17 @@ World.create(
   globals.coachLine = signal('');
   // What the call sheet is asking for right now: 'actor', 'camera', 'snap' or nothing.
   globals.coachTarget = signal('');
+  // The take: what it is doing, how far in it is, and how long it runs, in seconds.
+  globals.takeState = signal<string>(TakeState.Idle);
+  globals.takeSeconds = signal(0);
+  globals.takeLength = signal(0);
+  globals.recordRequested = signal(0);
+  globals.playRequested = signal(0);
 
   world
     .registerSystem(PlacementSystem, { priority: 10 })
     .registerSystem(PiecesSystem, { priority: 12 })
+    .registerSystem(TakeSystem, { priority: 14 })
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })
@@ -118,6 +126,34 @@ World.create(
   document.getElementById('page-reset')?.addEventListener('click', () => {
     newBoardRequested.value += 1;
   });
+  // A take on the page: drag a figure or the camera with the mouse while it records.
+  const takeState = globals.takeState as Signal<string>;
+  const takeLength = globals.takeLength as Signal<number>;
+  const recordRequested = globals.recordRequested as Signal<number>;
+  const playRequested = globals.playRequested as Signal<number>;
+  const pageRecord = document.getElementById('page-record') as HTMLButtonElement | null;
+  const pagePlay = document.getElementById('page-play') as HTMLButtonElement | null;
+  pageRecord?.addEventListener('click', () => {
+    recordRequested.value += 1;
+  });
+  pagePlay?.addEventListener('click', () => {
+    playRequested.value += 1;
+  });
+  const labelTake = (): void => {
+    const state = takeState.peek();
+    const has = takeLength.peek() > 0;
+    if (pageRecord) {
+      pageRecord.textContent =
+        state === TakeState.Recording ? 'Stop recording' : has ? 'Record over it' : 'Record a take';
+      pageRecord.setAttribute('aria-pressed', String(state === TakeState.Recording));
+    }
+    if (pagePlay) {
+      pagePlay.hidden = !has || state === TakeState.Recording;
+      pagePlay.textContent = state === TakeState.Playing ? 'Stop the take' : `Play take (${Math.round(takeLength.peek())} s)`;
+    }
+  };
+  takeState.subscribe(labelTake);
+  takeLength.subscribe(labelTake);
   const fieldShot = document.getElementById('f-shot');
   const fieldEyeline = document.getElementById('f-eyeline');
   const cells = Array.from(document.querySelectorAll<HTMLLIElement>('#board li'));

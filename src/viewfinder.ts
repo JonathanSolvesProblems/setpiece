@@ -14,6 +14,7 @@ import {
   Color,
   createSystem,
   Entity,
+  Group,
   Float32BufferAttribute,
   Line,
   LineBasicMaterial,
@@ -35,7 +36,7 @@ import {
   WebGLRenderTarget,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { SetPiece, SetRole, ShotCamera } from './set-components.js';
+import { CAMERA_TILT_LIMIT, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
 /** One miniature metre on the stage is ten real metres on set. */
@@ -74,6 +75,9 @@ const MONITOR_GLOW = 0xdfe8ff;
 /** The lens aims this far below the nearest actor's eyes, so the eyes sit high in frame. */
 const AIM_BELOW_EYES = 0.012;
 const MAX_TILT = 0.6;
+/** The camera head pivots at the top of the tripod; these parts of the rig ride it. */
+const HEAD_PIVOT_Y = 0.112;
+const HEAD_PARTS = /^(Body|Magazine|Lens|FocusRing|MatteBox|Eyepiece|Tally)/;
 /** The studio the shot lens sees around the set: 25 m away at the set's scale. */
 const BACKDROP_RADIUS = 2.5;
 /**
@@ -106,7 +110,12 @@ type Globals = {
   shotList: Signal<string[]>;
   shotFrames: Signal<Shot[]>;
   newBoardRequested: Signal<number>;
+  takeState: Signal<string>;
 };
+/** The monitor's tally at rest, and its two brightnesses while a take records. */
+const TALLY_REST = 0.35;
+const TALLY_ON = 2.6;
+const TALLY_OFF = 0.1;
 
 type AsyncReader = WebGLRenderer & {
   readRenderTargetPixelsAsync?: (
@@ -126,6 +135,7 @@ export class ViewfinderSystem extends createSystem({
   private target!: WebGLRenderTarget;
   private lensCamera!: PerspectiveCamera;
   private monitor: Mesh | null = null;
+  private cameraHead: Group | null = null;
   private backdrop: Mesh | null = null;
   private stageEntity: Entity | null = null;
   private tally: MeshStandardMaterial | null = null;
@@ -161,6 +171,9 @@ export class ViewfinderSystem extends createSystem({
   private liveFrames = LIVE_AT_START;
   private lastSignature = Number.NaN;
   private shadowTick = false;
+  private tallyBlinking = false;
+  /** The tally is held bright for a moment after a snap. */
+  private snapFlash = false;
   /** How many times the monitor has been drawn; a test reads it to see the saving. */
   lensPasses = 0;
   private prevClear = new Color();
@@ -180,15 +193,35 @@ export class ViewfinderSystem extends createSystem({
 
     // The monitor is created once the stage entity exists; see ensureMonitor().
 
+    // The camera's head tilts on its tripod. The rig arrives as one flat group,
+    // so the parts above the tripod head are gathered under a pivot here, on
+    // this placed copy, and the lens rides the same pivot.
     const attach = (entity: Entity) => {
-      entity.object3D?.add(this.lensCamera);
+      const rig = entity.object3D;
+      if (rig == null) return;
+      const head = new Group();
+      head.name = 'CameraHead';
+      head.position.set(0, HEAD_PIVOT_Y, 0);
+      rig.add(head);
+      for (const part of [...rig.children]) {
+        if (HEAD_PARTS.test(part.name)) {
+          part.position.y -= HEAD_PIVOT_Y;
+          head.add(part);
+        }
+      }
+      head.add(this.lensCamera);
       // Just in front of the lens barrel, so the rig's own body is never in frame.
-      this.lensCamera.position.set(0, 0.118, -0.06);
+      this.lensCamera.position.set(0, 0.118 - HEAD_PIVOT_Y, -0.06);
+      this.lensCamera.rotation.set(0, 0, 0);
+      this.cameraHead = head;
     };
     this.queries.cams.entities.forEach(attach);
     this.cleanupFuncs.push(
       this.queries.cams.subscribe('qualify', attach),
-      this.queries.cams.subscribe('disqualify', () => this.lensCamera.removeFromParent()),
+      this.queries.cams.subscribe('disqualify', () => {
+        this.lensCamera.removeFromParent();
+        this.cameraHead = null;
+      }),
     );
 
     const g = this.globals as Globals;
@@ -556,9 +589,17 @@ export class ViewfinderSystem extends createSystem({
     for (const cam of this.queries.cams.entities) cam.setValue(ShotCamera, 'lensMm', mm);
   }
 
-  update(): void {
+  update(_delta: number, time: number): void {
     const cam = this.queries.cams.entities.values().next().value as Entity | undefined;
     if (cam?.object3D == null || !this.ensureMonitor()) return;
+    // The tally blinks while a take records, as on a set.
+    const recording = (this.globals as Globals).takeState.peek() === 'recording';
+    if (recording !== this.tallyBlinking || recording) {
+      this.tallyBlinking = recording;
+      if (this.tally && !this.snapFlash) {
+        this.tally.emissiveIntensity = !recording ? TALLY_REST : Math.floor(time * 2) % 2 === 0 ? TALLY_ON : TALLY_OFF;
+      }
+    }
     this.updateEyelines();
     const signature = this.signature();
     if (signature !== this.lastSignature) {
@@ -572,7 +613,7 @@ export class ViewfinderSystem extends createSystem({
       // 11 ms behind at worst; the last frame of a move and a snap always redraw it.
       this.shadowTick = !this.shadowTick;
       if (this.shadowTick || this.liveFrames === 0 || this.snapPending) this.renderer.shadowMap.needsUpdate = true;
-      this.aimLens();
+      this.aimLens(cam);
       this.renderViewfinder();
       this.lensPasses++;
     }
@@ -590,6 +631,10 @@ export class ViewfinderSystem extends createSystem({
    */
   private signature(): number {
     let s = this.lensCamera.fov * 17.3;
+    for (const cam of this.queries.cams.entities) {
+      // A tilt by hand changes the picture; the camera's own aim follows the pieces, which are counted below.
+      if (cam.getValue(ShotCamera, 'aimed')) s += (cam.getValue(ShotCamera, 'tilt') ?? 0) * 31.7;
+    }
     for (const piece of this.queries.pieces.entities) {
       const object = piece.object3D;
       if (object == null) continue;
@@ -668,7 +713,15 @@ export class ViewfinderSystem extends createSystem({
    * eyes, the way an operator keeps the subject's eyes in the upper part of the
    * frame. Yaw stays with the rig, so a long lens still lands on a face.
    */
-  private aimLens(): void {
+  private aimLens(cam: Entity): void {
+    const head = this.cameraHead;
+    if (head == null) return;
+    // Tilted by hand: the hand's tilt stands.
+    if (cam.getValue(ShotCamera, 'aimed')) {
+      const tilt = cam.getValue(ShotCamera, 'tilt') ?? 0;
+      head.rotation.x = Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, tilt));
+      return;
+    }
     this.lensCamera.getWorldPosition(this.b);
     let nearest = Infinity;
     let pitch = 0;
@@ -681,7 +734,10 @@ export class ViewfinderSystem extends createSystem({
         pitch = Math.atan2(this.a.y - AIM_BELOW_EYES - this.b.y, run);
       }
     }
-    this.lensCamera.rotation.x = Math.max(-MAX_TILT, Math.min(MAX_TILT, pitch));
+    pitch = Math.max(-MAX_TILT, Math.min(MAX_TILT, pitch));
+    head.rotation.x = pitch;
+    // Kept on the camera, so a hand that takes over starts from where the camera was looking.
+    if (Math.abs((cam.getValue(ShotCamera, 'tilt') ?? 0) - pitch) > 1e-3) cam.setValue(ShotCamera, 'tilt', pitch);
   }
 
   private eyelineDeg(i: number): number {
@@ -809,8 +865,10 @@ export class ViewfinderSystem extends createSystem({
     AudioUtils.play(cam);
     if (this.tally) {
       this.tally.emissiveIntensity = 2.5;
+      this.snapFlash = true;
       setTimeout(() => {
-        if (this.tally) this.tally.emissiveIntensity = 0.35;
+        this.snapFlash = false;
+        if (this.tally) this.tally.emissiveIntensity = TALLY_REST;
       }, 240);
     }
     // Kept for the next visit. A browser with no storage keeps it for this one only.
