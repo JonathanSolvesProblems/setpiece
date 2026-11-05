@@ -139,6 +139,7 @@ type Globals = {
   roomScanRequested: Signal<number>;
   roomScanOffered: Signal<boolean>;
   takeState?: Signal<string>;
+  lifeSize?: Signal<boolean>;
 };
 /** The Quest Browser's own way to start the headset's room scan from inside a session, once per session. */
 type RoomCapture = XRSession & { initiateRoomCapture?: () => Promise<void> };
@@ -831,6 +832,7 @@ export class PlacementSystem extends createSystem({
     const busy =
       this.floatPending ||
       this.aiming ||
+      (this.globals as Globals).lifeSize?.peek() === true ||
       this.holding ||
       this.glide > 0 ||
       this.queries.grabbed.entities.size > 0 ||

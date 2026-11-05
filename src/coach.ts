@@ -346,7 +346,7 @@ export class CoachSystem extends createSystem({
       case Step.Done: {
         const s = Math.round(this.doneSeconds);
         const took = s > 0 ? ` in ${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s` : '';
-        return ['BOARD FULL', `Six frames${took}. Saved for your next visit.`];
+        return ['BOARD FULL', `Six frames${took}. Exit to the browser to save the board and the take.`];
       }
       case Step.Welcome:
         // Only say the set is where it was left when it is.
@@ -365,6 +365,7 @@ export class CoachSystem extends createSystem({
   private fillLine(): [string, string] {
     const brief = BRIEFS[(this.globals as Globals).briefIndex.peek()];
     if (this.shots === 2) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Pinch a frame on the board to go back to its setup.'];
+    if (this.shots === 3) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Press Stand in the shot to walk your blocking at full size.'];
     if (brief == null) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Every shot is printed. Shoot what you like.'];
     return [`NEXT: ${brief.title.toUpperCase()}`, brief.ask];
   }

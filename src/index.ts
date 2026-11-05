@@ -8,6 +8,8 @@ import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SlateSystem } from './slate.js';
+import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
+import { LifeSizeSystem } from './life-size.js';
 import { TakeState, TakeSystem } from './take.js';
 import { TraySystem } from './tray.js';
 import { Rig } from './camera-formats.js';
@@ -45,6 +47,8 @@ World.create(
   globals.poseRequested = signal(0);
   globals.lookRequested = signal(0);
   globals.castLine = signal('');
+  globals.lifeSize = signal(false);
+  globals.lifeSizeRequested = signal(0);
   globals.removeSelected = signal(0);
   globals.clearSet = signal(0);
   globals.selectedIsActor = signal(false);
@@ -68,6 +72,7 @@ World.create(
     .registerSystem(PiecesSystem, { priority: 12 })
     .registerSystem(TakeSystem, { priority: 14 })
     .registerSystem(TraySystem, { priority: 15 })
+    .registerSystem(LifeSizeSystem, { priority: 16 })
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })
@@ -180,6 +185,40 @@ World.create(
   };
   takeState.subscribe(labelTake);
   takeLength.subscribe(labelTake);
+  // What leaves with the director. The board and the take carry over from the headset.
+  const viewfinder = world.getSystem(ViewfinderSystem);
+  const saveBoard = document.getElementById('page-save-board') as HTMLButtonElement | null;
+  const saveList = document.getElementById('page-save-list') as HTMLButtonElement | null;
+  const saveTake = document.getElementById('page-save-take') as HTMLButtonElement | null;
+  saveBoard?.addEventListener('click', () => {
+    if (viewfinder) downloadBoard(viewfinder);
+  });
+  saveList?.addEventListener('click', () => downloadShotList((globals.shotFrames as Signal<Shot[]>).peek()));
+  saveTake?.addEventListener('click', () => {
+    if (viewfinder == null || takeState.peek() === TakeState.Recording) return;
+    saveTake.disabled = true;
+    saveTake.textContent = 'Filming the take';
+    void downloadAnimatic(
+      viewfinder,
+      takeLength.peek(),
+      () => {
+        if (takeState.peek() === TakeState.Idle) playRequested.value += 1;
+      },
+      () => {
+        if (takeState.peek() === TakeState.Playing) playRequested.value += 1;
+      },
+    ).finally(() => {
+      saveTake.disabled = false;
+      saveTake.textContent = 'Save animatic';
+    });
+  });
+  takeLength.subscribe((seconds) => {
+    if (saveTake) saveTake.hidden = seconds <= 0 || !canRecordVideo();
+  });
+  (globals.shotFrames as Signal<Shot[]>).subscribe((shots) => {
+    if (saveBoard) saveBoard.hidden = shots.length === 0;
+    if (saveList) saveList.hidden = shots.length === 0;
+  });
   const fieldShot = document.getElementById('f-shot');
   const fieldEyeline = document.getElementById('f-eyeline');
   const cells = Array.from(document.querySelectorAll<HTMLLIElement>('#board li'));

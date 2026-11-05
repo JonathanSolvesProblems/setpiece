@@ -219,6 +219,7 @@ export class ViewfinderSystem extends createSystem({
   private recalledIndex = -1;
   private recalledSignature = Number.NaN;
   private tallyBlinking = false;
+  private pixels: Uint8Array | null = null;
   private skipSeen = 0;
   /** The tally is held bright for a moment after a snap. */
   private snapFlash = false;
@@ -319,6 +320,26 @@ export class ViewfinderSystem extends createSystem({
 
   getShots(): readonly Shot[] {
     return this.shots;
+  }
+
+  /** The whole storyboard, for saving. */
+  boardPicture(): HTMLCanvasElement {
+    return this.boardCanvas;
+  }
+
+  /** The monitor's picture as it stands, right way up, on a canvas. */
+  copyMonitor(canvas: HTMLCanvasElement): void {
+    const w = RT_WIDTH;
+    const h = RT_HEIGHT;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (ctx == null) return;
+    this.pixels ??= new Uint8Array(w * h * 4);
+    this.renderer.readRenderTargetPixels(this.target, 0, 0, w, h, this.pixels);
+    const image = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) image.data.set(this.pixels.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+    ctx.putImageData(image, 0, 0);
   }
 
   /** Something changed that the pose of a piece does not show: draw the monitor again. */
@@ -866,9 +887,11 @@ export class ViewfinderSystem extends createSystem({
     // An effect moves on its own, so the monitor keeps up with it, at a rate the headset can spare.
     this.effectTick = (this.effectTick + 1) % EFFECT_LENS_EVERY;
     if (this.liveFrames === 0 && !this.snapPending && this.effectTick === 0 && (this.globals as Globals).effectsOn.peek() > 0) {
-      this.aimLens(cam);
-      this.renderViewfinder();
-      this.lensPasses++;
+      if (this.monitor?.visible === true) {
+        this.aimLens(cam);
+        this.renderViewfinder();
+        this.lensPasses++;
+      }
     }
     if (this.liveFrames > 0 || this.snapPending) {
       this.liveFrames = Math.max(0, this.liveFrames - 1);
@@ -878,8 +901,11 @@ export class ViewfinderSystem extends createSystem({
       this.shadowTick = !this.shadowTick;
       if (this.shadowTick || this.liveFrames === 0 || this.snapPending) this.renderer.shadowMap.needsUpdate = true;
       this.aimLens(cam);
-      this.renderViewfinder();
-      this.lensPasses++;
+      // With the monitor left on the table there is nobody to watch it.
+      if (this.monitor?.visible === true || this.snapPending) {
+        this.renderViewfinder();
+        this.lensPasses++;
+      }
     }
     if (this.snapPending) {
       this.snapPending = false;
@@ -970,8 +996,9 @@ export class ViewfinderSystem extends createSystem({
       position.setXYZ(1, this.c.x, this.c.y, this.c.z);
       position.needsUpdate = true;
       line.visible = true;
-      this.rises[i] = this.c.y - this.a.y;
-      this.runs[i] = Math.hypot(this.c.x - this.a.x, this.c.z - this.a.z);
+      const size = this.stageEntity?.object3D?.scale.x ?? 1;
+      this.rises[i] = (this.c.y - this.a.y) / size;
+      this.runs[i] = Math.hypot(this.c.x - this.a.x, this.c.z - this.a.z) / size;
     }
     for (let i = this.actors.length; i < this.lines.length; i++) this.lines[i].visible = false;
     if (this.frameCount++ % TEXT_EVERY_N_FRAMES === 0) this.publishEyelineText();
@@ -1042,6 +1069,7 @@ export class ViewfinderSystem extends createSystem({
     const prevAlpha = renderer.getClearAlpha();
 
     const monitor = this.monitor!;
+    const monitorShown = monitor.visible;
     monitor.visible = false;
     if (this.backdrop) this.backdrop.visible = true;
     if (!this.panelHidden) {
@@ -1072,7 +1100,7 @@ export class ViewfinderSystem extends createSystem({
     renderer.autoClear = prevAutoClear;
     renderer.shadowMap.autoUpdate = shadowAutoUpdate;
     xr.enabled = xrWasEnabled;
-    monitor.visible = true;
+    monitor.visible = monitorShown;
     if (this.backdrop) this.backdrop.visible = false;
     for (let i = 0; i < overlays.length; i++) overlays[i].visible = shown[i];
   }

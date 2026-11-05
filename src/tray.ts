@@ -121,6 +121,7 @@ export class TraySystem extends createSystem({
       if (assetByLabel(this.key(piece)) == null) continue;
       this.managed.push(piece);
       this.show(piece, this.on.has(this.key(piece)));
+      this.freeze(piece.object3D!);
       piece.object3D!.traverse((object) => {
         if (object.name !== 'EffectParticles') return;
         this.effects.push((object as Mesh).material as ShaderMaterial);
@@ -135,6 +136,15 @@ export class TraySystem extends createSystem({
     else this.applyRig(g.cameraRig.peek());
     this.publish();
     return true;
+  }
+
+  /** A piece moves as one body, so its parts need their local matrix worked out only once. */
+  private freeze(root: Object3D): void {
+    root.traverse((part) => {
+      if (part === root) return;
+      part.updateMatrix();
+      part.matrixAutoUpdate = false;
+    });
   }
 
   private show(piece: Entity, on: boolean): void {

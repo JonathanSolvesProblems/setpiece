@@ -17,6 +17,8 @@ const UP = new Vector3(0, 1, 0);
 const CATCH_UP = 16;
 /** A turn larger than this in one frame is tracking being lost and found, not a wrist. */
 const MAX_STEP = 0.5;
+/** Less than this in one frame is tracking noise, not a wrist: about 5 degrees a second at 90 Hz. */
+const NOISE_STEP = 0.001;
 
 export class HandTurn {
   private space: Object3D | null = null;
@@ -76,7 +78,7 @@ export class HandTurn {
       w = -w;
     }
     const yaw = 2 * Math.atan2(y, w);
-    if (Math.abs(yaw) < MAX_STEP) this.pending += yaw * gain;
+    if (Math.abs(yaw) < MAX_STEP && Math.abs(yaw) > NOISE_STEP) this.pending += yaw * gain;
     const ease = 1 - Math.exp(-CATCH_UP * seconds);
     if (tiltAxis != null) {
       // The twist of the same rotation about the level axis.
@@ -84,7 +86,7 @@ export class HandTurn {
       let along = d.x * tiltAxis.x + d.y * tiltAxis.y + d.z * tiltAxis.z;
       if (d.w < 0) along = -along;
       const tilt = 2 * Math.atan2(along, w);
-      if (Math.abs(tilt) < MAX_STEP) {
+      if (Math.abs(tilt) < MAX_STEP && Math.abs(tilt) > NOISE_STEP) {
         this.pendingTilt += tilt * tiltGain;
         this.tiltAsked += tilt * tiltGain;
       }

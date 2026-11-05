@@ -95,7 +95,10 @@
     line-height: 18px;
     color: #f6f7ef;
     flex-grow: 1;
+    flex-shrink: 0;
+    min-height: 42px;
     height: 42px;
+    text-align: center;
     justify-content: center;
     align-items: center;
     border-width: 2px;
@@ -190,6 +193,7 @@
     <div id="btn-reset-stage" class="word">Reset stage</div>
   </div>
   <div id="btn-snap" class="primary">Snap frame</div>
+  <div id="btn-life" class="takebutton">Stand in the shot</div>
   <div class="tabs">
     <div id="tab-shoot" class="tab">Shoot</div>
     <div id="tab-camera" class="tab">Camera</div>
@@ -272,6 +276,7 @@
       <div id="btn-pose" class="word" style="display: none">Pose</div>
       <div id="btn-look" class="word" style="display: none">Look</div>
     </div>
+    <div class="line muted">Effects are stand-ins for placing a shot, not simulations.</div>
     <div class="field">
       <div id="assets-count" class="line muted">3 on the set</div>
       <div id="btn-clear-set" class="word">Clear set</div>

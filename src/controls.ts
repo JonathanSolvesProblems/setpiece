@@ -22,7 +22,12 @@ import { SetPiece, StageAnchor } from './set-components.js';
  * Where the panel sits relative to the stage, as the scene authors it: left of
  * the slate, a little above it, turned in toward the viewer.
  */
-const PANEL_OFFSET = new Vector3(-0.4, 0.3, -0.16);
+const PANEL_OFFSET = new Vector3(-0.4, 0.33, -0.16);
+/** At full size the table is left behind, so the panel stays with the wearer: this far ahead, this far off centre, this far below the eyes. */
+const WALK_AHEAD = 0.6;
+const WALK_LEFT = 0.32;
+const WALK_BELOW = 0.2;
+const WALK_FOLLOW = 3;
 const PANEL_YAW = (34 * Math.PI) / 180;
 const UP = new Vector3(0, 1, 0);
 
@@ -51,6 +56,8 @@ type Globals = {
   takeLength: Signal<number>;
   roomScanRequested: Signal<number>;
   roomScanOffered: Signal<boolean>;
+  lifeSize: Signal<boolean>;
+  lifeSizeRequested: Signal<number>;
   recordRequested: Signal<number>;
   playRequested: Signal<number>;
   trayToggle: Signal<string>;
@@ -83,6 +90,8 @@ export class ControlsSystem extends createSystem({
   private stage: Entity | null = null;
   private panelObject: Object3D | null = null;
   private panelPosition = new Vector3();
+  private head = new Vector3();
+  private forward = new Vector3();
   private panelQuaternion = new Quaternion();
   private panelTurn = new Quaternion().setFromAxisAngle(UP, PANEL_YAW);
   private snapButton: { setProperties(properties: Record<string, unknown>): void } | null = null;
@@ -93,8 +102,12 @@ export class ControlsSystem extends createSystem({
    * wherever the table turns out to be, and inside the same narrow field of view.
    * The page hides the panel and has its own controls.
    */
-  update(_delta: number, time: number): void {
+  update(delta: number, time: number): void {
     if (this.world.visibilityState.peek() === VisibilityState.NonImmersive) return;
+    if ((this.globals as Globals).lifeSize.peek()) {
+      this.walkWithWearer(delta);
+      return;
+    }
     const lit =
       (this.globals as Globals).coachTarget.peek() === 'snap' && Math.floor(time * SNAP_FLASH_RATE * 2) % 2 === 0;
     if (lit !== this.snapLit) {
@@ -113,6 +126,27 @@ export class ControlsSystem extends createSystem({
     setWorldQuaternion(panel, this.panelQuaternion);
     // The set is out of sight for the first moment of a session; so is its panel.
     panel.visible = stageObject.visible;
+  }
+
+  /** On a full-size set the panel keeps beside the wearer, lazily, so it can be read and pinched anywhere. */
+  private walkWithWearer(delta: number): void {
+    const panel = this.panelObject;
+    if (panel == null) return;
+    this.player.head.getWorldPosition(this.head);
+    this.player.head.getWorldDirection(this.forward).negate();
+    this.forward.y = 0;
+    if (this.forward.lengthSq() < 1e-4) this.forward.set(0, 0, -1);
+    this.forward.normalize();
+    const yaw = Math.atan2(-this.forward.x, -this.forward.z);
+    this.panelPosition.set(
+      this.head.x + this.forward.x * WALK_AHEAD + this.forward.z * WALK_LEFT,
+      this.head.y - WALK_BELOW,
+      this.head.z + this.forward.z * WALK_AHEAD - this.forward.x * WALK_LEFT,
+    );
+    panel.getWorldPosition(this.head).lerp(this.panelPosition, 1 - Math.exp(-WALK_FOLLOW * delta));
+    setWorldPosition(panel, this.head);
+    setWorldQuaternion(panel, this.panelQuaternion.setFromAxisAngle(UP, yaw + 0.35));
+    panel.visible = true;
   }
 
   init(): void {
@@ -206,6 +240,19 @@ export class ControlsSystem extends createSystem({
     };
     for (const name of TABS) wire(`tab-${name}`, () => showTab(name));
     showTab('shoot');
+
+    // The full-size set, and the way back to the table.
+    wire('btn-life', () => {
+      g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
+    });
+    const life = panel.getElementById<UIKit.Text>('btn-life');
+    this.cleanupFuncs.push(
+      g.lifeSize.subscribe((on) => {
+        life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        // A frame needs the slate under the actors, and the slate is back on the table.
+        panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
+      }),
+    );
 
     // The camera kit.
     wire('btn-format', () => {
