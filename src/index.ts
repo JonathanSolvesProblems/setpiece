@@ -28,6 +28,8 @@ World.create(
   globals.resetStageRequested = signal(0);
   globals.newBoardRequested = signal(0);
   globals.coachLine = signal('');
+  // What the call sheet is asking for right now: 'actor', 'camera', 'snap' or nothing.
+  globals.coachTarget = signal('');
 
   world
     .registerSystem(PlacementSystem, { priority: 10 })

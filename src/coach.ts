@@ -49,7 +49,9 @@ const Step = {
 } as const;
 type StepId = (typeof Step)[keyof typeof Step];
 
-type Globals = { shotFrames: Signal<unknown[]>; coachLine: Signal<string> };
+type Globals = { shotFrames: Signal<unknown[]>; coachLine: Signal<string>; coachTarget: Signal<string> };
+/** The thing each step asks the wearer to put a hand on; it is marked on the set while the step is up. */
+const TARGET: Partial<Record<StepId, string>> = { [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
 type CoachState = { done: boolean };
 
 export class CoachSystem extends createSystem({
@@ -126,16 +128,20 @@ export class CoachSystem extends createSystem({
   update(delta: number): void {
     if (!this.ensureSheet()) return;
     const sheet = this.sheet!;
+    const g = this.globals as Globals;
     if (!this.inSession) {
       sheet.visible = false;
       if (this.drawnStep !== Step.Hidden) {
         this.drawnStep = Step.Hidden;
-        (this.globals as Globals).coachLine.value = '';
+        g.coachLine.value = '';
+        g.coachTarget.value = '';
       }
       return;
     }
     if (this.timing && this.shots < BOARD_SLOTS) this.boardSeconds += delta;
     this.advance(delta);
+    const target = TARGET[this.step] ?? '';
+    if (g.coachTarget.peek() !== target) g.coachTarget.value = target;
     sheet.visible = this.step !== Step.Hidden;
     if (!sheet.visible || !this.fontsReady) return;
     const xr = this.input.xr;
@@ -192,7 +198,9 @@ export class CoachSystem extends createSystem({
       else if (this.shots === 0) this.step = Step.Land;
       else return;
     }
-    if (floating) {
+    // A floating set is somewhere to work too: once a piece has been picked
+    // up, the sheet stops asking for a table.
+    if (floating && !this.moved && !this.framed && this.shots === 0) {
       this.step = Step.Land;
       return;
     }

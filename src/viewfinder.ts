@@ -160,6 +160,7 @@ export class ViewfinderSystem extends createSystem({
    */
   private liveFrames = LIVE_AT_START;
   private lastSignature = Number.NaN;
+  private shadowTick = false;
   /** How many times the monitor has been drawn; a test reads it to see the saving. */
   lensPasses = 0;
   private prevClear = new Color();
@@ -566,7 +567,11 @@ export class ViewfinderSystem extends createSystem({
     }
     if (this.liveFrames > 0 || this.snapPending) {
       this.liveFrames = Math.max(0, this.liveFrames - 1);
-      this.renderer.shadowMap.needsUpdate = true;
+      // Six passes for the key light's shadow is most of the cost of a moving
+      // frame. While a piece is being carried it is redrawn every other frame,
+      // 11 ms behind at worst; the last frame of a move and a snap always redraw it.
+      this.shadowTick = !this.shadowTick;
+      if (this.shadowTick || this.liveFrames === 0 || this.snapPending) this.renderer.shadowMap.needsUpdate = true;
       this.aimLens();
       this.renderViewfinder();
       this.lensPasses++;

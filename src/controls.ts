@@ -43,7 +43,11 @@ type Globals = {
   stageStatus: Signal<string>;
   resetStageRequested: Signal<number>;
   newBoardRequested: Signal<number>;
+  coachTarget: Signal<string>;
 };
+const CHALK = '#f6f7ef';
+/** While the call sheet asks for a frame, Snap frame flashes this many times a second. */
+const SNAP_FLASH_RATE = 1.6;
 
 /** Wires the Setpiece control panel to the shared signals the viewfinder reads. */
 export class ControlsSystem extends createSystem({
@@ -54,14 +58,22 @@ export class ControlsSystem extends createSystem({
   private panelPosition = new Vector3();
   private panelQuaternion = new Quaternion();
   private panelTurn = new Quaternion().setFromAxisAngle(UP, PANEL_YAW);
+  private snapButton: { setProperties(properties: Record<string, unknown>): void } | null = null;
+  private snapLit = false;
 
   /**
    * In the headset the panel travels with the set, so it is beside the slate
    * wherever the table turns out to be, and inside the same narrow field of view.
    * The page hides the panel and has its own controls.
    */
-  update(): void {
+  update(_delta: number, time: number): void {
     if (this.world.visibilityState.peek() === VisibilityState.NonImmersive) return;
+    const lit =
+      (this.globals as Globals).coachTarget.peek() === 'snap' && Math.floor(time * SNAP_FLASH_RATE * 2) % 2 === 0;
+    if (lit !== this.snapLit) {
+      this.snapLit = lit;
+      this.snapButton?.setProperties({ backgroundColor: lit ? OPTIC_YELLOW : CHALK });
+    }
     const stageObject = this.stage?.object3D;
     if (stageObject == null) return;
     if (this.panelObject == null) this.panelObject = this.scene.getObjectByName('Controls Panel') ?? null;
@@ -137,6 +149,7 @@ export class ControlsSystem extends createSystem({
     this.cleanupFuncs.push(() => newBoard?.removeEventListener('click', requestNewBoard));
 
     const snap = panel.getElementById('btn-snap');
+    this.snapButton = snap ?? null;
     const requestSnap = () => {
       g.snapRequested.value = g.snapRequested.value + 1;
     };

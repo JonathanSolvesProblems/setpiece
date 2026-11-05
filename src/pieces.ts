@@ -58,7 +58,10 @@ const NO_RAYCAST = (): void => {};
 /** Position then quaternion, in the stage's own space. */
 type Pose = number[];
 type SavedPieces = Record<string, Pose>;
-type Globals = { newBoardRequested: Signal<number> };
+type Globals = { newBoardRequested: Signal<number>; coachTarget: Signal<string> };
+/** The ring under the piece the call sheet is asking for breathes this much, this fast. */
+const BECKON_SWELL = 0.22;
+const BECKON_RATE = 5;
 
 const isPose = (value: unknown): value is Pose =>
   Array.isArray(value) && value.length === 7 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
@@ -116,13 +119,13 @@ export class PiecesSystem extends createSystem({
     );
   }
 
-  update(delta: number): void {
+  update(delta: number, time: number): void {
     if (!this.ready) {
       this.ready = this.captureAndRestore();
       return;
     }
     if (this.guard > 0) this.guard -= delta;
-    this.followHands(delta);
+    this.followHands(delta, time);
     if (this.released.length === 0) return;
     for (const piece of this.released) {
       if (piece.object3D == null) continue;
@@ -141,11 +144,19 @@ export class PiecesSystem extends createSystem({
    * Mark the piece the hand is on, and turn a held piece with the wrist that
    * holds it. The grab itself only carries: it moves the piece with the hand.
    */
-  private followHands(delta: number): void {
+  private followHands(delta: number, time: number): void {
+    // The call sheet names one kind of piece at a time; the first of that kind is the one marked.
+    const wanted = (this.globals as Globals).coachTarget.peek();
+    let beckoned = false;
     for (let i = 0; i < this.dressed.length; i++) {
       const piece = this.dressed[i];
       const held = piece.hasComponent(Grabbed) && !this.ignored.has(piece);
-      this.rings[i].visible = held || piece.hasComponent(Hovered);
+      const touched = held || piece.hasComponent(Hovered);
+      const beckon = !beckoned && wanted !== '' && piece.getValue(SetPiece, 'role') === wanted;
+      if (beckon) beckoned = true;
+      const ring = this.rings[i];
+      ring.visible = touched || beckon;
+      ring.scale.setScalar(beckon && !touched ? 1 + BECKON_SWELL * (0.5 + 0.5 * Math.sin(time * BECKON_RATE)) : 1);
       const turn = this.turns[i];
       if (!held) {
         if (turn.active) turn.end();
