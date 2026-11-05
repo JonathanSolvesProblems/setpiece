@@ -191,6 +191,8 @@ Not proven on the device yet: landing by touch on a real table, landing from a r
 
 Next, in order: land the set on a real table both ways and relaunch to prove the anchor; record a take on the device; then depth (props and effects, sensor formats, a drone above crane height), a call sheet of shot briefs checked from the geometry, the headline number, the phone link, three outside testers, the video.
 
+Later on Nov 5: landing by pointing. A live pinch log showed the touch landing could not work as built: the floating set covered the table, and the 0.2 m rule rejected real touches because the wearer's head was only 0.13 to 0.17 m above the fingertip. A probe in the running session showed the Quest's hit test answers with no room scan: 589 of 892 frames along the head, 1,080 of 1,080 along each hand. Its pose normals were not usable (near zero on what should be a flat surface), so a surface is judged by being below the eyes and below the hand. Now the set stays hidden while a chalk outline follows the aim across real surfaces, and a pinch or trigger lands it (src/landing.ts). On the device the outline tracked a real surface and the set landed, by controller, at 0.59 m in a room with no scan. It landed to the wearer's right and behind them, so one trigger press with an unaimed controller can place it badly; Reset stage brings the outline back. Not yet seen: a deliberate landing on the table by hand, and a relaunch.
+
 ## Build dates
 
 - Oct 24: headset ordered, rename, card committed. Oct 25: headset delivered.
