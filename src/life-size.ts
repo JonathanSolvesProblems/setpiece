@@ -18,7 +18,7 @@ const UP = new Vector3(0, 1, 0);
 /** Where the lens is on the rig: this far along its forward, -Z. */
 const LENS_AHEAD = -0.06;
 /** What stays on the table: the furniture of the miniature, not the blocking. */
-const LEFT_BEHIND = new Set(['Plate', 'Rim', 'ClapperStripe', 'Strip', 'Viewfinder', 'StoryboardCard', 'HandleGlow', 'HandleLabel', 'StageHandle', 'LensBackdrop']);
+const LEFT_BEHIND = new Set(['Plate', 'Rim', 'ClapperStripe', 'Strip', 'Viewfinder', 'StoryboardCard', 'HandleLabel', 'StageHandle', 'LensBackdrop']);
 
 type Globals = { lifeSize: Signal<boolean>; lifeSizeRequested: Signal<number> };
 
@@ -32,7 +32,6 @@ export class LifeSizeSystem extends createSystem({
   private savedPosition = new Vector3();
   private savedQuaternion = new Quaternion();
   private hidden: Object3D[] = [];
-  private restoreEvents: [Object3D, Object3D['pointerEvents']][] = [];
   private light: PointLight | null = null;
   private lightIntensity = 0;
   private lightDistance = 0;
@@ -52,7 +51,8 @@ export class LifeSizeSystem extends createSystem({
         else this.enter();
       }),
       this.world.visibilityState.subscribe((state) => {
-        if (state === VisibilityState.NonImmersive && g.lifeSize.peek()) this.leave();
+        // The session is over: the placement system has its own pose for the page.
+        if (state === VisibilityState.NonImmersive && g.lifeSize.peek()) this.leave(false);
       }),
     );
   }
@@ -89,7 +89,6 @@ export class LifeSizeSystem extends createSystem({
     setWorldPosition(object, this.head);
 
     this.hidden.length = 0;
-    this.restoreEvents.length = 0;
     object.traverse((child) => {
       if (LEFT_BEHIND.has(child.name) && child.visible) {
         child.visible = false;
@@ -101,16 +100,10 @@ export class LifeSizeSystem extends createSystem({
     });
     // Nothing on a full-size set is within reach: the blocking is to be walked, not moved.
     for (const piece of this.queries.pieces.entities) {
-      const target = piece.object3D;
-      if (target == null) continue;
-      this.restoreEvents.push([target, target.pointerEvents]);
-      target.pointerEvents = 'none';
+      if (piece.object3D != null) piece.object3D.pointerEvents = 'none';
     }
     const card = this.scene.getObjectByName('StoryboardCard');
-    if (card != null) {
-      this.restoreEvents.push([card, card.pointerEvents]);
-      card.pointerEvents = 'none';
-    }
+    if (card != null) card.pointerEvents = 'none';
     if (this.light != null) {
       this.lightIntensity = this.light.intensity;
       this.lightDistance = this.light.distance;
@@ -121,17 +114,24 @@ export class LifeSizeSystem extends createSystem({
     g.lifeSize.value = true;
   }
 
-  private leave(): void {
+  private leave(restorePose = true): void {
     const g = this.globals as Globals;
     const object = this.stage()?.object3D;
     if (object == null) return;
     object.scale.setScalar(1);
-    object.position.copy(this.savedPosition);
-    object.quaternion.copy(this.savedQuaternion);
+    if (restorePose) {
+      object.position.copy(this.savedPosition);
+      object.quaternion.copy(this.savedQuaternion);
+    }
     for (const child of this.hidden) child.visible = true;
     this.hidden.length = 0;
-    for (const [target, events] of this.restoreEvents) target.pointerEvents = events;
-    this.restoreEvents.length = 0;
+    // From what is true now: an asset may have been added or removed at full size.
+    for (const piece of this.queries.pieces.entities) {
+      const target = piece.object3D;
+      if (target != null) target.pointerEvents = target.visible ? 'auto' : 'none';
+    }
+    const card = this.scene.getObjectByName('StoryboardCard');
+    if (card != null) card.pointerEvents = 'auto';
     if (this.light != null) {
       this.light.intensity = this.lightIntensity;
       this.light.distance = this.lightDistance;

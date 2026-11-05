@@ -22,7 +22,14 @@ import { SetPiece, StageAnchor } from './set-components.js';
  * Where the panel sits relative to the stage, as the scene authors it: left of
  * the slate, a little above it, turned in toward the viewer.
  */
-const PANEL_OFFSET = new Vector3(-0.4, 0.33, -0.16);
+const PANEL_OFFSET = new Vector3(-0.38, 0.33, -0.16);
+/**
+ * The panel hangs from its top edge, this far above the slate, so Snap frame
+ * and the tabs stay put when a page changes the panel's height. Metres per
+ * panel unit is measured from the panel as it is scaled in the scene.
+ */
+const PANEL_TOP = 0.68;
+const PANEL_UNIT = 0.00101;
 /** At full size the table is left behind, so the panel stays with the wearer: this far ahead, this far off centre, this far below the eyes. */
 const WALK_AHEAD = 0.6;
 const WALK_LEFT = 0.32;
@@ -120,12 +127,22 @@ export class ControlsSystem extends createSystem({
     const panel = this.panelObject;
     if (panel == null) return;
     stageObject.updateWorldMatrix(true, false);
-    this.panelPosition.copy(PANEL_OFFSET).applyMatrix4(stageObject.matrixWorld);
+    this.panelPosition.copy(PANEL_OFFSET);
+    const height = this.panelHeight();
+    if (height > 0) this.panelPosition.y = PANEL_TOP - (height * PANEL_UNIT) / 2;
+    this.panelPosition.applyMatrix4(stageObject.matrixWorld);
     stageObject.getWorldQuaternion(this.panelQuaternion).multiply(this.panelTurn);
     setWorldPosition(panel, this.panelPosition);
     setWorldQuaternion(panel, this.panelQuaternion);
     // The set is out of sight for the first moment of a session; so is its panel.
     panel.visible = stageObject.visible;
+  }
+
+  private panelRoot: { size?: { value?: number[] | undefined } } | null = null;
+
+  /** The panel's laid-out height, in panel units; zero until it has one. */
+  private panelHeight(): number {
+    return this.panelRoot?.size?.value?.[1] ?? 0;
   }
 
   /** On a full-size set the panel keeps beside the wearer, lazily, so it can be read and pinched anywhere. */
@@ -165,6 +182,7 @@ export class ControlsSystem extends createSystem({
     // press the panel, even when one of those zones is nearer the hand. UIKit
     // sets this on every element itself, so it goes in as an inherited property.
     root?.setProperties({ pointerEventsOrder: PANEL_ORDER });
+    this.panelRoot = (root as unknown as { size?: { value?: number[] } }) ?? null;
     this.cleanupFuncs.push(
       this.world.visibilityState.subscribe((state) => {
         root?.setProperties({ display: state === VisibilityState.NonImmersive ? 'none' : 'flex' });
@@ -251,6 +269,7 @@ export class ControlsSystem extends createSystem({
         life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         // A frame needs the slate under the actors, and the slate is back on the table.
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
+        panel.getElementById('btn-reset-stage')?.setProperties({ display: on ? 'none' : 'flex' });
       }),
     );
 

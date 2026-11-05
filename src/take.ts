@@ -40,11 +40,12 @@ type Track = {
   /** Where the piece stood when the pass began. */
   start: Float32Array;
 };
-type SavedTake = { rate: number; length: number; tracks: Record<string, number[]> };
+type SavedTake = { rate: number; length: number; tracks: Record<string, number[]>; rig?: string };
 type Globals = {
   takeState: Signal<string>;
   takeSeconds: Signal<number>;
   takeLength: Signal<number>;
+  cameraRig: Signal<string>;
   recordRequested: Signal<number>;
   playRequested: Signal<number>;
   newBoardRequested: Signal<number>;
@@ -72,6 +73,10 @@ export class TakeSystem extends createSystem({
   private heldPieces = 0;
   private a = new Quaternion();
   private b = new Quaternion();
+  /** The rig the camera's move was recorded on. */
+  private rig = '';
+  /** Whether the camera was aiming itself before the take took it over. */
+  private aimedBefore: boolean | null = null;
 
   init(): void {
     const g = this.globals as Globals;
@@ -189,9 +194,21 @@ export class TakeSystem extends createSystem({
     }
   }
 
+  private borrowCamera(): void {
+    if (this.aimedBefore != null) return;
+    for (const cam of this.queries.cams.entities) this.aimedBefore = cam.getValue(ShotCamera, 'aimed') === true;
+  }
+
+  private returnCamera(): void {
+    if (this.aimedBefore == null) return;
+    for (const cam of this.queries.cams.entities) cam.setValue(ShotCamera, 'aimed', this.aimedBefore);
+    this.aimedBefore = null;
+  }
+
   private startRecording(): void {
     if (this.tracks.length === 0) return;
     if (this.state === TakeState.Playing) this.stopPlaying();
+    this.borrowCamera();
     this.backToOne();
     this.time = 0;
     this.written = -1;
@@ -235,7 +252,10 @@ export class TakeSystem extends createSystem({
           track.recorded = true;
         }
       }
-      if (track.touched) this.readPose(track, track.data, index * STRIDE);
+      if (track.touched) {
+        this.readPose(track, track.data, index * STRIDE);
+        if (track.piece.hasComponent(ShotCamera)) this.rig = (this.globals as Globals).cameraRig.peek();
+      }
     }
   }
 
@@ -253,6 +273,7 @@ export class TakeSystem extends createSystem({
         this.time = 0;
         this.setSeconds();
         this.setState(TakeState.Idle);
+        this.returnCamera();
         return;
       }
       this.length = written;
@@ -274,6 +295,10 @@ export class TakeSystem extends createSystem({
 
   private startPlaying(): void {
     if (this.length === 0) return;
+    this.borrowCamera();
+    // A camera move recorded on the drone plays on the drone.
+    const g = this.globals as Globals;
+    if (this.rig !== '' && g.cameraRig.peek() !== this.rig) g.cameraRig.value = this.rig;
     this.time = 0;
     this.setSeconds();
     this.setState(TakeState.Playing);
@@ -296,6 +321,7 @@ export class TakeSystem extends createSystem({
 
   private stopPlaying(): void {
     this.backToOne();
+    this.returnCamera();
     this.time = 0;
     this.setSeconds();
     this.setState(TakeState.Idle);
@@ -320,6 +346,8 @@ export class TakeSystem extends createSystem({
 
   private clear(): void {
     this.length = 0;
+    this.rig = '';
+    this.returnCamera();
     this.time = 0;
     for (let i = 0; i < this.tracks.length; i++) {
       this.tracks[i].recorded = false;
@@ -341,7 +369,7 @@ export class TakeSystem extends createSystem({
       for (let i = 0; i < count; i++) values[i] = Math.round(track.data[i] * 1e4) / 1e4;
       tracks[track.key] = values;
     }
-    saveJson(StoreKey.Take, { rate: RATE, length: this.length, tracks } satisfies SavedTake);
+    saveJson(StoreKey.Take, { rate: RATE, length: this.length, tracks, rig: this.rig } satisfies SavedTake);
   }
 
   private restore(): void {
@@ -360,6 +388,7 @@ export class TakeSystem extends createSystem({
     }
     if (!any) return;
     this.length = length;
+    this.rig = saved.rig ?? '';
     (this.globals as Globals).takeLength.value = length / RATE;
   }
 }

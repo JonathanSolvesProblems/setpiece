@@ -590,8 +590,10 @@ export class ViewfinderSystem extends createSystem({
       this.eyePoint(creature, this.a);
       creatureIn = inside(this.inFrame(this.a, p));
     }
+    const sensor = SENSORS[g.sensorIndex.peek()] ?? SENSORS[0];
     return {
       lensMm: g.lensMm.peek(),
+      equivalentMm: Math.round((g.lensMm.peek() * SENSORS[0].heightMm) / sensor.heightMm),
       rig: g.cameraRig.peek(),
       heightM: (at.y - stageY) * SET_SCALE,
       tiltDeg: ((this.cameraHead?.rotation.x ?? 0) * 180) / Math.PI,
@@ -602,12 +604,12 @@ export class ViewfinderSystem extends createSystem({
   }
 
   /** The current brief, judged on this frame. A frame is kept either way; only a pass is stamped. */
-  private judge(cam: Entity, shot: Shot): void {
+  private judge(measured: Measure, shot: Shot): void {
     const g = this.globals as Globals;
     const index = g.briefIndex.peek();
     const brief = BRIEFS[index];
     if (brief == null) return;
-    const reason = brief.test(this.measure(cam));
+    const reason = brief.test(measured);
     if (reason != null) {
       g.coachNote.value = `NOT YET: ${brief.title.toUpperCase()} | ${reason}`;
       return;
@@ -860,7 +862,7 @@ export class ViewfinderSystem extends createSystem({
   }
 
   update(_delta: number, time: number): void {
-    const cam = this.queries.cams.entities.values().next().value as Entity | undefined;
+    const cam = this.cameraEntity();
     if (cam?.object3D == null || !this.ensureMonitor()) return;
     // The tally blinks while a take records, as on a set.
     const recording = (this.globals as Globals).takeState.peek() === 'recording';
@@ -921,12 +923,12 @@ export class ViewfinderSystem extends createSystem({
    */
   private signature(): number {
     let s = this.lensCamera.fov * 17.3;
-    for (const cam of this.queries.cams.entities) {
-      // A tilt by hand changes the picture; the camera's own aim follows the pieces, which are counted below.
-      if (cam.getValue(ShotCamera, 'aimed')) s += (cam.getValue(ShotCamera, 'tilt') ?? 0) * 31.7;
-    }
-    for (const piece of this.queries.pieces.entities) {
-      const object = piece.object3D;
+    const cam = this.cameraEntity();
+    // A tilt by hand changes the picture; the camera's own aim follows the pieces, which are counted below.
+    if (cam?.getValue(ShotCamera, 'aimed')) s += (cam.getValue(ShotCamera, 'tilt') ?? 0) * 31.7;
+    const pieces = this.pieceList();
+    for (let i = 0; i < pieces.length; i++) {
+      const object = pieces[i].object3D;
       if (object == null) continue;
       const p = object.position;
       const q = object.quaternion;
@@ -940,9 +942,24 @@ export class ViewfinderSystem extends createSystem({
     return s;
   }
 
+  private pieces: Entity[] = [];
+  private shotCamera: Entity | undefined;
+
+  /** The set's pieces as an array, so a walk over them every frame allocates nothing. */
+  private pieceList(): Entity[] {
+    if (this.pieces.length !== this.queries.pieces.entities.size) this.pieces = [...this.queries.pieces.entities];
+    return this.pieces;
+  }
+
+  private cameraEntity(): Entity | undefined {
+    this.shotCamera ??= this.queries.cams.entities.values().next().value as Entity | undefined;
+    return this.shotCamera;
+  }
+
   private findRole(role: string): Entity | undefined {
-    for (const piece of this.queries.pieces.entities) {
-      if (piece.getValue(SetPiece, 'role') === role) return piece;
+    const pieces = this.pieceList();
+    for (let i = 0; i < pieces.length; i++) {
+      if (pieces[i].getValue(SetPiece, 'role') === role) return pieces[i];
     }
     return undefined;
   }
@@ -974,7 +991,9 @@ export class ViewfinderSystem extends createSystem({
   private updateEyelines(): void {
     const creature = this.findRole(SetRole.Creature);
     this.actors.length = 0;
-    for (const piece of this.queries.pieces.entities) {
+    const pieces = this.pieceList();
+    for (let p = 0; p < pieces.length; p++) {
+      const piece = pieces[p];
       // An actor taken off the set has no eyeline and is not in a brief.
       if (piece.getValue(SetPiece, 'role') !== SetRole.Actor || piece.object3D?.visible !== true) continue;
       if (this.actors.length < MAX_ACTORS) this.actors.push(piece);
@@ -1109,6 +1128,29 @@ export class ViewfinderSystem extends createSystem({
     const w = RT_WIDTH;
     const h = RT_HEIGHT;
     const pixels = new Uint8Array(w * h * 4);
+    // Read now: the picture below was drawn this frame, and a hand may move before it arrives.
+    const setup = this.readSetup(cam);
+    const measured = this.measure(cam);
+    const stageObject = this.findRole(SetRole.Stage)?.object3D;
+    const creatureObject = this.findRole(SetRole.Creature)?.object3D;
+    this.lensCamera.getWorldPosition(this.a);
+    const stageY = stageObject ? stageObject.getWorldPosition(this.b).y : this.a.y;
+    const lensY = this.a.y;
+    let distance = 0;
+    if (creatureObject) {
+      creatureObject.getWorldPosition(this.b);
+      distance = Math.hypot(this.b.x - this.a.x, this.b.z - this.a.z);
+    }
+    const g = this.globals as Globals;
+    let eyelines = '';
+    for (let i = 0; i < this.actors.length; i++) {
+      const label = this.actors[i].getValue(SetPiece, 'label') || `Actor ${i + 1}`;
+      const deg = this.eyelineDeg(i);
+      eyelines += `${i > 0 ? ' · ' : ''}${label} ${deg >= 0 ? 'up' : 'down'} ${Math.abs(deg).toFixed(0)}°`;
+    }
+    const firstEyeline = this.actors.length > 0 ? this.eyelineDeg(0) : 0;
+    const lensMm = g.lensMm.peek();
+    const sensorIndex = g.sensorIndex.peek();
     const renderer = this.renderer as AsyncReader;
     if (renderer.readRenderTargetPixelsAsync) {
       await renderer.readRenderTargetPixelsAsync(this.target, 0, 0, w, h, pixels);
@@ -1126,36 +1168,20 @@ export class ViewfinderSystem extends createSystem({
     }
     ctx.putImageData(image, 0, 0);
 
-    const stage = this.findRole(SetRole.Stage);
-    const creature = this.findRole(SetRole.Creature);
-    this.lensCamera.getWorldPosition(this.a);
-    const stageY = stage?.object3D ? stage.object3D.getWorldPosition(this.b).y : this.a.y;
-    let distance = 0;
-    if (creature?.object3D) {
-      creature.object3D.getWorldPosition(this.b);
-      distance = Math.hypot(this.b.x - this.a.x, this.b.z - this.a.z);
-    }
-    const g = this.globals as Globals;
-    let eyelines = '';
-    for (let i = 0; i < this.actors.length; i++) {
-      const label = this.actors[i].getValue(SetPiece, 'label') || `Actor ${i + 1}`;
-      const deg = this.eyelineDeg(i);
-      eyelines += `${i > 0 ? ' · ' : ''}${label} ${deg >= 0 ? 'up' : 'down'} ${Math.abs(deg).toFixed(0)}°`;
-    }
     this.taken += 1;
     const shot: Shot = {
       index: this.taken,
-      lensMm: g.lensMm.peek(),
-      cameraHeightM: (this.a.y - stageY) * SET_SCALE,
+      lensMm,
+      cameraHeightM: (lensY - stageY) * SET_SCALE,
       distanceToCreatureM: distance * SET_SCALE,
-      eyelineDeg: this.actors.length > 0 ? this.eyelineDeg(0) : 0,
+      eyelineDeg: firstEyeline,
       eyelines: eyelines || 'no actor on the set',
       dataUrl: canvas.toDataURL('image/jpeg', 0.86),
-      setup: this.readSetup(cam),
+      setup,
     };
-    const sensor = SENSORS[g.sensorIndex.peek()];
-    if (sensor && g.sensorIndex.peek() !== 0) shot.format = sensor.short;
-    this.judge(cam, shot);
+    const sensor = SENSORS[sensorIndex];
+    if (sensor && sensorIndex !== 0) shot.format = sensor.short;
+    this.judge(measured, shot);
     // A new frame is where the set is now.
     this.recalledIndex = shot.index;
     this.recalledSignature = Number.NaN;

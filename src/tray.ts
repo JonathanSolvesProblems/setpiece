@@ -33,6 +33,7 @@ type Globals = {
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
   trayRestore: Signal<string[] | null>;
+  lifeSize: Signal<boolean>;
   effectsOn: Signal<number>;
   removeSelected: Signal<number>;
   clearSet: Signal<number>;
@@ -150,7 +151,8 @@ export class TraySystem extends createSystem({
   private show(piece: Entity, on: boolean): void {
     const object = piece.object3D!;
     object.visible = on;
-    (object as Object3D & { pointerEvents?: string }).pointerEvents = on ? 'auto' : 'none';
+    // At full size nothing is within reach; coming back to the table sets this from `visible`.
+    if (!(this.globals as Globals).lifeSize.peek()) object.pointerEvents = on ? 'auto' : 'none';
   }
 
   private toggle(label: string): void {

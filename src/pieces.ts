@@ -76,6 +76,7 @@ type Globals = {
   coachTarget: Signal<string>;
   setupRecalled: Signal<number>;
   cameraRig: Signal<string>;
+  takeState: Signal<string>;
 };
 /** A flown camera stays where it is let go, between these heights. */
 const DRONE_MIN_HEIGHT = 0.2;
@@ -138,6 +139,10 @@ export class PiecesSystem extends createSystem({
           this.boardSeen = n;
           this.backToStart();
         }
+      }),
+      // Poses during a take belong to the take; the blocking is kept once it is over.
+      g.takeState.subscribe((state) => {
+        if (state === 'idle' && this.ready) this.save();
       }),
       // The card sent every piece back to a frame's setup: that is the blocking to keep now.
       g.setupRecalled.subscribe((n) => {
@@ -314,6 +319,7 @@ export class PiecesSystem extends createSystem({
   }
 
   private save(): void {
+    if ((this.globals as Globals).takeState.peek() !== 'idle') return;
     const poses: SavedPieces = {};
     for (const piece of this.queries.pieces.entities) {
       const object = piece.object3D;

@@ -24,6 +24,8 @@ export type PieceInFrame = {
 
 export type Measure = {
   lensMm: number;
+  /** The lens that would frame the same on full frame. */
+  equivalentMm: number;
   rig: string;
   /** Real metres of lens above the slate. */
   heightM: number;
@@ -49,9 +51,9 @@ const THIRD = 1 / 3;
 export const BRIEFS: Brief[] = [
   {
     title: 'Wide establishing shot',
-    ask: 'Everyone and the creature in frame, on 35 mm or wider.',
+    ask: 'Everyone and the creature in frame, framing 35 mm or wider.',
     test: (m) => {
-      if (m.lensMm > 35) return `${m.lensMm} mm is too long. Go to 35 mm or wider.`;
+      if (m.equivalentMm > 35) return `That frames like ${m.equivalentMm} mm. Go to 35 mm or wider.`;
       const missing = m.actors.find((a) => !a.whole);
       if (missing) return `${missing.label} is not fully in frame.`;
       return !m.creatureOnSet || m.creatureIn ? null : 'The creature is out of frame.';
@@ -124,11 +126,11 @@ export const BRIEFS: Brief[] = [
   },
   {
     title: 'Creature reveal',
-    ask: 'Creature in frame, with an actor looking up at it on a long lens.',
+    ask: 'Creature in frame with an actor, framing 50 mm or longer.',
     test: (m) => {
       if (!m.creatureOnSet) return 'Add the creature from Assets.';
       if (!m.creatureIn) return 'The creature is out of frame.';
-      if (m.lensMm < 50) return `${m.lensMm} mm is too wide. Go to 50 mm or longer.`;
+      if (m.equivalentMm < 50) return `That frames like ${m.equivalentMm} mm. Go to 50 mm or longer.`;
       return m.actors.some((a) => a.eyesIn) ? null : 'Keep an actor in frame with it.';
     },
   },

@@ -367,7 +367,7 @@ export class PlacementSystem extends createSystem({
         this.chooseTable(stage);
       }
     }
-    if (inSession) {
+    if (inSession && (this.globals as Globals).lifeSize?.peek() !== true) {
       this.updatePinch(stage, 'left', delta);
       this.updatePinch(stage, 'right', delta);
     }
@@ -395,8 +395,11 @@ export class PlacementSystem extends createSystem({
     object.getWorldQuaternion(this.lastWorldQuaternion);
   }
 
+  private stageEntity: Entity | undefined;
+
   private firstStage(): Entity | undefined {
-    return this.queries.stages.entities.values().next().value as Entity | undefined;
+    this.stageEntity ??= this.queries.stages.entities.values().next().value as Entity | undefined;
+    return this.stageEntity;
   }
 
   /** Whether this session can look for real surfaces. */
@@ -912,7 +915,7 @@ export class PlacementSystem extends createSystem({
 
   private reset(): void {
     const stage = this.firstStage();
-    if (stage?.object3D == null) return;
+    if (stage?.object3D == null || (this.globals as Globals).lifeSize?.peek() === true) return;
     clearKey(StoreKey.Stage);
     stage.setValue(StageAnchor, 'placement', Placement.Floating);
     this.tableDone = false;
