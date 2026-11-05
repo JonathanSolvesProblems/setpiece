@@ -57,6 +57,7 @@ type Globals = {
   takeState: Signal<string>;
   takeSeconds: Signal<number>;
   takeLength: Signal<number>;
+  roomScanOffered: Signal<boolean>;
 };
 /** The thing each step asks the wearer to put a hand on; it is marked on the set while the step is up. */
 const TARGET: Partial<Record<StepId, string>> = { [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
@@ -91,6 +92,8 @@ export class CoachSystem extends createSystem({
   /** The wearer is holding controllers, so the words say trigger where they would say pinch. */
   private controllers = false;
   private drawnControllers = false;
+  private scanOffered = false;
+  private drawnScanOffered = false;
   /** While a take records or plays, the sheet is its clock. */
   private take: string = TakeState.Idle;
   private takeSeconds = 0;
@@ -155,6 +158,7 @@ export class CoachSystem extends createSystem({
     this.advance(delta);
     this.take = g.takeState.peek();
     this.takeSeconds = g.takeSeconds.peek();
+    this.scanOffered = g.roomScanOffered.peek();
     const onTake = this.take !== TakeState.Idle;
     const target = onTake ? '' : (TARGET[this.step] ?? '');
     if (g.coachTarget.peek() !== target) g.coachTarget.value = target;
@@ -167,6 +171,7 @@ export class CoachSystem extends createSystem({
       this.shots !== this.drawnShots ||
       this.restored !== this.drawnRestored ||
       this.controllers !== this.drawnControllers ||
+      this.scanOffered !== this.drawnScanOffered ||
       this.take !== this.drawnTake ||
       (onTake && this.takeSeconds !== this.drawnTakeSeconds)
     ) {
@@ -174,6 +179,7 @@ export class CoachSystem extends createSystem({
       this.drawnShots = this.shots;
       this.drawnRestored = this.restored;
       this.drawnControllers = this.controllers;
+      this.drawnScanOffered = this.scanOffered;
       this.drawnTake = this.take;
       this.drawnTakeSeconds = this.takeSeconds;
       this.draw();
@@ -280,7 +286,11 @@ export class CoachSystem extends createSystem({
       case Step.Land:
         return [
           '1 OF 4 · LAND THE SET',
-          this.controllers ? 'Rest a controller on your table and pull the trigger.' : 'Touch your table and pinch.',
+          this.controllers
+            ? 'Rest a controller on your table and pull the trigger.'
+            : this.scanOffered
+              ? 'Touch your table and pinch. Or pinch Find my table.'
+              : 'Touch your table and pinch.',
         ];
       case Step.Move:
         return [

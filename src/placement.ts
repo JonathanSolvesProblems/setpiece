@@ -129,7 +129,17 @@ export const StageStatus = {
 } as const;
 
 type SavedPose = { anchored: boolean; position: number[]; quaternion: number[] };
-type Globals = { stageStatus: Signal<string>; resetStageRequested: Signal<number>; takeState?: Signal<string> };
+type Globals = {
+  stageStatus: Signal<string>;
+  resetStageRequested: Signal<number>;
+  roomScanRequested: Signal<number>;
+  roomScanOffered: Signal<boolean>;
+  takeState?: Signal<string>;
+};
+/** The Quest Browser's own way to start the headset's room scan from inside a session, once per session. */
+type RoomCapture = XRSession & { initiateRoomCapture?: () => Promise<void> };
+/** Seconds to give the headset to report the room it already knows before offering to scan it. */
+const SCAN_OFFER_AFTER = 3;
 type NativePlane = { orientation?: string; semanticLabel?: string };
 type Side = 'left' | 'right';
 type Pinch = {
@@ -198,6 +208,9 @@ export class PlacementSystem extends createSystem({
   private settle = 0;
   /** Seconds the wearer has been away from a set that follows them. */
   private away = 0;
+  private scanSeen = 0;
+  /** The headset allows one room scan per session. */
+  private scanUsed = false;
   private glide = 0;
   private glideFromPosition = new Vector3();
   private glideToPosition = new Vector3();
@@ -266,6 +279,16 @@ export class PlacementSystem extends createSystem({
           this.resetSeen = n;
           this.reset();
         }
+      }),
+      g.roomScanRequested.subscribe((n) => {
+        if (n <= this.scanSeen) return;
+        this.scanSeen = n;
+        const session = this.world.session as RoomCapture | undefined;
+        if (this.scanUsed || typeof session?.initiateRoomCapture !== 'function') return;
+        this.scanUsed = true;
+        // The headset takes over, walks the wearer round the room, and reports
+        // what it found as planes and meshes; a table among them lands the set.
+        void session.initiateRoomCapture().catch(() => {});
       }),
       () => this.bindSession(null),
     );
@@ -344,6 +367,7 @@ export class PlacementSystem extends createSystem({
       object.scale.setScalar(SETTLE_FROM + (1 - SETTLE_FROM) * (1 - (1 - t) * (1 - t)));
     }
     if (inSession) this.followWearer(stage, delta);
+    this.offerScan(stage, inSession);
     if (this.glide > 0) {
       this.glide = Math.max(0, this.glide - delta);
       const t = 1 - this.glide / GLIDE_SECONDS;
@@ -691,6 +715,25 @@ export class PlacementSystem extends createSystem({
     this.glide = 0;
     setWorldPosition(object, this.corner);
     setWorldQuaternion(object, this.yawQuaternion);
+  }
+
+  /**
+   * Offer the room scan while the set floats, the headset has had time to
+   * report the room it already knows, no table was among it, and this browser
+   * can start a scan.
+   */
+  private offerScan(stage: Entity, inSession: boolean): void {
+    const session = this.world.session as RoomCapture | undefined;
+    const offered =
+      inSession &&
+      !this.scanUsed &&
+      !this.tableDone &&
+      this.candidates.length === 0 &&
+      this.sessionElapsed > SCAN_OFFER_AFTER &&
+      stage.getValue(StageAnchor, 'placement') === Placement.Floating &&
+      typeof session?.initiateRoomCapture === 'function';
+    const signal = (this.globals as Globals).roomScanOffered;
+    if (signal.peek() !== offered) signal.value = offered;
   }
 
   /**

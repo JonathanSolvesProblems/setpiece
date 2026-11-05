@@ -46,6 +46,8 @@ type Globals = {
   coachTarget: Signal<string>;
   takeState: Signal<string>;
   takeLength: Signal<number>;
+  roomScanRequested: Signal<number>;
+  roomScanOffered: Signal<boolean>;
   recordRequested: Signal<number>;
   playRequested: Signal<number>;
 };
@@ -146,6 +148,19 @@ export class ControlsSystem extends createSystem({
     };
     resetStage?.addEventListener('click', requestReset);
     this.cleanupFuncs.push(() => resetStage?.removeEventListener('click', requestReset));
+
+    // Offered only while the set floats and the headset can scan the room for a table.
+    const findTable = panel.getElementById('btn-find-table');
+    const requestScan = () => {
+      g.roomScanRequested.value = g.roomScanRequested.value + 1;
+    };
+    findTable?.addEventListener('click', requestScan);
+    this.cleanupFuncs.push(
+      () => findTable?.removeEventListener('click', requestScan),
+      g.roomScanOffered.subscribe((offered) => {
+        findTable?.setProperties({ display: offered ? 'flex' : 'none' });
+      }),
+    );
 
     const newBoard = panel.getElementById('btn-new-board');
     const requestNewBoard = () => {

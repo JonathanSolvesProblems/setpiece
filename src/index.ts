@@ -27,6 +27,9 @@ World.create(
   globals.shotFrames = signal<Shot[]>([]);
   globals.stageStatus = signal<string>(StageStatus.Floating);
   globals.resetStageRequested = signal(0);
+  // The headset can scan the room for a table when it has not been told about one.
+  globals.roomScanRequested = signal(0);
+  globals.roomScanOffered = signal(false);
   globals.newBoardRequested = signal(0);
   globals.coachLine = signal('');
   // What the call sheet is asking for right now: 'actor', 'camera', 'snap' or nothing.

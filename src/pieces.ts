@@ -47,8 +47,12 @@ const GRAB_VOLUME: Record<string, [number, number]> = {
 };
 /** A wrist turns about a quarter turn in comfort; this makes that most of a half turn. */
 const TURN_GAIN = 1.8;
-/** Tipping the wrist tilts the camera a little more than one for one. */
-const TILT_GAIN = 1.4;
+/**
+ * The camera is aimed, not just faced: it follows the hand closely, so a small
+ * correction of the wrist is a small correction of the frame.
+ */
+const CAMERA_TURN_GAIN = 1.3;
+const TILT_GAIN = 1.0;
 /**
  * The camera tilts itself at the nearest actor until a hand tilts it. A hand
  * has to ask for this much tilt in one hold before it takes over, so carrying
@@ -184,7 +188,7 @@ export class PiecesSystem extends createSystem({
       }
       // The camera also tilts, about its own left-to-right axis.
       this.right.set(1, 0, 0).applyQuaternion(object.getWorldQuaternion(this.rigTurn));
-      turn.apply(object, delta, TURN_GAIN, this.right, TILT_GAIN);
+      turn.apply(object, delta, CAMERA_TURN_GAIN, this.right, TILT_GAIN);
       const aimed = piece.getValue(ShotCamera, 'aimed') === true;
       if (!aimed && Math.abs(turn.tiltAsked) < TILT_TAKEOVER) continue;
       if (!aimed) piece.setValue(ShotCamera, 'aimed', true);

@@ -59,6 +59,7 @@
   }
   .lenses { flex-direction: row; gap: 6px; flex-grow: 1; justify-content: flex-start; }
   .takes { flex-direction: row; gap: 6px; flex-grow: 1; justify-content: flex-start; }
+  .stage-actions { flex-direction: row; gap: 6px; width: 100%; justify-content: flex-end; }
   .lens {
     font-family: "Shoulders";
     font-weight: 700;
@@ -120,8 +121,8 @@
     <div class="label">STAGE</div>
     <div id="stage-status" class="status">Floating. Not on your table yet.</div>
   </div>
-  <div class="field">
-    <div class="label"> </div>
+  <div class="stage-actions">
+    <div id="btn-find-table" class="word" style="display: none">Find my table</div>
     <div id="btn-reset-stage" class="word">Reset stage</div>
   </div>
   <div class="field">
