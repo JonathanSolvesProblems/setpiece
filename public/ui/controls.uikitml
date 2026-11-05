@@ -117,7 +117,7 @@
   <div class="rule"></div>
   <div class="field">
     <div class="label">STAGE</div>
-    <div id="stage-status" class="status">Floating. Touch your table and pinch to land it.</div>
+    <div id="stage-status" class="status">Floating. Not on your table yet.</div>
   </div>
   <div class="field">
     <div class="label"> </div>

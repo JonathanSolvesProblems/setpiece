@@ -6,19 +6,34 @@
  *  2. the user touches their table with a fingertip and pinches, which needs
  *     hand tracking and nothing else, so it works in a room that was never
  *     scanned and when room data was not allowed;
- *  3. the user grabs the plate and carries the set there.
+ *  3. the user holds the slate by its striped front edge and carries the set
+ *     there, turning it with the wrist.
  *
  * Until one of those happens the set floats in front of the user. Wherever it
  * ends up it is parked on a room anchor and its pose is saved, so the set is
  * back where it was left on the next launch.
+ *
+ * Only the striped edge moves the set. The slate's top, the monitor and the
+ * storyboard card do not: a pinch that misses an actor must not carry the
+ * whole set away with it.
  */
 import {
   AudioSource,
   AudioUtils,
+  BoxGeometry,
+  CanvasTexture,
   createSystem,
+  DoubleSide,
   Entity,
   Grabbed,
+  GrabSystem,
+  Hovered,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  PlaneGeometry,
   Pressed,
+  SRGBColorSpace,
   VisibilityState,
   Quaternion,
   setWorldPosition,
@@ -29,9 +44,11 @@ import {
   XRPlane,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { STAGE_DEPTH } from './scene-assets/rig.scene-asset.js';
+import { HandTurn } from './hand-turn.js';
+import { STAGE_DEPTH, STAGE_WIDTH } from './scene-assets/rig.scene-asset.js';
 import { Placement, SetPiece, StageAnchor } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
+import { ViewfinderSystem } from './viewfinder.js';
 
 const TABLE_LABELS = new Set(['table', 'desk']);
 const STAGE_LIFT = 0.002;
@@ -43,7 +60,7 @@ const ANCHOR_WAIT_SECONDS = 8;
  * Floating: this far ahead of the head and this far below it. High enough that
  * a hand resting on the table aims under the set, not at it.
  */
-const FLOAT_AHEAD = 0.55;
+const FLOAT_AHEAD = 0.48;
 const FLOAT_BELOW = 0.34;
 /**
  * Seconds into a session before the head pose is used for floating, and how
@@ -61,6 +78,25 @@ const TOUCH_MAX_DRIFT = 0.05;
 const TOUCH_CLEARANCE = 0.05;
 /** A fingertip joint sits about this far above the surface the finger rests on. */
 const FINGER_PAD = 0.008;
+/** A controller resting on a table has its pointing end about this far above it. */
+const CONTROLLER_PAD = 0.035;
+/**
+ * The pinch that answered the headset's own prompt is often still closed when
+ * the session appears. For this long after it does, a grab is not a choice.
+ */
+const INPUT_GUARD_SECONDS = 0.8;
+/** The set turns a little less eagerly than a piece: it is the whole table. */
+const STAGE_TURN_GAIN = 1.5;
+/** A hold that carried the set less than this and turned it less than this was not a move. */
+const MOVED_DISTANCE = 0.015;
+const MOVED_TURN = 0.05;
+/** The parts of the slate that a hand can hold. Everything else on it lets a ray through. */
+const HANDLE_NAMES = new Set(['ClapperStripe', 'StageHandle']);
+const OPTIC_YELLOW = 0xd6e13c;
+const NO_RAYCAST = (): void => {};
+const silence = (object: Object3D): void => {
+  object.raycast = NO_RAYCAST;
+};
 /** The set settles onto the table over this long. */
 const SETTLE_SECONDS = 0.22;
 const SETTLE_FROM = 0.94;
@@ -69,7 +105,7 @@ const UP = new Vector3(0, 1, 0);
 type Candidate = { x: number; top: number; z: number };
 
 export const StageStatus = {
-  Floating: 'Floating. Touch your table and pinch to land it.',
+  Floating: 'Floating. Not on your table yet.',
   Table: 'On your table.',
   Touch: 'On your table, where you touched it.',
   Manual: 'Moved by hand. Position saved.',
@@ -111,7 +147,24 @@ export class PlacementSystem extends createSystem({
   pressed: { required: [Pressed] },
   meshes: { required: [XRMesh] },
   planes: { required: [XRPlane] },
+  pieces: { required: [SetPiece] },
 }) {
+  private grab: GrabSystem | undefined;
+  private turn = new HandTurn();
+  private handleGlow: Mesh | null = null;
+  private labelTexture: CanvasTexture | null = null;
+  /** How many children the slate had when the ones that are not handles were silenced. */
+  private childCount = -1;
+  /** True from the first frame of a session to its end, so a prompt coming and going is not an entry. */
+  private entered = false;
+  private guard = 0;
+  private ignoredHold = false;
+  private holding = false;
+  private holdEnded = false;
+  private holdStart = new Vector3();
+  /** Counts landings, so a hold can tell that the set was landed while it was held. */
+  private landings = 0;
+  private landingsAtHold = 0;
   private corner = new Vector3();
   private head = new Vector3();
   private forward = new Vector3();
@@ -153,17 +206,35 @@ export class PlacementSystem extends createSystem({
 
   init(): void {
     const g = this.globals as Globals;
+    this.grab = this.world.getSystem(GrabSystem);
     this.cleanupFuncs.push(
       this.world.visibilityState.subscribe((state) => {
         this.sessionElapsed = 0;
+        if (state === VisibilityState.Visible) this.guard = INPUT_GUARD_SECONDS;
         this.onVisibility(state);
       }),
       this.queries.heldStages.subscribe('qualify', (stage) => {
-        stage.setValue(StageAnchor, 'placement', Placement.Manual);
-        this.floatPending = false;
-        this.status(StageStatus.Manual);
+        if (this.guard > 0) {
+          this.ignoredHold = true;
+          this.grab?.forceRelease(stage);
+          return;
+        }
+        this.holding = true;
+        this.turn.total = 0;
+        this.landingsAtHold = this.landings;
+        stage.object3D?.getWorldPosition(this.holdStart);
       }),
-      this.queries.heldStages.subscribe('disqualify', (stage) => this.save(stage)),
+      // Whether the hold moved the set is decided in update, after a touch landing has had its say.
+      this.queries.heldStages.subscribe('disqualify', () => {
+        if (this.ignoredHold) {
+          this.ignoredHold = false;
+          return;
+        }
+        if (!this.holding) return;
+        this.holding = false;
+        this.holdEnded = true;
+      }),
+      () => this.labelTexture?.dispose(),
       this.queries.meshes.subscribe('qualify', (mesh) => this.onSurface(mesh, 'mesh')),
       this.queries.planes.subscribe('qualify', (plane) => this.onSurface(plane, 'plane')),
       g.resetStageRequested.subscribe((n) => {
@@ -208,14 +279,26 @@ export class PlacementSystem extends createSystem({
       }
     }
     this.sessionElapsed += delta;
+    if (this.guard > 0) this.guard -= delta;
+    this.quietChildren(stage);
     const inSession = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
-    if (this.floatPending && inSession && this.sessionElapsed >= FLOAT_DELAY) {
+    if (this.floatPending && inSession && !this.holding && this.sessionElapsed >= FLOAT_DELAY) {
       this.player.head.getWorldPosition(this.head);
       if (this.head.lengthSq() > 1e-4 || this.sessionElapsed >= FLOAT_GIVE_UP) {
         this.floatPending = false;
         if (stage.getValue(StageAnchor, 'placement') === Placement.Floating) this.floatInFront(stage);
       }
     }
+    // The set is out of sight only until it has somewhere to be.
+    if (!this.floatPending && !object.visible) object.visible = true;
+    if (this.holding) {
+      if (!this.turn.active) {
+        const side = this.grab?.getHolderHand(stage);
+        if (side != null) this.turn.begin(this.player.gripSpaces[side]);
+      }
+      this.turn.apply(object, delta, STAGE_TURN_GAIN);
+    }
+    if (this.handleGlow) this.handleGlow.visible = this.holding || this.edgeHovered(stage);
     if (this.candidateTimer >= 0) {
       this.candidateTimer -= delta;
       if (this.candidateTimer <= 0) {
@@ -226,6 +309,10 @@ export class PlacementSystem extends createSystem({
     if (inSession) {
       this.updatePinch(stage, 'left', delta);
       this.updatePinch(stage, 'right', delta);
+    }
+    if (this.holdEnded) {
+      this.holdEnded = false;
+      this.finishHold(stage);
     }
     if (this.settle > 0) {
       this.settle = Math.max(0, this.settle - delta);
@@ -243,6 +330,115 @@ export class PlacementSystem extends createSystem({
 
   private status(text: string): void {
     (this.globals as Globals).stageStatus.value = text;
+  }
+
+  /** A hold on the striped edge has ended: if it carried or turned the set, that is where the set now lives. */
+  private finishHold(stage: Entity): void {
+    this.turn.end();
+    const object = stage.object3D;
+    // Landed by touch while it was held: the landing stands.
+    if (object == null || this.landings !== this.landingsAtHold) return;
+    object.getWorldPosition(this.corner);
+    if (this.corner.distanceTo(this.holdStart) < MOVED_DISTANCE && Math.abs(this.turn.total) < MOVED_TURN) return;
+    stage.setValue(StageAnchor, 'placement', Placement.Manual);
+    this.floatPending = false;
+    this.status(StageStatus.Manual);
+    this.save(stage);
+  }
+
+  /**
+   * Everything standing on the slate that is not a piece or the striped edge
+   * lets a ray through: the slate's top, the monitor, the card, the backdrop.
+   * Other systems add those after this one starts, so it runs again whenever
+   * the slate gains a child.
+   */
+  private quietChildren(stage: Entity): void {
+    const object = stage.object3D!;
+    if (object.children.length === this.childCount) return;
+    this.childCount = object.children.length;
+    for (const child of object.children) {
+      if (HANDLE_NAMES.has(child.name) || this.isPiece(child)) continue;
+      child.traverse(silence);
+    }
+  }
+
+  private isPiece(object: Object3D): boolean {
+    for (const piece of this.queries.pieces.entities) {
+      if (piece.object3D === object) return true;
+    }
+    return false;
+  }
+
+  /**
+   * A hand is on the striped edge itself. Hovering a piece hovers the slate it
+   * stands on as well, so the slate counts only when no piece does.
+   */
+  private edgeHovered(stage: Entity): boolean {
+    if (!stage.hasComponent(Hovered)) return false;
+    for (const piece of this.queries.pieces.entities) {
+      if (piece !== stage && piece.hasComponent(Hovered)) return false;
+    }
+    return true;
+  }
+
+  /** True when a pinch has hold of something other than the slate itself. */
+  private claimedElsewhere(stage: Entity): boolean {
+    for (const entity of this.queries.grabbed.entities) if (entity !== stage) return true;
+    for (const entity of this.queries.pressed.entities) if (entity !== stage) return true;
+    return false;
+  }
+
+  /**
+   * The slate's handle: an unseen bar around the striped front edge, deep
+   * enough to catch a ray or a hand closed on the edge, a line of optic yellow
+   * that lights when a hand is on it, and the words that say what it is for.
+   */
+  private makeHandle(object: Object3D): void {
+    const handle = new Mesh(
+      new BoxGeometry(STAGE_WIDTH + 0.02, 0.04, 0.06),
+      new MeshBasicMaterial({ visible: false, side: DoubleSide }),
+    );
+    handle.name = 'StageHandle';
+    handle.position.set(0, -0.016, STAGE_DEPTH / 2 + 0.015);
+    const glow = new Mesh(
+      new BoxGeometry(STAGE_WIDTH + 0.004, 0.003, 0.003),
+      new MeshBasicMaterial({ color: OPTIC_YELLOW, toneMapped: false }),
+    );
+    glow.name = 'HandleGlow';
+    glow.position.set(0, 0.0015, STAGE_DEPTH / 2);
+    glow.visible = false;
+    glow.raycast = NO_RAYCAST;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 64;
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    this.labelTexture = texture;
+    const draw = (): void => {
+      const g = canvas.getContext('2d');
+      if (g == null) return;
+      g.clearRect(0, 0, canvas.width, canvas.height);
+      g.font = '700 44px "Big Shoulders Stencil", "Arial Narrow", sans-serif';
+      g.fillStyle = '#c7c7b7';
+      g.textBaseline = 'middle';
+      g.fillText('HOLD THE STRIPED EDGE TO MOVE OR TURN THE SET', 8, 34);
+      texture.needsUpdate = true;
+    };
+    draw();
+    void document.fonts.load('700 44px "Big Shoulders Stencil"').then(draw);
+    const label = new Mesh(
+      new PlaneGeometry(0.3, 0.01875),
+      new MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false, depthWrite: false }),
+    );
+    label.name = 'HandleLabel';
+    label.rotation.x = -Math.PI / 2;
+    label.position.set(0.06, 0.0012, STAGE_DEPTH / 2 - 0.016);
+    label.raycast = NO_RAYCAST;
+    object.add(handle, glow, label);
+    const viewfinder = this.world.getSystem(ViewfinderSystem);
+    viewfinder?.hideFromLens(glow);
+    viewfinder?.hideFromLens(label);
+    this.handleGlow = glow;
   }
 
   /** Pinches arrive as session events; they are judged in update, where the hand poses are current. */
@@ -265,13 +461,16 @@ export class PlacementSystem extends createSystem({
     const pinch = this.pinches[side];
     if (!pinch.active) return;
     const handSpace = this.player.gripSpaces[side];
+    // With a controller there is no fingertip: its pointing end is what rests on the table.
+    const byHand = this.input.xr.isPrimary('hand', side);
     if (pinch.begun) {
       pinch.begun = false;
-      this.player.indexTipSpaces[side].getWorldPosition(pinch.start);
+      (byHand ? this.player.indexTipSpaces[side] : this.player.raySpaces[side]).getWorldPosition(pinch.start);
       handSpace.getWorldPosition(pinch.hand);
     }
     pinch.seconds += delta;
-    if (this.queries.grabbed.entities.size > 0 || this.queries.pressed.entities.size > 0) pinch.claimed = true;
+    // Holding the slate's own edge is not a claim: a touch under a floating set often catches it.
+    if (this.claimedElsewhere(stage)) pinch.claimed = true;
     if (!pinch.ended) return;
     pinch.active = false;
     pinch.ended = false;
@@ -279,10 +478,10 @@ export class PlacementSystem extends createSystem({
     if (stage.getValue(StageAnchor, 'placement') !== Placement.Floating) return;
     handSpace.getWorldPosition(this.tip);
     if (this.tip.distanceTo(pinch.hand) > TOUCH_MAX_DRIFT) return;
-    this.placeAtFingertip(stage, pinch.start);
+    this.placeAtFingertip(stage, pinch.start, byHand ? FINGER_PAD : CONTROLLER_PAD);
   }
 
-  private placeAtFingertip(stage: Entity, tip: Vector3): void {
+  private placeAtFingertip(stage: Entity, tip: Vector3, pad: number): void {
     this.player.head.getWorldPosition(this.head);
     const dx = tip.x - this.head.x;
     const dz = tip.z - this.head.z;
@@ -297,7 +496,7 @@ export class PlacementSystem extends createSystem({
       uz = this.forward.z;
     }
     const out = STAGE_DEPTH / 2 + TOUCH_CLEARANCE;
-    this.placeAt(stage, tip.x + ux * out, tip.y - FINGER_PAD, tip.z + uz * out, Placement.Touch, StageStatus.Touch);
+    this.placeAt(stage, tip.x + ux * out, tip.y - pad, tip.z + uz * out, Placement.Touch, StageStatus.Touch);
   }
 
   /** The way the head faces, flattened onto the floor plane. */
@@ -317,6 +516,7 @@ export class PlacementSystem extends createSystem({
     if (stage.getValue(StageAnchor, 'persist') && !stage.hasComponent(XRAnchor)) {
       stage.addComponent(XRAnchor);
     }
+    this.makeHandle(object);
     this.status(StageStatus.Floating);
   }
 
@@ -329,6 +529,8 @@ export class PlacementSystem extends createSystem({
     const stage = this.firstStage();
     if (stage?.object3D == null || !this.stageReady) return;
     if (state === VisibilityState.NonImmersive) {
+      this.entered = false;
+      stage.object3D.visible = true;
       this.applyAuthored(stage);
       stage.setValue(StageAnchor, 'placement', Placement.Floating);
       this.tableDone = false;
@@ -337,11 +539,16 @@ export class PlacementSystem extends createSystem({
       this.candidates = [];
       this.candidateTimer = -1;
       this.status(StageStatus.Floating);
-    } else if (state === VisibilityState.Visible) {
+    } else if (!this.entered) {
+      // A headset prompt blurs the session and gives it back; only the first frame is an entry.
+      this.entered = true;
       if (stage.getValue(StageAnchor, 'placement') !== Placement.Floating) return;
       const pose = this.load();
       if (pose != null && !pose.anchored && this.tryRestore(stage, false)) return;
       this.floatPending = true;
+      // Where the page drew the set is not where the wearer is: keep it out of
+      // sight for the moment it takes to know where their head is.
+      stage.object3D.visible = false;
     }
   }
 
@@ -418,6 +625,7 @@ export class PlacementSystem extends createSystem({
     stage.setValue(StageAnchor, 'placement', placement);
     this.tableDone = true;
     this.floatPending = false;
+    this.landings++;
     this.settle = SETTLE_SECONDS;
     if (stage.hasComponent(AudioSource)) AudioUtils.play(stage);
     this.status(status);

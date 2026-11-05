@@ -78,6 +78,9 @@ export class CoachSystem extends createSystem({
   private timing = false;
   private doneSeconds = 0;
   private inSession = false;
+  /** The wearer is holding controllers, so the words say trigger where they would say pinch. */
+  private controllers = false;
+  private drawnControllers = false;
 
   init(): void {
     this.canvas = document.createElement('canvas');
@@ -135,10 +138,18 @@ export class CoachSystem extends createSystem({
     this.advance(delta);
     sheet.visible = this.step !== Step.Hidden;
     if (!sheet.visible || !this.fontsReady) return;
-    if (this.step !== this.drawnStep || this.shots !== this.drawnShots || this.restored !== this.drawnRestored) {
+    const xr = this.input.xr;
+    this.controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
+    if (
+      this.step !== this.drawnStep ||
+      this.shots !== this.drawnShots ||
+      this.restored !== this.drawnRestored ||
+      this.controllers !== this.drawnControllers
+    ) {
       this.drawnStep = this.step;
       this.drawnShots = this.shots;
       this.drawnRestored = this.restored;
+      this.drawnControllers = this.controllers;
       this.draw();
     }
   }
@@ -226,13 +237,31 @@ export class CoachSystem extends createSystem({
   private copy(): [string, string] {
     switch (this.step) {
       case Step.Land:
-        return ['1 OF 4 · LAND THE SET', 'Touch your table and pinch.'];
+        return [
+          '1 OF 4 · LAND THE SET',
+          this.controllers ? 'Rest a controller on your table and pull the trigger.' : 'Touch your table and pinch.',
+        ];
       case Step.Move:
-        return ['2 OF 4 · BLOCK IT', 'Point at an actor, pinch, and move your hand.'];
+        return [
+          '2 OF 4 · BLOCK IT',
+          this.controllers
+            ? 'Hold the trigger on an actor and move it. Turn your wrist to turn it.'
+            : 'Pinch an actor and move it. Turn your wrist to turn it.',
+        ];
       case Step.Frame:
-        return ['3 OF 4 · FRAME IT', 'Pinch the camera and aim it. Watch the monitor.'];
+        return [
+          '3 OF 4 · FRAME IT',
+          this.controllers
+            ? 'Hold the trigger on the camera. Turn your wrist to aim it.'
+            : 'Pinch the camera. Turn your wrist to aim it.',
+        ];
       case Step.Snap:
-        return ['4 OF 4 · SNAP', 'Pinch Snap frame, on the panel to your left.'];
+        return [
+          '4 OF 4 · SNAP',
+          this.controllers
+            ? 'Pull the trigger on Snap frame, on the panel to your left.'
+            : 'Pinch Snap frame, on the panel to your left.',
+        ];
       case Step.Fill:
         return [
           `FRAME ${this.shots} OF ${BOARD_SLOTS}`,
@@ -272,7 +301,7 @@ export class CoachSystem extends createSystem({
     ctx.fillText(label, 60, 96);
     let px = 112;
     ctx.font = `700 ${px}px ${TEXT}`;
-    while (px > 64 && ctx.measureText(line).width > W - 110) {
+    while (px > 52 && ctx.measureText(line).width > W - 110) {
       px -= 4;
       ctx.font = `700 ${px}px ${TEXT}`;
     }

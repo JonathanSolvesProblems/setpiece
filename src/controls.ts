@@ -18,7 +18,7 @@ import { SetPiece, StageAnchor } from './set-components.js';
  * Where the panel sits relative to the stage, as the scene authors it: left of
  * the slate, a little above it, turned in toward the viewer.
  */
-const PANEL_OFFSET = new Vector3(-0.46, 0.32, -0.07);
+const PANEL_OFFSET = new Vector3(-0.4, 0.3, -0.16);
 const PANEL_YAW = (34 * Math.PI) / 180;
 const UP = new Vector3(0, 1, 0);
 
@@ -72,6 +72,8 @@ export class ControlsSystem extends createSystem({
     stageObject.getWorldQuaternion(this.panelQuaternion).multiply(this.panelTurn);
     setWorldPosition(panel, this.panelPosition);
     setWorldQuaternion(panel, this.panelQuaternion);
+    // The set is out of sight for the first moment of a session; so is its panel.
+    panel.visible = stageObject.visible;
   }
 
   init(): void {

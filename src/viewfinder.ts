@@ -49,6 +49,8 @@ const FRAME_WIDTH = 0.1;
 const FRAME_HEIGHT = (FRAME_WIDTH * 9) / 16;
 const FRAME_GAP = 0.011;
 const FRAME_COLUMNS = 3;
+/** Meshes other systems hang on the pieces to make them easy to pick up. */
+const HELPER_NAMES = new Set(['GrabVolume', 'HoverRing', 'StageHandle', 'HandleGlow', 'HandleLabel']);
 /** Two lines under each frame: the lens and camera, then each actor's eyeline. */
 const CAPTION_HEIGHT = 0.019;
 /** The storyboard card: three frames wide, two high, the width of the monitor. */
@@ -221,6 +223,11 @@ export class ViewfinderSystem extends createSystem({
 
   getShots(): readonly Shot[] {
     return this.shots;
+  }
+
+  /** For the other systems: something the viewer sees and the shot lens must not. */
+  hideFromLens(object: Object3D): void {
+    this.overlays.push(object);
   }
 
   /**
@@ -484,6 +491,8 @@ export class ViewfinderSystem extends createSystem({
       this.tagPiece(piece);
       piece.object3D?.traverse((object) => {
         if (!(object instanceof Mesh)) return;
+        // Grab volumes and hover marks are helpers, not set dressing.
+        if (HELPER_NAMES.has(object.name)) return;
         const material = object.material as MeshStandardMaterial;
         if (object.name === 'EyelineBall') {
           const felt = material.clone();

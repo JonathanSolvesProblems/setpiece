@@ -5,10 +5,28 @@
  * is a choice. Each piece knocks softly when it is lifted and when it lands.
  * Where every piece stands is kept between visits.
  */
-import { AudioSource, AudioUtils, createSystem, Entity, Grabbed, Quaternion, Vector3 } from '@iwsdk/core';
+import {
+  AudioSource,
+  AudioUtils,
+  createSystem,
+  CylinderGeometry,
+  DoubleSide,
+  Entity,
+  Grabbed,
+  GrabSystem,
+  Hovered,
+  Mesh,
+  MeshBasicMaterial,
+  Quaternion,
+  RingGeometry,
+  Vector3,
+  VisibilityState,
+} from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { HandTurn } from './hand-turn.js';
 import { Cue, SetPiece, SetRole, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
+import { ViewfinderSystem } from './viewfinder.js';
 
 /** A piece carried further than this from the slate's centre goes back to where it started. */
 const MAX_FROM_CENTRE = 0.8;
@@ -16,6 +34,26 @@ const MAX_FROM_CENTRE = 0.8;
 const CAMERA_FLOOR_SNAP = 0.03;
 const CAMERA_MAX_HEIGHT = 0.45;
 const UP = new Vector3(0, 1, 0);
+/**
+ * A lay figure is a few centimetres of thin wood and a tripod is thinner. Each
+ * piece carries an unseen cylinder, radius then height in metres, that the
+ * hand ray or a pinch right on the piece can catch: a near miss still picks
+ * the piece up, and a hand closed around it is inside the cylinder.
+ */
+const GRAB_VOLUME: Record<string, [number, number]> = {
+  [SetRole.Actor]: [0.04, 0.2],
+  [SetRole.Creature]: [0.035, 0.36],
+  [SetRole.Camera]: [0.045, 0.19],
+};
+/** A wrist turns about a quarter turn in comfort; this makes that most of a half turn. */
+const TURN_GAIN = 1.8;
+/**
+ * The pinch that answered the headset's own prompt is often still closed when
+ * the session appears. For this long after it does, a grab is not a choice.
+ */
+const INPUT_GUARD_SECONDS = 0.8;
+const OPTIC_YELLOW = 0xd6e13c;
+const NO_RAYCAST = (): void => {};
 
 /** Position then quaternion, in the stage's own space. */
 type Pose = number[];
@@ -32,6 +70,16 @@ export class PiecesSystem extends createSystem({
 }) {
   private authored = new Map<string, Pose>();
   private released: Entity[] = [];
+  /** The pieces that can be held, with each one's hover mark and wrist follower, by index. */
+  private dressed: Entity[] = [];
+  private rings: Mesh[] = [];
+  private turns: HandTurn[] = [];
+  /** Grabs that began inside the guard window and were let go at once. */
+  private ignored = new Set<Entity>();
+  private guard = 0;
+  private grab: GrabSystem | undefined;
+  private volumeMaterial = new MeshBasicMaterial({ visible: false, side: DoubleSide });
+  private ringMaterial = new MeshBasicMaterial({ color: OPTIC_YELLOW, toneMapped: false });
   private ready = false;
   private boardSeen = 0;
   private forward = new Vector3();
@@ -39,14 +87,24 @@ export class PiecesSystem extends createSystem({
 
   init(): void {
     const g = this.globals as Globals;
+    this.grab = this.world.getSystem(GrabSystem);
     this.cleanupFuncs.push(
+      this.world.visibilityState.subscribe((state) => {
+        if (state === VisibilityState.Visible) this.guard = INPUT_GUARD_SECONDS;
+      }),
       this.queries.held.subscribe('qualify', (piece) => {
         if (this.isStage(piece)) return;
+        if (this.guard > 0) {
+          this.ignored.add(piece);
+          this.grab?.forceRelease(piece);
+          return;
+        }
         this.knock(Cue.Pick, piece);
       }),
       // The grab writes the piece's pose once more as it lets go, so settle on the next update.
       this.queries.held.subscribe('disqualify', (piece) => {
         if (this.isStage(piece)) return;
+        if (this.ignored.delete(piece)) return;
         this.released.push(piece);
       }),
       g.newBoardRequested.subscribe((n) => {
@@ -58,11 +116,13 @@ export class PiecesSystem extends createSystem({
     );
   }
 
-  update(): void {
+  update(delta: number): void {
     if (!this.ready) {
       this.ready = this.captureAndRestore();
       return;
     }
+    if (this.guard > 0) this.guard -= delta;
+    this.followHands(delta);
     if (this.released.length === 0) return;
     for (const piece of this.released) {
       if (piece.object3D == null) continue;
@@ -75,6 +135,50 @@ export class PiecesSystem extends createSystem({
 
   private isStage(piece: Entity): boolean {
     return piece.getValue(SetPiece, 'role') === SetRole.Stage;
+  }
+
+  /**
+   * Mark the piece the hand is on, and turn a held piece with the wrist that
+   * holds it. The grab itself only carries: it moves the piece with the hand.
+   */
+  private followHands(delta: number): void {
+    for (let i = 0; i < this.dressed.length; i++) {
+      const piece = this.dressed[i];
+      const held = piece.hasComponent(Grabbed) && !this.ignored.has(piece);
+      this.rings[i].visible = held || piece.hasComponent(Hovered);
+      const turn = this.turns[i];
+      if (!held) {
+        if (turn.active) turn.end();
+        continue;
+      }
+      if (!turn.active) {
+        const side = this.grab?.getHolderHand(piece);
+        if (side != null) turn.begin(this.player.gripSpaces[side]);
+      }
+      if (piece.object3D != null) turn.apply(piece.object3D, delta, TURN_GAIN);
+    }
+  }
+
+  /** The unseen cylinder that makes a piece easy to catch, and the ring that says it is caught. */
+  private dress(piece: Entity): void {
+    const object = piece.object3D!;
+    const size = GRAB_VOLUME[piece.getValue(SetPiece, 'role') as string];
+    if (size == null) return;
+    const [radius, height] = size;
+    const volume = new Mesh(new CylinderGeometry(radius, radius, height, 14, 1), this.volumeMaterial);
+    volume.name = 'GrabVolume';
+    volume.position.y = height / 2;
+    const ring = new Mesh(new RingGeometry(radius * 0.9, radius * 1.1, 40), this.ringMaterial);
+    ring.name = 'HoverRing';
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.0045;
+    ring.visible = false;
+    ring.raycast = NO_RAYCAST;
+    object.add(volume, ring);
+    this.world.getSystem(ViewfinderSystem)?.hideFromLens(ring);
+    this.dressed.push(piece);
+    this.rings.push(ring);
+    this.turns.push(new HandTurn());
   }
 
   private key(piece: Entity): string {
@@ -101,6 +205,7 @@ export class PiecesSystem extends createSystem({
       this.authored.set(key, [...object.position.toArray(), ...(object.quaternion.toArray() as number[])]);
       const pose = saved?.[key];
       if (isPose(pose)) this.apply(piece, pose);
+      this.dress(piece);
     }
     return true;
   }
