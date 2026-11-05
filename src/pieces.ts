@@ -23,6 +23,7 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { assetByLabel } from './catalog.js';
 import { HandTurn } from './hand-turn.js';
 import { CAMERA_TILT_LIMIT, Cue, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
@@ -44,10 +45,6 @@ const GRAB_VOLUME: Record<string, [number, number]> = {
   [SetRole.Actor]: [0.04, 0.2],
   [SetRole.Creature]: [0.035, 0.36],
   [SetRole.Camera]: [0.045, 0.19],
-  Car: [0.13, 0.16],
-  Fire: [0.06, 0.18],
-  Smoke: [0.08, 0.3],
-  Water: [0.1, 0.16],
 };
 /** A wrist turns about a quarter turn in comfort; this makes that most of a half turn. */
 const TURN_GAIN = 1.8;
@@ -185,7 +182,7 @@ export class PiecesSystem extends createSystem({
       const piece = this.dressed[i];
       const held = piece.hasComponent(Grabbed) && !this.ignored.has(piece);
       const touched = held || piece.hasComponent(Hovered);
-      const beckon = !beckoned && wanted !== '' && piece.getValue(SetPiece, 'role') === wanted;
+      const beckon = !beckoned && wanted !== '' && piece.object3D?.visible === true && piece.getValue(SetPiece, 'role') === wanted;
       if (beckon) beckoned = true;
       const ring = this.rings[i];
       ring.visible = touched || beckon;
@@ -222,7 +219,7 @@ export class PiecesSystem extends createSystem({
   private dress(piece: Entity): void {
     const object = piece.object3D!;
     const size =
-      GRAB_VOLUME[piece.getValue(SetPiece, 'role') as string] ?? GRAB_VOLUME[piece.getValue(SetPiece, 'label') as string];
+      assetByLabel(String(piece.getValue(SetPiece, 'label')))?.grab ?? GRAB_VOLUME[piece.getValue(SetPiece, 'role') as string];
     if (size == null) return;
     const [radius, height] = size;
     const volume = new Mesh(new CylinderGeometry(radius, radius, height, 14, 1), this.volumeMaterial);

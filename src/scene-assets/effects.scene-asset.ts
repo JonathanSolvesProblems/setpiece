@@ -17,7 +17,8 @@ import {
   ShaderMaterial,
 } from '@iwsdk/core';
 
-type Motion = 'rise' | 'burst';
+type Motion = 'rise' | 'burst' | 'fall';
+const MOTION: Record<Motion, number> = { rise: 0, burst: 1, fall: 2 };
 type Spec = {
   count: number;
   radius: number;
@@ -44,7 +45,10 @@ varying vec2 vUv;
 void main() {
   float life = fract(uTime * aSeed.z + aSeed.w);
   vec3 centre;
-  if (uBurst > 0.5) {
+  if (uBurst > 1.5) {
+    float far = uRadius * sqrt(aSeed.y);
+    centre = vec3(cos(aSeed.x) * far, uHeight * (1.0 - life), sin(aSeed.x) * far);
+  } else if (uBurst > 0.5) {
     float reach = uRadius * life * (0.4 + aSeed.y);
     float rise = uHeight * 4.0 * life * (1.0 - life) * (0.45 + 0.55 * aSeed.y);
     centre = vec3(cos(aSeed.x) * reach, rise, sin(aSeed.x) * reach);
@@ -107,7 +111,7 @@ function effect(spec: Spec): Mesh {
       uRadius: { value: spec.radius },
       uHeight: { value: spec.height },
       uSize: { value: spec.size },
-      uBurst: { value: spec.motion === 'burst' ? 1 : 0 },
+      uBurst: { value: MOTION[spec.motion] },
       uLow: { value: new Color(spec.low) },
       uMid: { value: new Color(spec.mid) },
       uHigh: { value: new Color(spec.high) },
@@ -165,5 +169,44 @@ export const waterEffect = named('Water', {
   high: 0x3f93cf,
   alpha: 0.85,
   additive: false,
+  motion: 'burst',
+});
+export const explosionEffect = named('Explosion', {
+  count: 80,
+  radius: 0.17,
+  height: 0.2,
+  rate: [0.4, 0.62],
+  size: [0.1, 0.03],
+  low: 0xfff0b0,
+  mid: 0xff6a12,
+  high: 0x35221c,
+  alpha: 0.7,
+  additive: true,
+  motion: 'burst',
+});
+export const rainEffect = named('Rain', {
+  count: 130,
+  radius: 0.3,
+  height: 0.5,
+  rate: [1.1, 1.7],
+  size: [0.006, 0.006],
+  low: 0xdcecf7,
+  mid: 0xc4dff0,
+  high: 0xa7cde6,
+  alpha: 0.8,
+  additive: false,
+  motion: 'fall',
+});
+export const sparksEffect = named('Sparks', {
+  count: 60,
+  radius: 0.12,
+  height: 0.15,
+  rate: [0.8, 1.3],
+  size: [0.012, 0.004],
+  low: 0xfffbe0,
+  mid: 0xffc23a,
+  high: 0xff6a12,
+  alpha: 0.95,
+  additive: true,
   motion: 'burst',
 });

@@ -121,6 +121,8 @@ export interface Setup {
   aimed: boolean;
   sensor?: number;
   rig?: string;
+  /** Which assets were on the set. */
+  on?: string[];
 }
 
 /** The board as it is kept between visits: the frames on the card and how many were ever taken. */
@@ -139,6 +141,8 @@ type Globals = {
   sensorIndex: Signal<number>;
   cameraRig: Signal<string>;
   effectsOn: Signal<number>;
+  trayOn: Signal<string[]>;
+  trayRestore: Signal<string[] | null>;
   briefIndex: Signal<number>;
   briefPrinted: Signal<number>;
   briefSkip: Signal<number>;
@@ -470,6 +474,7 @@ export class ViewfinderSystem extends createSystem({
     const g = this.globals as Globals;
     if (setup == null || g.takeState.peek() !== 'idle') return false;
     if (setup.rig) g.cameraRig.value = setup.rig;
+    if (setup.on) g.trayRestore.value = setup.on;
     for (const piece of this.queries.pieces.entities) {
       const object = piece.object3D;
       const pose = setup.pieces[`${piece.getValue(SetPiece, 'role')}:${piece.getValue(SetPiece, 'label')}`];
@@ -509,6 +514,7 @@ export class ViewfinderSystem extends createSystem({
       aimed: cam.getValue(ShotCamera, 'aimed') === true,
       sensor: (this.globals as Globals).sensorIndex.peek(),
       rig: (this.globals as Globals).cameraRig.peek(),
+      on: (this.globals as Globals).trayOn.peek(),
     };
   }
 
@@ -558,7 +564,8 @@ export class ViewfinderSystem extends createSystem({
     }
     const creature = this.findRole(SetRole.Creature);
     let creatureIn = false;
-    if (creature != null) {
+    const creatureOnSet = creature?.object3D?.visible === true;
+    if (creature != null && creatureOnSet) {
       this.eyePoint(creature, this.a);
       creatureIn = inside(this.inFrame(this.a, p));
     }
@@ -568,6 +575,7 @@ export class ViewfinderSystem extends createSystem({
       heightM: (at.y - stageY) * SET_SCALE,
       tiltDeg: ((this.cameraHead?.rotation.x ?? 0) * 180) / Math.PI,
       actors,
+      creatureOnSet,
       creatureIn,
     };
   }
@@ -659,6 +667,7 @@ export class ViewfinderSystem extends createSystem({
     card.rotation.x = -0.15;
     // A frame on the card is a way back: pinch it and the set returns to that setup.
     cardEntity.addComponent(RayInteractable);
+    (card as Mesh & { pointerEventsOrder?: number }).pointerEventsOrder = 5;
     const target = card as unknown as CardTarget;
     // The card stands on the slate; a pinch on it must not carry the slate away.
     target.addEventListener('pointerdown', (event) => event.stopPropagation?.());
@@ -940,11 +949,16 @@ export class ViewfinderSystem extends createSystem({
     const creature = this.findRole(SetRole.Creature);
     this.actors.length = 0;
     for (const piece of this.queries.pieces.entities) {
-      if (piece.getValue(SetPiece, 'role') === SetRole.Actor && this.actors.length < MAX_ACTORS) {
-        this.actors.push(piece);
-      }
+      // An actor taken off the set has no eyeline and is not in a brief.
+      if (piece.getValue(SetPiece, 'role') !== SetRole.Actor || piece.object3D?.visible !== true) continue;
+      if (this.actors.length < MAX_ACTORS) this.actors.push(piece);
     }
     if (creature?.object3D == null) return;
+    if (!creature.object3D.visible) {
+      for (let i = 0; i < this.lines.length; i++) this.lines[i].visible = false;
+      if ((this.globals as Globals).eyelineText.peek().length > 0) (this.globals as Globals).eyelineText.value = [];
+      return;
+    }
     this.eyePoint(creature, this.c);
     for (let i = 0; i < this.actors.length; i++) {
       const actor = this.actors[i];

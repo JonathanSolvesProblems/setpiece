@@ -12,7 +12,7 @@ export const StoreKey = {
   Coach: 'setpiece.coach.v1',
   Take: 'setpiece.take.v1',
   Camera: 'setpiece.camera.v1',
-  Tray: 'setpiece.tray.v1',
+  Tray: 'setpiece.tray.v2',
   Briefs: 'setpiece.briefs.v1',
 } as const;
 

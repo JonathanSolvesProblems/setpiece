@@ -12,6 +12,8 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { BRIEFS } from './briefs.js';
+import { ASSETS, assetTitle, SHELF_SLOTS, SHELVES } from './catalog.js';
+import type { Shelf } from './catalog.js';
 import { LENSES, Rig, SENSORS } from './camera-formats.js';
 import { StageStatus } from './placement.js';
 import { SetPiece, StageAnchor } from './set-components.js';
@@ -53,6 +55,9 @@ type Globals = {
   playRequested: Signal<number>;
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
+  removeSelected: Signal<number>;
+  clearSet: Signal<number>;
+  selectedIsActor: Signal<boolean>;
   poseRequested: Signal<number>;
   lookRequested: Signal<number>;
   castLine: Signal<string>;
@@ -62,11 +67,12 @@ type Globals = {
   briefPrinted: Signal<number>;
   briefSkip: Signal<number>;
 };
-const TABS = ['shoot', 'camera', 'set', 'briefs'] as const;
-const TRAY = ['Car', 'Fire', 'Smoke', 'Water'] as const;
+const TABS = ['shoot', 'camera', 'assets', 'briefs'] as const;
 /** The tally's red: the record button wears it while a take is being recorded. */
 const TALLY_RED = '#e0352b';
 const CHALK = '#f6f7ef';
+/** Rays prefer the higher order, whatever is nearer. Nothing else on the set is above the board's 5. */
+const PANEL_ORDER = 10;
 /** While the call sheet asks for a frame, Snap frame flashes this many times a second. */
 const SNAP_FLASH_RATE = 1.6;
 
@@ -121,6 +127,10 @@ export class ControlsSystem extends createSystem({
     const g = this.globals as Globals;
     // The whole panel belongs to the headset; the page has its own controls.
     const root = panel.getElementById('panel-root');
+    // Pieces carry generous unseen grab zones. A ray that reaches the panel must
+    // press the panel, even when one of those zones is nearer the hand. UIKit
+    // sets this on every element itself, so it goes in as an inherited property.
+    root?.setProperties({ pointerEventsOrder: PANEL_ORDER });
     this.cleanupFuncs.push(
       this.world.visibilityState.subscribe((state) => {
         root?.setProperties({ display: state === VisibilityState.NonImmersive ? 'none' : 'flex' });
@@ -211,12 +221,43 @@ export class ControlsSystem extends createSystem({
       g.cameraRig.subscribe((value) => rig?.setProperties({ text: value === Rig.Drone ? 'Drone' : 'Tripod' })),
     );
 
-    // The tray and the cast.
-    for (const label of TRAY) {
-      wire(`tray-${label}`, () => {
-        g.trayToggle.value = label;
+    // The asset library: one shelf shows; a slot adds its item, or takes it off the set.
+    let shelf: Shelf = 'Cast';
+    const onShelf = (): typeof ASSETS => ASSETS.filter((asset) => asset.shelf === shelf);
+    const showShelf = (): void => {
+      const items = onShelf();
+      const on = g.trayOn.peek();
+      for (const name of SHELVES) {
+        panel.getElementById(`shelf-${name}`)?.setProperties({ borderColor: name === shelf ? OPTIC_YELLOW : SLATE });
+      }
+      for (let i = 0; i < SHELF_SLOTS; i++) {
+        const item = items[i];
+        panel.getElementById<UIKit.Text>(`asset-${i}`)?.setProperties({
+          display: item ? 'flex' : 'none',
+          text: item ? assetTitle(item.label) : '',
+          borderColor: item && on.includes(item.label) ? OPTIC_YELLOW : CHALK_HAZE,
+        });
+      }
+      panel.getElementById<UIKit.Text>('assets-count')?.setProperties({ text: `${on.length} on the set` });
+    };
+    for (const name of SHELVES) {
+      wire(`shelf-${name}`, () => {
+        shelf = name;
+        showShelf();
       });
     }
+    for (let i = 0; i < SHELF_SLOTS; i++) {
+      wire(`asset-${i}`, () => {
+        const item = onShelf()[i];
+        if (item) g.trayToggle.value = item.label;
+      });
+    }
+    wire('btn-remove', () => {
+      g.removeSelected.value = g.removeSelected.peek() + 1;
+    });
+    wire('btn-clear-set', () => {
+      g.clearSet.value = g.clearSet.peek() + 1;
+    });
     wire('btn-pose', () => {
       g.poseRequested.value = g.poseRequested.peek() + 1;
     });
@@ -225,13 +266,15 @@ export class ControlsSystem extends createSystem({
     });
     const cast = panel.getElementById<UIKit.Text>('cast-line');
     this.cleanupFuncs.push(
-      g.trayOn.subscribe((on) => {
-        for (const label of TRAY) {
-          panel.getElementById(`tray-${label}`)?.setProperties({ borderColor: on.includes(label) ? OPTIC_YELLOW : CHALK_HAZE });
-        }
-      }),
+      g.trayOn.subscribe(showShelf),
       g.castLine.subscribe((line) => {
-        if (line !== '') cast?.setProperties({ text: line });
+        const selected = line !== '';
+        cast?.setProperties({ text: selected ? line : 'Pick up a piece to select it' });
+        panel.getElementById('btn-remove')?.setProperties({ display: selected ? 'flex' : 'none' });
+      }),
+      g.selectedIsActor.subscribe((actor) => {
+        panel.getElementById('btn-pose')?.setProperties({ display: actor ? 'flex' : 'none' });
+        panel.getElementById('btn-look')?.setProperties({ display: actor ? 'flex' : 'none' });
       }),
     );
 

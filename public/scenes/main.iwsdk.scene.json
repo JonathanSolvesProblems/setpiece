@@ -243,6 +243,457 @@
           }
         },
         {
+          "id": "actor-c",
+          "name": "Actor C",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "actor-c",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0.0,
+              0,
+              0.06
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "actor",
+              "label": "C",
+              "eyeHeight": 0.165
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "actor-d",
+          "name": "Actor D",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "actor-d",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0.13,
+              0,
+              0.04
+            ],
+            "rotationDeg": [
+              0,
+              -20,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "actor",
+              "label": "D",
+              "eyeHeight": 0.15
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-van",
+          "name": "Van",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "van",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.02,
+              0,
+              -0.1
+            ],
+            "rotationDeg": [
+              0,
+              90,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Van",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-motorbike",
+          "name": "Motorbike",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "motorbike",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0.2,
+              0,
+              0.1
+            ],
+            "rotationDeg": [
+              0,
+              200,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Motorbike",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-wall",
+          "name": "Wall",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "wall",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0.1,
+              0,
+              -0.14
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Wall",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-lamp",
+          "name": "Lamp post",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "lamp-post",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.25,
+              0,
+              -0.1
+            ],
+            "rotationDeg": [
+              0,
+              90,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Lamp post",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-tree",
+          "name": "Tree",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "tree",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0.24,
+              0,
+              -0.1
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Tree",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-crate",
+          "name": "Crate",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "crate",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.14,
+              0,
+              0.13
+            ],
+            "rotationDeg": [
+              0,
+              20,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Crate",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "fx-explosion",
+          "name": "Explosion",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "explosion",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              0.1,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Explosion",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "fx-rain",
+          "name": "Rain",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "rain",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Rain",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "fx-sparks",
+          "name": "Sparks",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "sparks",
+            "castShadow": false,
+            "receiveShadow": false
+          },
+          "transform": {
+            "position": [
+              -0.06,
+              0,
+              0.12
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Sparks",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
           "id": "fx-water",
           "name": "Water",
           "metadata": {
@@ -506,7 +957,8 @@
           "left": "16px",
           "width": "15vw",
           "height": "80%"
-        }
+        },
+        "PokeInteractable": {}
       }
     }
   ]

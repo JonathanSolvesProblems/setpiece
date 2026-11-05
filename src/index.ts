@@ -45,6 +45,10 @@ World.create(
   globals.poseRequested = signal(0);
   globals.lookRequested = signal(0);
   globals.castLine = signal('');
+  globals.removeSelected = signal(0);
+  globals.clearSet = signal(0);
+  globals.selectedIsActor = signal(false);
+  globals.trayRestore = signal<string[] | null>(null);
   globals.sensorIndex = signal(0);
   globals.cameraRig = signal<string>(Rig.Tripod);
   // The shot briefs: which one is up, how many are printed.

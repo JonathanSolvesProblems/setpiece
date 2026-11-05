@@ -30,6 +30,8 @@ export type Measure = {
   /** Degrees the camera looks above level. */
   tiltDeg: number;
   actors: PieceInFrame[];
+  /** The creature is on the set at all; a brief only asks for it when it is. */
+  creatureOnSet: boolean;
   creatureIn: boolean;
 };
 
@@ -52,7 +54,7 @@ export const BRIEFS: Brief[] = [
       if (m.lensMm > 35) return `${m.lensMm} mm is too long. Go to 35 mm or wider.`;
       const missing = m.actors.find((a) => !a.whole);
       if (missing) return `${missing.label} is not fully in frame.`;
-      return m.creatureIn ? null : 'The creature is out of frame.';
+      return !m.creatureOnSet || m.creatureIn ? null : 'The creature is out of frame.';
     },
   },
   {
@@ -124,6 +126,7 @@ export const BRIEFS: Brief[] = [
     title: 'Creature reveal',
     ask: 'Creature in frame, with an actor looking up at it on a long lens.',
     test: (m) => {
+      if (!m.creatureOnSet) return 'Add the creature from Assets.';
       if (!m.creatureIn) return 'The creature is out of frame.';
       if (m.lensMm < 50) return `${m.lensMm} mm is too wide. Go to 50 mm or longer.`;
       return m.actors.some((a) => a.eyesIn) ? null : 'Keep an actor in frame with it.';

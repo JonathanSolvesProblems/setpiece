@@ -447,14 +447,16 @@ export class PlacementSystem extends createSystem({
 
   /** While the set is out of sight nothing of it may catch a ray: three.js rays do not skip hidden objects. */
   private setInteractive(on: boolean): void {
-    const value = on ? undefined : 'none';
-    const quiet = (object: Object3D | null | undefined): void => {
-      // A prop still in the tray stays out of reach when the set comes back.
-      if (object != null && (!on || object.visible)) (object as Object3D & { pointerEvents?: string }).pointerEvents = value;
+    type Pointable = Object3D & { pointerEvents?: string };
+    const set = (object: Object3D | null | undefined): void => {
+      if (object != null) (object as Pointable).pointerEvents = on ? 'auto' : 'none';
     };
-    for (const piece of this.queries.pieces.entities) quiet(piece.object3D);
-    quiet(this.scene.getObjectByName('StoryboardCard'));
-    quiet(this.scene.getObjectByName('Controls Panel'));
+    for (const piece of this.queries.pieces.entities) {
+      // A piece still on the shelf stays out of reach when the set comes back.
+      if (!on || piece.object3D?.visible === true) set(piece.object3D);
+    }
+    set(this.scene.getObjectByName('StoryboardCard'));
+    set(this.scene.getObjectByName('Controls Panel'));
   }
 
   private status(text: string): void {

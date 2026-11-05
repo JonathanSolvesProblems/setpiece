@@ -1,12 +1,13 @@
 /**
- * What the director adds and changes on the set: props and effects from the
- * tray, an actor's pose and look, the camera's format and rig. All of it is kept
- * between visits. Effects and rotors are the only things here that run on their
- * own, so this is also where their clock lives.
+ * The asset library at work on the set: what is on the slate, what was last
+ * picked up, an actor's pose and look, the camera's format and rig. All of it
+ * is kept between visits. Effects and rotors are the only things here that run
+ * on their own, so this is also where their clock lives.
  */
 import { createSystem, Entity, Grabbed, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { Rig, SENSORS } from './camera-formats.js';
+import { assetByLabel, assetTitle, STARTING_ASSETS } from './catalog.js';
 import { SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -18,7 +19,7 @@ export const LOOKS = [
   { name: 'White shirt', top: 0xe6e4da, legs: 0x2a2c31, hair: true },
   { name: 'Hi-vis', top: 0xd6e13c, legs: 0x2f3a45, hair: true },
 ] as const;
-export const POSES = ['Blocking', 'Neutral', 'Arms up', 'Running'] as const;
+export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running'] as const;
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
 const WOOD_LEGS = /^Leg/;
 const TRIPOD = /^(Base|Post|Leg\d|TripodHead)$/;
@@ -31,7 +32,11 @@ type Saved = { on: string[]; cast: Record<string, [number, number]>; sensor: num
 type Globals = {
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
+  trayRestore: Signal<string[] | null>;
   effectsOn: Signal<number>;
+  removeSelected: Signal<number>;
+  clearSet: Signal<number>;
+  selectedIsActor: Signal<boolean>;
   poseRequested: Signal<number>;
   lookRequested: Signal<number>;
   castLine: Signal<string>;
@@ -45,51 +50,51 @@ export class TraySystem extends createSystem({
   held: { required: [SetPiece, Grabbed] },
   cams: { required: [ShotCamera] },
 }) {
-  private props: Entity[] = [];
+  private managed: Entity[] = [];
   private effects: ShaderMaterial[] = [];
+  /** Materials of the effects that are on the set, the ones whose clock runs. */
   private on = new Set<string>();
   private rotors: Object3D[] = [];
   private cast = new Map<string, [number, number]>();
-  private actor: Entity | null = null;
+  private selected: Entity | null = null;
   private ready = false;
-  private seen = { pose: 0, look: 0, board: 0 };
+  private seen = { pose: 0, look: 0, board: 0, remove: 0, clear: 0 };
 
   init(): void {
     const g = this.globals as Globals;
+    const counter = (signal: Signal<number>, name: keyof TraySystem['seen'], run: () => void) =>
+      signal.subscribe((n) => {
+        if (n <= this.seen[name]) return;
+        this.seen[name] = n;
+        if (this.ready) run();
+      });
     this.cleanupFuncs.push(
       g.trayToggle.subscribe((label) => {
         if (label === '') return;
         g.trayToggle.value = '';
         if (this.ready) this.toggle(label);
       }),
-      g.poseRequested.subscribe((n) => {
-        if (n > this.seen.pose) {
-          this.seen.pose = n;
-          this.step(0, POSES.length);
-        }
+      g.trayRestore.subscribe((list) => {
+        if (list == null) return;
+        g.trayRestore.value = null;
+        if (this.ready) this.setOn(new Set(list));
       }),
-      g.lookRequested.subscribe((n) => {
-        if (n > this.seen.look) {
-          this.seen.look = n;
-          this.step(1, LOOKS.length);
-        }
+      counter(g.poseRequested, 'pose', () => this.step(0, POSES.length)),
+      counter(g.lookRequested, 'look', () => this.step(1, LOOKS.length)),
+      counter(g.removeSelected, 'remove', () => {
+        if (this.selected != null) this.toggle(this.key(this.selected));
       }),
+      counter(g.clearSet, 'clear', () => this.setOn(new Set())),
+      counter(g.newBoardRequested, 'board', () => this.clear()),
       g.sensorIndex.subscribe(() => this.save()),
       g.cameraRig.subscribe((rig) => {
         this.applyRig(rig);
         this.save();
       }),
-      g.newBoardRequested.subscribe((n) => {
-        if (n > this.seen.board) {
-          this.seen.board = n;
-          this.clear();
-        }
-      }),
-      // The actor last picked up is the one the panel changes.
       this.queries.held.subscribe('qualify', (piece) => {
-        if (piece.getValue(SetPiece, 'role') !== SetRole.Actor) return;
-        this.actor = piece;
-        this.publishCast();
+        if (piece.getValue(SetPiece, 'role') === SetRole.Stage) return;
+        this.selected = piece;
+        this.publishSelected();
       }),
     );
   }
@@ -110,46 +115,48 @@ export class TraySystem extends createSystem({
   private prepare(): boolean {
     for (const piece of this.queries.pieces.entities) if (piece.object3D == null) return false;
     const saved = loadJson<Saved>(StoreKey.Tray);
-    for (const label of saved?.on ?? []) this.on.add(label);
+    for (const label of saved?.on ?? STARTING_ASSETS) this.on.add(label);
     for (const [key, value] of Object.entries(saved?.cast ?? {})) this.cast.set(key, value);
     for (const piece of this.queries.pieces.entities) {
-      const role = piece.getValue(SetPiece, 'role');
-      if (role === SetRole.Prop) {
-        this.props.push(piece);
-        this.show(piece, this.on.has(this.key(piece)));
-        piece.object3D!.traverse((object) => {
-          if (object.name !== 'EffectParticles') return;
-          this.effects.push((object as Mesh).material as ShaderMaterial);
-          object.raycast = () => {};
-        });
-      } else if (role === SetRole.Actor) {
-        this.actor ??= piece;
-        const value = this.cast.get(this.key(piece));
-        if (value) this.dress(piece, value);
-      }
+      if (assetByLabel(this.key(piece)) == null) continue;
+      this.managed.push(piece);
+      this.show(piece, this.on.has(this.key(piece)));
+      piece.object3D!.traverse((object) => {
+        if (object.name !== 'EffectParticles') return;
+        this.effects.push((object as Mesh).material as ShaderMaterial);
+        object.raycast = () => {};
+      });
+      const value = this.cast.get(this.key(piece));
+      if (value && piece.getValue(SetPiece, 'role') === SetRole.Actor) this.dress(piece, value);
     }
     const g = this.globals as Globals;
     if (saved != null && Number.isInteger(saved.sensor) && SENSORS[saved.sensor]) g.sensorIndex.value = saved.sensor;
     if (saved?.rig === Rig.Drone) g.cameraRig.value = Rig.Drone;
     else this.applyRig(g.cameraRig.peek());
     this.publish();
-    this.publishCast();
     return true;
   }
 
   private show(piece: Entity, on: boolean): void {
     const object = piece.object3D!;
     object.visible = on;
-    (object as Object3D & { pointerEvents?: string }).pointerEvents = on ? undefined : 'none';
+    (object as Object3D & { pointerEvents?: string }).pointerEvents = on ? 'auto' : 'none';
   }
 
   private toggle(label: string): void {
-    for (const piece of this.props) {
-      if (this.key(piece) !== label) continue;
-      const on = !this.on.has(label);
-      if (on) this.on.add(label);
-      else this.on.delete(label);
+    const next = new Set(this.on);
+    if (next.has(label)) next.delete(label);
+    else next.add(label);
+    this.setOn(next);
+  }
+
+  /** The set as it should stand: everything listed on it, everything else back on the shelf. */
+  private setOn(next: Set<string>): void {
+    this.on = next;
+    for (const piece of this.managed) {
+      const on = next.has(this.key(piece));
       this.show(piece, on);
+      if (!on && piece === this.selected) this.selected = null;
     }
     this.world.getSystem(ViewfinderSystem)?.refresh();
     this.publish();
@@ -160,25 +167,20 @@ export class TraySystem extends createSystem({
     const g = this.globals as Globals;
     g.trayOn.value = [...this.on];
     let live = 0;
-    for (const piece of this.props) {
-      let effect = false;
-      piece.object3D?.traverse((object) => {
-        if (object.name === 'EffectParticles') effect = true;
-      });
-      if (effect && this.on.has(this.key(piece))) live++;
-    }
+    for (const label of this.on) if (assetByLabel(label)?.shelf === 'Effects') live++;
     g.effectsOn.value = live;
+    this.publishSelected();
   }
 
   private step(field: 0 | 1, size: number): void {
-    const actor = this.actor;
-    if (actor == null) return;
+    const actor = this.selected;
+    if (actor == null || actor.getValue(SetPiece, 'role') !== SetRole.Actor) return;
     const key = this.key(actor);
     const value = this.cast.get(key) ?? [0, 0];
     value[field] = (value[field] + 1) % size;
     this.cast.set(key, value);
     this.dress(actor, value);
-    this.publishCast();
+    this.publishSelected();
     this.save();
   }
 
@@ -206,11 +208,20 @@ export class TraySystem extends createSystem({
     this.world.getSystem(ViewfinderSystem)?.refresh();
   }
 
-  private publishCast(): void {
-    const actor = this.actor;
-    if (actor == null) return;
-    const [pose, look] = this.cast.get(this.key(actor)) ?? [0, 0];
-    (this.globals as Globals).castLine.value = `${this.key(actor)}: ${POSES[pose]}, ${LOOKS[look].name}`;
+  private publishSelected(): void {
+    const g = this.globals as Globals;
+    const piece = this.selected;
+    const actor = piece != null && piece.getValue(SetPiece, 'role') === SetRole.Actor;
+    if (piece == null || assetByLabel(this.key(piece)) == null) {
+      g.castLine.value = '';
+      g.selectedIsActor.value = false;
+      return;
+    }
+    const [pose, look] = this.cast.get(this.key(piece)) ?? [0, 0];
+    g.castLine.value = actor
+      ? `${assetTitle(this.key(piece))}: ${POSES[pose]}, ${LOOKS[look].name}`
+      : assetTitle(this.key(piece));
+    g.selectedIsActor.value = actor;
   }
 
   /** The same camera on legs or in the air. A flown camera goes up on its own; a landed one comes down. */
@@ -243,16 +254,13 @@ export class TraySystem extends createSystem({
     } satisfies Saved);
   }
 
-  /** A new board keeps the camera kit and clears what was dressed onto the set. */
+  /** A new board starts from the opening cast, in wood. The camera kit stays as it is. */
   private clear(): void {
-    this.on.clear();
-    for (const piece of this.props) this.show(piece, false);
-    for (const piece of this.queries.pieces.entities) {
+    for (const piece of this.managed) {
       if (piece.getValue(SetPiece, 'role') === SetRole.Actor) this.dress(piece, [0, 0]);
     }
     this.cast.clear();
     clearKey(StoreKey.Tray);
-    this.publish();
-    this.publishCast();
+    this.setOn(new Set(STARTING_ASSETS));
   }
 }

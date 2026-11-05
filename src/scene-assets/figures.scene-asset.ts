@@ -179,4 +179,6 @@ const running: Stance = { running: true };
 
 export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running]);
 export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running]);
+export const actorC = castFigure('ActorC', 1.78, [neutral, { step: 'L' }, armsUp, running]);
+export const actorD = castFigure('ActorD', 1.6, [neutral, { pointing: 'L' }, armsUp, running]);
 export const creature = eyelineStand(0.33);
