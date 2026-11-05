@@ -84,9 +84,10 @@ export class LandingGuide {
     return this.hasHit && this.held >= STEADY_SECONDS;
   }
 
-  /** This hand can land the set: it is the aiming hand, or nothing but the head is aiming. */
+  /** This hand can land the set: its own ray is on a surface, or only the head is aiming. */
   canLand(side: Side): boolean {
-    return this.ready && this.active != null && (this.active.side === side || this.active.side === 'head');
+    if (!this.ready || this.active == null) return false;
+    return this.active.side === 'head' || this.aims.some((aim) => aim.side === side && aim.valid);
   }
 
   constructor(private world: World) {
