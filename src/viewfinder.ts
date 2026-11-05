@@ -25,6 +25,7 @@ import {
   PCFSoftShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
+  RayInteractable,
   PointLight,
   RepeatWrapping,
   Sprite,
@@ -58,8 +59,13 @@ const CAPTION_HEIGHT = 0.019;
 const CARD_WIDTH = FRAME_WIDTH * FRAME_COLUMNS + FRAME_GAP * (FRAME_COLUMNS + 1);
 const CARD_HEIGHT = (FRAME_HEIGHT + CAPTION_HEIGHT) * 2 + FRAME_GAP * 3;
 const CARD_PIXELS = 2048;
-const PAPER = '#f5f6e5';
+/** Camera-report paper, toned down: a white card is the brightest thing in a dim room. */
+const PAPER = '#dcdccb';
 const PENCIL = '#87877d';
+/** An empty slot is unexposed: slate, with its number and what fills it in chalk. */
+const SLOT_EMPTY = '#3f4044';
+const CHALK = '#f6f7ef';
+const CHALK_DUST = '#c7c7b7';
 const INK = '#1e232b';
 const INK_SOFT = '#585752';
 
@@ -98,6 +104,16 @@ export interface Shot {
   /** Every actor's eyeline when the frame was taken, as the crew reads it: "A up 30° · B up 35°". */
   eyelines: string;
   dataUrl: string;
+  /** Where everything stood when the frame was taken, so the set can go back to it. */
+  setup?: Setup;
+}
+
+/** The blocking behind a frame: each piece's pose on the slate, the lens, and the camera head's tilt. */
+export interface Setup {
+  pieces: Record<string, number[]>;
+  lensMm: number;
+  tilt: number;
+  aimed: boolean;
 }
 
 /** The board as it is kept between visits: the frames on the card and how many were ever taken. */
@@ -111,7 +127,12 @@ type Globals = {
   shotFrames: Signal<Shot[]>;
   newBoardRequested: Signal<number>;
   takeState: Signal<string>;
+  setupRecalled: Signal<number>;
+  coachNote: Signal<string>;
 };
+/** What a pointer event on the card carries that is used here. */
+type CardEvent = { point?: Vector3; stopPropagation?: () => void };
+type CardTarget = { addEventListener(type: string, listener: (event: CardEvent) => void): void };
 /** The monitor's tally at rest, and its two brightnesses while a take records. */
 const TALLY_REST = 0.35;
 const TALLY_ON = 2.6;
@@ -171,6 +192,9 @@ export class ViewfinderSystem extends createSystem({
   private liveFrames = LIVE_AT_START;
   private lastSignature = Number.NaN;
   private shadowTick = false;
+  /** The frame the set stands at now: the one last snapped or sent back to, until something moves. */
+  private recalledIndex = -1;
+  private recalledSignature = Number.NaN;
   private tallyBlinking = false;
   /** The tally is held bright for a moment after a snap. */
   private snapFlash = false;
@@ -290,18 +314,25 @@ export class ViewfinderSystem extends createSystem({
       const shot = this.shots[i];
       const thumb = this.thumbs[i];
       if (shot == null || thumb == null) {
-        ctx.strokeStyle = PENCIL;
-        ctx.lineWidth = 5;
-        ctx.strokeRect(x + 2.5, y + 2.5, frameW - 5, frameH - 5);
-        ctx.fillStyle = INK_SOFT;
-        ctx.font = `700 ${Math.round(gap * 1.5)}px "Big Shoulders Stencil"`;
-        ctx.fillText(String(i + 1), x + 18, y + gap * 1.5 + 6);
+        // An empty slot says that it is empty, and the next one says how to fill it.
+        ctx.fillStyle = SLOT_EMPTY;
+        ctx.fillRect(x, y, frameW, frameH);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = CHALK_DUST;
+        ctx.font = `700 ${Math.round(frameH * 0.42)}px "Big Shoulders Stencil"`;
+        ctx.fillText(String(this.taken - this.shots.length + i + 1), x + frameW / 2, y + frameH * 0.56);
+        ctx.fillStyle = i === this.shots.length ? CHALK : CHALK_DUST;
+        ctx.font = `700 ${Math.round(frameH * 0.15)}px "Big Shoulders"`;
+        ctx.fillText(i === this.shots.length ? 'SNAP FRAME FILLS THIS' : 'EMPTY', x + frameW / 2, y + frameH * 0.82);
+        ctx.textAlign = 'left';
         continue;
       }
       ctx.drawImage(thumb, x, y, frameW, frameH);
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = 4;
-      ctx.strokeRect(x + 2, y + 2, frameW - 4, frameH - 4);
+      // The frame the set was last sent back to wears the selected colour.
+      const current = shot.index === this.recalledIndex;
+      ctx.strokeStyle = current ? '#d6e13c' : INK;
+      ctx.lineWidth = current ? 12 : 4;
+      ctx.strokeRect(x + ctx.lineWidth / 2, y + ctx.lineWidth / 2, frameW - ctx.lineWidth, frameH - ctx.lineWidth);
       // The frame number on a slate tab, so it reads over any picture.
       const tab = Math.round(gap * 1.5);
       ctx.fillStyle = INK;
@@ -371,10 +402,71 @@ export class ViewfinderSystem extends createSystem({
     this.publishBoard();
   }
 
+  /** Which frame on the card is at this point, measured from the card's top left in metres. */
+  private recallAt(u: number, v: number): void {
+    for (let i = 0; i < this.shots.length; i++) {
+      const x = FRAME_GAP + (i % FRAME_COLUMNS) * (FRAME_WIDTH + FRAME_GAP);
+      const y = FRAME_GAP + Math.floor(i / FRAME_COLUMNS) * (FRAME_HEIGHT + CAPTION_HEIGHT + FRAME_GAP);
+      if (u >= x && u <= x + FRAME_WIDTH && v >= y && v <= y + FRAME_HEIGHT + CAPTION_HEIGHT) {
+        this.recall(this.shots[i]);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Send the set back to how it stood for a frame: every piece to its mark,
+   * the lens on, the camera head tilted as it was. Only what the frame itself
+   * recorded is restored; a frame from before setups were kept does nothing.
+   */
+  recall(shot: Shot): boolean {
+    const setup = shot.setup;
+    const g = this.globals as Globals;
+    if (setup == null || g.takeState.peek() !== 'idle') return false;
+    for (const piece of this.queries.pieces.entities) {
+      const object = piece.object3D;
+      const pose = setup.pieces[`${piece.getValue(SetPiece, 'role')}:${piece.getValue(SetPiece, 'label')}`];
+      if (object == null || !Array.isArray(pose) || pose.length !== 7) continue;
+      object.position.fromArray(pose, 0);
+      object.quaternion.fromArray(pose, 3);
+    }
+    for (const cam of this.queries.cams.entities) {
+      cam.setValue(ShotCamera, 'tilt', setup.tilt);
+      cam.setValue(ShotCamera, 'aimed', setup.aimed);
+    }
+    g.lensMm.value = setup.lensMm;
+    this.recalledIndex = shot.index;
+    this.recalledSignature = Number.NaN;
+    this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
+    this.drawBoard();
+    g.coachNote.value = `BACK TO FRAME ${shot.index} | Pieces, camera and lens are as they were.`;
+    g.setupRecalled.value = g.setupRecalled.peek() + 1;
+    return true;
+  }
+
+  private readSetup(cam: Entity): Setup {
+    const pieces: Record<string, number[]> = {};
+    for (const piece of this.queries.pieces.entities) {
+      const object = piece.object3D;
+      if (object == null || piece.getValue(SetPiece, 'role') === SetRole.Stage) continue;
+      pieces[`${piece.getValue(SetPiece, 'role')}:${piece.getValue(SetPiece, 'label')}`] = [
+        ...object.position.toArray(),
+        ...(object.quaternion.toArray() as number[]),
+      ].map((n) => Math.round(n * 1e4) / 1e4);
+    }
+    return {
+      pieces,
+      lensMm: (this.globals as Globals).lensMm.peek(),
+      tilt: cam.getValue(ShotCamera, 'tilt') ?? 0,
+      aimed: cam.getValue(ShotCamera, 'aimed') === true,
+    };
+  }
+
   private clearBoard(): void {
     this.shots = [];
     this.thumbs = [];
     this.taken = 0;
+    this.recalledIndex = -1;
     clearKey(StoreKey.Board);
     this.drawBoard();
     this.publishBoard();
@@ -426,9 +518,20 @@ export class ViewfinderSystem extends createSystem({
       new MeshStandardMaterial({ color: 0xffffff, map: this.boardTexture, roughness: 1 }),
     );
     card.name = 'StoryboardCard';
-    this.world.createTransformEntity(card, { parent: stage });
+    const cardEntity = this.world.createTransformEntity(card, { parent: stage });
     card.position.set(MONITOR_LOCAL[0], CARD_CENTER_Y, MONITOR_LOCAL[2] - 0.001);
     card.rotation.x = -0.15;
+    // A frame on the card is a way back: pinch it and the set returns to that setup.
+    cardEntity.addComponent(RayInteractable);
+    const target = card as unknown as CardTarget;
+    // The card stands on the slate; a pinch on it must not carry the slate away.
+    target.addEventListener('pointerdown', (event) => event.stopPropagation?.());
+    target.addEventListener('click', (event) => {
+      event.stopPropagation?.();
+      if (event.point == null) return;
+      const local = card.worldToLocal(this.c.copy(event.point));
+      this.recallAt(local.x + CARD_WIDTH / 2, CARD_HEIGHT / 2 - local.y);
+    });
     this.overlays.push(card, this.player);
     // Chalk haze on the slate plate, cloned so the shared material stays clean.
     const plate = stage.object3D.getObjectByName('Plate') as Mesh | undefined;
@@ -605,6 +708,14 @@ export class ViewfinderSystem extends createSystem({
     if (signature !== this.lastSignature) {
       this.lastSignature = signature;
       this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
+    }
+    // The set has moved on from the frame it stood at: the card stops marking it.
+    if (this.recalledIndex >= 0) {
+      if (Number.isNaN(this.recalledSignature)) this.recalledSignature = signature;
+      else if (signature !== this.recalledSignature) {
+        this.recalledIndex = -1;
+        this.drawBoard();
+      }
     }
     if (this.liveFrames > 0 || this.snapPending) {
       this.liveFrames = Math.max(0, this.liveFrames - 1);
@@ -854,7 +965,11 @@ export class ViewfinderSystem extends createSystem({
       eyelineDeg: this.actors.length > 0 ? this.eyelineDeg(0) : 0,
       eyelines: eyelines || 'no actor on the set',
       dataUrl: canvas.toDataURL('image/jpeg', 0.86),
+      setup: this.readSetup(cam),
     };
+    // A new frame is where the set is now.
+    this.recalledIndex = shot.index;
+    this.recalledSignature = Number.NaN;
     this.shots.push(shot);
     this.thumbs.push(canvas);
     if (this.shots.length > MAX_FRAMES) {

@@ -58,7 +58,10 @@ type Globals = {
   takeSeconds: Signal<number>;
   takeLength: Signal<number>;
   roomScanOffered: Signal<boolean>;
+  coachNote: Signal<string>;
 };
+/** Seconds a passing note stays on the sheet. */
+const NOTE_SECONDS = 4;
 /** The thing each step asks the wearer to put a hand on; it is marked on the set while the step is up. */
 const TARGET: Partial<Record<StepId, string>> = { [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
 type CoachState = { done: boolean };
@@ -94,6 +97,10 @@ export class CoachSystem extends createSystem({
   private drawnControllers = false;
   private scanOffered = false;
   private drawnScanOffered = false;
+  /** A passing note ("BACK TO FRAME 3 | ...") and how long it has left. */
+  private note = '';
+  private noteLeft = 0;
+  private drawnNote = '';
   /** While a take records or plays, the sheet is its clock. */
   private take: string = TakeState.Idle;
   private takeSeconds = 0;
@@ -110,6 +117,12 @@ export class CoachSystem extends createSystem({
     const g = this.globals as Globals;
     this.cleanupFuncs.push(
       this.world.visibilityState.subscribe((state) => this.onVisibility(state)),
+      g.coachNote.subscribe((note) => {
+        if (note === '') return;
+        this.note = note;
+        this.noteLeft = NOTE_SECONDS;
+        g.coachNote.value = '';
+      }),
       g.shotFrames.subscribe((frames) => {
         const before = this.shots;
         this.shots = frames.length;
@@ -156,13 +169,17 @@ export class CoachSystem extends createSystem({
     }
     if (this.timing && this.shots < BOARD_SLOTS) this.boardSeconds += delta;
     this.advance(delta);
+    if (this.noteLeft > 0) {
+      this.noteLeft -= delta;
+      if (this.noteLeft <= 0) this.note = '';
+    }
     this.take = g.takeState.peek();
     this.takeSeconds = g.takeSeconds.peek();
     this.scanOffered = g.roomScanOffered.peek();
     const onTake = this.take !== TakeState.Idle;
     const target = onTake ? '' : (TARGET[this.step] ?? '');
     if (g.coachTarget.peek() !== target) g.coachTarget.value = target;
-    sheet.visible = this.step !== Step.Hidden || onTake;
+    sheet.visible = this.step !== Step.Hidden || onTake || this.note !== '';
     if (!sheet.visible || !this.fontsReady) return;
     const xr = this.input.xr;
     this.controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
@@ -172,6 +189,7 @@ export class CoachSystem extends createSystem({
       this.restored !== this.drawnRestored ||
       this.controllers !== this.drawnControllers ||
       this.scanOffered !== this.drawnScanOffered ||
+      this.note !== this.drawnNote ||
       this.take !== this.drawnTake ||
       (onTake && this.takeSeconds !== this.drawnTakeSeconds)
     ) {
@@ -180,6 +198,7 @@ export class CoachSystem extends createSystem({
       this.drawnRestored = this.restored;
       this.drawnControllers = this.controllers;
       this.drawnScanOffered = this.scanOffered;
+      this.drawnNote = this.note;
       this.drawnTake = this.take;
       this.drawnTakeSeconds = this.takeSeconds;
       this.draw();
@@ -269,6 +288,10 @@ export class CoachSystem extends createSystem({
   }
 
   private copy(): [string, string] {
+    if (this.note !== '') {
+      const [label, line] = this.note.split(' | ');
+      return [label ?? '', line ?? ''];
+    }
     const length = Math.round((this.globals as Globals).takeLength.peek());
     if (this.take === TakeState.Recording) {
       // The first pass sets the length; later passes run to it.
@@ -316,7 +339,11 @@ export class CoachSystem extends createSystem({
       case Step.Fill:
         return [
           `FRAME ${this.shots} OF ${BOARD_SLOTS}`,
-          this.shots === BOARD_SLOTS - 1 ? 'One more: move the camera and snap.' : 'Move the camera or change the lens, and snap again.',
+          this.shots === BOARD_SLOTS - 1
+            ? 'One more: move the camera and snap.'
+            : this.shots === 2
+              ? 'Pinch a frame on the board to go back to its setup.'
+              : 'Move the camera or change the lens, and snap again.',
         ];
       case Step.Done: {
         const s = Math.round(this.doneSeconds);

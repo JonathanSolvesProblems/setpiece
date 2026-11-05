@@ -70,7 +70,7 @@ const NO_RAYCAST = (): void => {};
 /** Position then quaternion, in the stage's own space. */
 type Pose = number[];
 type SavedPieces = Record<string, Pose>;
-type Globals = { newBoardRequested: Signal<number>; coachTarget: Signal<string> };
+type Globals = { newBoardRequested: Signal<number>; coachTarget: Signal<string>; setupRecalled: Signal<number> };
 /** The ring under the piece the call sheet is asking for breathes this much, this fast. */
 const BECKON_SWELL = 0.22;
 const BECKON_RATE = 5;
@@ -128,6 +128,13 @@ export class PiecesSystem extends createSystem({
         if (n > this.boardSeen) {
           this.boardSeen = n;
           this.backToStart();
+        }
+      }),
+      // The card sent every piece back to a frame's setup: that is the blocking to keep now.
+      g.setupRecalled.subscribe((n) => {
+        if (n > 0 && this.ready) {
+          this.knock(Cue.Place, this.dressed[0]);
+          this.save();
         }
       }),
     );

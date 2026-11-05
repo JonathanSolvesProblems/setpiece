@@ -91,7 +91,7 @@ const STAGE_TURN_GAIN = 1.5;
 const MOVED_DISTANCE = 0.015;
 const MOVED_TURN = 0.05;
 /** The parts of the slate that a hand can hold. Everything else on it lets a ray through. */
-const HANDLE_NAMES = new Set(['ClapperStripe', 'StageHandle']);
+const HANDLE_NAMES = new Set(['ClapperStripe', 'StageHandle', 'StoryboardCard']);
 /**
  * A set that is not on a table belongs with its user. When they have walked
  * away from it, sat down or stood up under it, or turned their back on it, and

@@ -34,6 +34,9 @@ World.create(
   globals.coachLine = signal('');
   // What the call sheet is asking for right now: 'actor', 'camera', 'snap' or nothing.
   globals.coachTarget = signal('');
+  // A line the call sheet shows for a few seconds, as "LABEL | words"; and a count of setups recalled from the card.
+  globals.coachNote = signal('');
+  globals.setupRecalled = signal(0);
   // The take: what it is doing, how far in it is, and how long it runs, in seconds.
   globals.takeState = signal<string>(TakeState.Idle);
   globals.takeSeconds = signal(0);
