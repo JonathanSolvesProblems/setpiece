@@ -100,6 +100,20 @@ export const STARTING_ASSETS = ASSETS.filter((asset) => asset.starts).map((asset
 /** A shelf shows this many at a time; More turns to the rest. */
 export const SHELF_SLOTS = 8;
 
+/**
+ * Everything whose name or other words start with what has been spelled so
+ * far, names first, then the rest of each word's matches. The camera is not on
+ * a shelf, so it is not found here either.
+ */
+export function searchAssets(query: string): Asset[] {
+  const q = query.toLowerCase();
+  const words = (asset: Asset): string[] => [assetTitle(asset.label), asset.label, ...(asset.aliases ?? [])].flatMap((name) => name.toLowerCase().split(' '));
+  const kit = ASSETS.filter((asset) => asset.shelf !== 'Kit');
+  const named = kit.filter((asset) => words(asset).some((word) => word.startsWith(q)));
+  const within = kit.filter((asset) => !named.includes(asset) && q.length > 1 && words(asset).some((word) => word.includes(q)));
+  return [...named, ...within];
+}
+
 /** Paint for anything with a body: the first is the primer it comes in. */
 export const PAINTS = [
   { name: 'Primer', hex: 0 },

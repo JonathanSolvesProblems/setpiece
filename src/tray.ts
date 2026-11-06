@@ -10,6 +10,7 @@ import type { Signal } from '@preact/signals-core';
 import { CAMERAS, Rig, SENSORS } from './camera-formats.js';
 import { assetByLabel, assetTitle, PAINTS, SIZES, STARTING_ASSETS } from './catalog.js';
 import { Held, SetPiece, SetRole, ShotCamera } from './set-components.js';
+import { SCENES } from './scenes.js';
 import type { Spoken } from './scene-request.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -48,6 +49,9 @@ export type Dress = { cast: Record<string, [number, number]>; finish: Record<str
 type Saved = { on: string[]; sensor: number; rig: string } & Partial<Dress>;
 type Globals = {
   sceneRequest: Signal<Spoken | null>;
+  sceneStart: Signal<number>;
+  lensMm: Signal<number>;
+  setupRecalled: Signal<number>;
   coachNote: Signal<string>;
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
@@ -113,6 +117,11 @@ export class TraySystem extends createSystem({
         if (spoken == null) return;
         g.sceneRequest.value = null;
         if (this.ready) this.build(spoken);
+      }),
+      g.sceneStart.subscribe((index) => {
+        if (index < 0) return;
+        g.sceneStart.value = -1;
+        if (this.ready) this.startScene(index);
       }),
       g.trayDressRestore.subscribe((dress) => {
         if (dress == null) return;
@@ -310,6 +319,40 @@ export class TraySystem extends createSystem({
     }
     const nothingDone = names.length === 0 && request.remove.length === 0 && !request.clear;
     g.coachNote.value = `${nothingDone ? 'NOT IN THE KIT' : 'SET FROM YOUR WORDS'} | ${parts.join(' ')}`;
+  }
+
+  /** A whole set to start from: every piece to its mark, dressed, and the camera where it should be. */
+  private startScene(index: number): void {
+    const scene = SCENES[index];
+    if (scene == null) return;
+    const g = this.globals as Globals;
+    const keep = [...this.on].filter((label) => assetByLabel(label)?.shelf === 'Kit');
+    this.cast.clear();
+    this.finish.clear();
+    for (const placed of scene.pieces) {
+      const asset = assetByLabel(placed.label);
+      this.finish.set(placed.label, [placed.paint ?? asset?.coat ?? 0, placed.size ?? 0, placed.style ?? 0]);
+      if (placed.pose != null || placed.look != null) this.cast.set(placed.label, [placed.pose ?? 0, placed.look ?? 0]);
+    }
+    this.wear({ cast: Object.fromEntries(this.cast), finish: Object.fromEntries(this.finish) });
+    this.setOn(new Set([...keep, ...scene.pieces.map((placed) => placed.label)]));
+    for (const placed of scene.pieces) {
+      const object = this.managed.find((piece) => this.key(piece) === placed.label)?.object3D;
+      if (object == null) continue;
+      object.position.set(placed.x, 0, placed.z);
+      object.rotation.set(0, ((placed.yaw ?? 0) * Math.PI) / 180, 0);
+    }
+    const camera = [...this.queries.cams.entities].find((cam) => this.key(cam) === CAMERAS[0]);
+    if (camera?.object3D != null) {
+      const [x, z, yaw] = scene.camera;
+      camera.object3D.position.set(x, camera.object3D.position.y, z);
+      camera.object3D.rotation.set(0, (yaw * Math.PI) / 180, 0);
+      camera.setValue(ShotCamera, 'aimed', false);
+    }
+    g.lensMm.value = scene.lens;
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    g.setupRecalled.value = g.setupRecalled.peek() + 1;
+    g.coachNote.value = `${scene.title.toUpperCase()} | Everything here can be moved. Pick up a piece, or look through the lens.`;
   }
 
   /** The set as it should stand: everything listed on it, everything else back on the shelf. */

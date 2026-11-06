@@ -81,7 +81,8 @@
     color: #f6f7ef;
     background-color: #2a211c;
     flex-grow: 1;
-    width: 80px;
+    padding-left: 4px;
+    padding-right: 4px;
     height: 30px;
     justify-content: center;
     align-items: center;
@@ -122,6 +123,22 @@
     align-items: center;
     border-width: 2px;
     border-color: #5a4b3d;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .keys { flex-direction: row; gap: 3px; width: 100%; }
+  .key {
+    font-family: "Grotesk";
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 18px;
+    color: #f6f7ef;
+    background-color: #2a211c;
+    text-align: center;
+    width: 32px;
+    height: 29px;
+    justify-content: center;
+    align-items: center;
     border-radius: 2px;
     cursor: pointer;
   }
@@ -272,11 +289,20 @@
       <div id="shelf-Cast" class="shelf">Cast</div>
       <div id="shelf-Creatures" class="shelf">Creatures</div>
       <div id="shelf-Vehicles" class="shelf">Vehicles</div>
+      <div id="shelf-Effects" class="shelf">Effects</div>
     </div>
     <div class="tabs">
-      <div id="shelf-Effects" class="shelf">Effects</div>
       <div id="shelf-Set" class="shelf">Set</div>
       <div id="shelf-Props" class="shelf">Props</div>
+      <div id="shelf-Scenes" class="shelf">Scenes</div>
+      <div id="shelf-Search" class="shelf">Search</div>
+    </div>
+    <div id="search-box" class="page" style="display: none">
+      <div id="search-query" class="status">Spell a name</div>
+      <div class="keys"><div id="key-a" class="key">A</div><div id="key-b" class="key">B</div><div id="key-c" class="key">C</div><div id="key-d" class="key">D</div><div id="key-e" class="key">E</div><div id="key-f" class="key">F</div><div id="key-g" class="key">G</div></div>
+      <div class="keys"><div id="key-h" class="key">H</div><div id="key-i" class="key">I</div><div id="key-j" class="key">J</div><div id="key-k" class="key">K</div><div id="key-l" class="key">L</div><div id="key-m" class="key">M</div><div id="key-n" class="key">N</div></div>
+      <div class="keys"><div id="key-o" class="key">O</div><div id="key-p" class="key">P</div><div id="key-q" class="key">Q</div><div id="key-r" class="key">R</div><div id="key-s" class="key">S</div><div id="key-t" class="key">T</div><div id="key-u" class="key">U</div></div>
+      <div class="keys"><div id="key-v" class="key">V</div><div id="key-w" class="key">W</div><div id="key-x" class="key">X</div><div id="key-y" class="key">Y</div><div id="key-z" class="key">Z</div><div id="key-del" class="key">Del</div></div>
     </div>
     <div class="assetrow">
       <div id="asset-0" class="asset">-</div>
@@ -299,6 +325,7 @@
       <div id="btn-more" class="word">More</div>
     </div>
     <div id="fx-note" class="line muted" style="display: none">Effects are stand-ins, not simulations.</div>
+    <div id="held-block" class="page">
     <div class="rule"></div>
     <div class="field">
       <div class="label short">HELD</div>
@@ -320,6 +347,7 @@
       <div id="btn-pose" class="word" style="display: none">Pose</div>
       <div id="btn-look" class="word" style="display: none">Look</div>
       <div id="btn-remove" class="word">Remove</div>
+    </div>
     </div>
     <div class="field">
       <div id="assets-count" class="line muted">3 on the set</div>

@@ -53,6 +53,7 @@ World.create(
   globals.poseRequested = signal(0);
   globals.squirmOn = signal(loadJson<{ squirm: boolean }>(StoreKey.Settings)?.squirm !== false);
   globals.selectedPaint = signal(-1);
+  globals.sceneStart = signal(-1);
   globals.sceneRequest = signal<Spoken | null>(null);
   globals.cameraOn = signal<string>(CAMERAS[0]);
   globals.selectedStyles = signal(false);

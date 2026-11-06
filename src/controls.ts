@@ -12,13 +12,14 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { BRIEFS } from './briefs.js';
-import { assetByLabel, ASSETS, assetTitle, PAINTS, SHELF_SLOTS, SHELVES } from './catalog.js';
+import { assetByLabel, ASSETS, assetTitle, PAINTS, searchAssets, SHELF_SLOTS, SHELVES } from './catalog.js';
 import type { Shelf } from './catalog.js';
 import { CAMERAS, LENSES, Rig, SENSORS } from './camera-formats.js';
 import { StageStatus } from './placement.js';
 import { understand, wordsToHear } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
 import { SetPiece, StageAnchor } from './set-components.js';
+import { SCENES } from './scenes.js';
 import { saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
@@ -35,6 +36,9 @@ const PANEL_OFFSET = new Vector3(-0.38, 0.33, -0.16);
  */
 const PANEL_TOP = 0.71;
 const LIFE_CONFIRM_MS = 3000;
+/** Search keeps the keys on the panel, so it shows fewer results at once. */
+const SEARCH_SLOTS = 4;
+const SEARCH_LONGEST = 12;
 const PANEL_UNIT = 0.00101;
 /** At full size the table is left behind, so the panel stays with the wearer: this far ahead, this far off centre, this far below the eyes. */
 const WALK_AHEAD = 0.6;
@@ -90,6 +94,7 @@ type Globals = {
   squirmOn: Signal<boolean>;
   cameraOn: Signal<string>;
   sceneRequest: Signal<Spoken | null>;
+  sceneStart: Signal<number>;
   castLine: Signal<string>;
   sensorIndex: Signal<number>;
   cameraRig: Signal<string>;
@@ -411,25 +416,44 @@ export class ControlsSystem extends createSystem({
     this.cleanupFuncs.push(g.cameraOn.subscribe(showCameras), g.trayOn.subscribe(showCameras));
 
     // The asset library: one shelf shows; a slot adds its item, or takes it off the set.
-    let shelf: Shelf = 'Cast';
+    // Two views sit on the shelves' tabs: whole scenes to start from, and a spelled search of everything.
+    const SHELF_TABS = [...SHELVES, 'Scenes', 'Search'] as const;
+    type ShelfTab = (typeof SHELF_TABS)[number];
+    let shelf: ShelfTab = 'Cast';
     let page = 0;
-    const onShelf = (): typeof ASSETS => ASSETS.filter((asset) => asset.shelf === shelf);
+    let query = '';
+    const slots = (): number => (shelf === 'Search' ? SEARCH_SLOTS : SHELF_SLOTS);
+    const onShelf = (): typeof ASSETS => {
+      if (shelf === 'Search') return query === '' ? [] : searchAssets(query);
+      return ASSETS.filter((asset) => asset.shelf === (shelf as Shelf));
+    };
     const showShelf = (): void => {
+      const scenes = shelf === 'Scenes';
       const all = onShelf();
-      const pages = Math.max(1, Math.ceil(all.length / SHELF_SLOTS));
+      const count = scenes ? SCENES.length : all.length;
+      const pages = Math.max(1, Math.ceil(count / slots()));
       if (page >= pages) page = 0;
       const on = g.trayOn.peek();
-      for (const name of SHELVES) {
+      for (const name of SHELF_TABS) {
         panel.getElementById(`shelf-${name}`)?.setProperties({
           backgroundColor: name === shelf ? OPTIC_YELLOW : BLOCK,
           color: name === shelf ? CLOTH : CHALK,
         });
       }
+      const searching = shelf === 'Search';
+      panel.getElementById('search-box')?.setProperties({ display: searching ? 'flex' : 'none' });
+      panel.getElementById('held-block')?.setProperties({ display: searching ? 'none' : 'flex' });
+      if (searching) {
+        const found = query === '' ? 'Spell a name' : all.length === 0 ? `${query.toUpperCase()}: nothing in the kit` : query.toUpperCase();
+        panel.getElementById<UIKit.Text>('search-query')?.setProperties({ text: found });
+      }
       for (let i = 0; i < SHELF_SLOTS; i++) {
-        const item = all[page * SHELF_SLOTS + i];
+        const at = page * slots() + i;
+        const scene = scenes ? SCENES[at] : undefined;
+        const item = !scenes && i < slots() ? all[at] : undefined;
         panel.getElementById<UIKit.Text>(`asset-${i}`)?.setProperties({
-          display: item ? 'flex' : 'none',
-          text: item ? assetTitle(item.label) : '',
+          display: item || scene ? 'flex' : 'none',
+          text: scene ? scene.title : item ? assetTitle(item.label) : '',
           borderColor: item && on.includes(item.label) ? OPTIC_YELLOW : CHALK_HAZE,
         });
       }
@@ -439,20 +463,39 @@ export class ControlsSystem extends createSystem({
       const dressing = on.filter((label) => assetByLabel(label)?.shelf !== 'Kit').length;
       panel.getElementById<UIKit.Text>('assets-count')?.setProperties({ text: `${dressing} on the set` });
     };
-    for (const name of SHELVES) {
+    for (const name of SHELF_TABS) {
       wire(`shelf-${name}`, () => {
         shelf = name;
         page = 0;
         showShelf();
       });
     }
+    for (let code = 97; code <= 122; code++) {
+      const letter = String.fromCharCode(code);
+      wire(`key-${letter}`, () => {
+        if (query.length >= SEARCH_LONGEST) return;
+        query += letter;
+        page = 0;
+        showShelf();
+      });
+    }
+    wire('key-del', () => {
+      query = query.slice(0, -1);
+      page = 0;
+      showShelf();
+    });
     wire('btn-more', () => {
       page += 1;
       showShelf();
     });
     for (let i = 0; i < SHELF_SLOTS; i++) {
       wire(`asset-${i}`, () => {
-        const item = onShelf()[page * SHELF_SLOTS + i];
+        const at = page * slots() + i;
+        if (shelf === 'Scenes') {
+          if (SCENES[at]) g.sceneStart.value = at;
+          return;
+        }
+        const item = onShelf()[at];
         if (item) g.trayToggle.value = item.label;
       });
     }
