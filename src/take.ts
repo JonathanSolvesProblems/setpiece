@@ -50,6 +50,8 @@ type Globals = {
   trayOn: Signal<string[]>;
   takeState: Signal<string>;
   takeSeconds: Signal<number>;
+  takeEmpty: Signal<number>;
+  coachNote: Signal<string>;
   takeLength: Signal<number>;
   cameraRig: Signal<string>;
   recordRequested: Signal<number>;
@@ -345,7 +347,10 @@ export class TakeSystem extends createSystem({
     else if (this.cuts.length === 0) this.cuts = [0, this.liveIndex];
     if (this.length === 0) {
       if (!any || written < MIN_SAMPLES) {
-        // Nothing was carried, or the pass was a slip: there is still no take.
+        // Nothing was carried, or the pass was a slip: there is still no take, and it says so.
+        const g = this.globals as unknown as Globals;
+        g.coachNote.value = 'NO TAKE YET | Carry a piece while it records.';
+        g.takeEmpty.value += 1;
         for (let i = 0; i < this.tracks.length; i++) {
           this.tracks[i].recorded = false;
           this.tracks[i].touched = false;

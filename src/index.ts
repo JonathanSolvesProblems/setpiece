@@ -88,6 +88,7 @@ World.create(
   // The take: what it is doing, how far in it is, and how long it runs, in seconds.
   globals.takeState = signal<string>(TakeState.Idle);
   globals.takeSeconds = signal(0);
+  globals.takeEmpty = signal(0);
   globals.takeLength = signal(0);
   globals.recordRequested = signal(0);
   globals.playRequested = signal(0);
@@ -211,8 +212,13 @@ World.create(
   const playRequested = globals.playRequested as Signal<number>;
   const pageRecord = document.getElementById('page-record') as HTMLButtonElement | null;
   const pagePlay = document.getElementById('page-play') as HTMLButtonElement | null;
+  const takeNote = document.getElementById('take-note');
   pageRecord?.addEventListener('click', () => {
+    if (takeNote) takeNote.hidden = true;
     recordRequested.value += 1;
+  });
+  (globals.takeEmpty as Signal<number>).subscribe((times) => {
+    if (takeNote && times > 0) takeNote.hidden = false;
   });
   pagePlay?.addEventListener('click', () => {
     playRequested.value += 1;

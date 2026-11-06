@@ -374,6 +374,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
 }
 
 /* Lens and take. Everything here presses, so everything here is a block. */
+.take-note { margin: 0; padding-left: calc(var(--label-col) + var(--unit) * 3); }
+.take-note[hidden] { display: none; }
 .strip { display: grid; row-gap: calc(var(--unit) * 2); margin-top: calc(var(--unit) * 3); }
 .lenses { display: flex; gap: var(--unit); }
 .strip-actions {
@@ -512,6 +514,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
   .lenses { flex: 1; }
   .lens { flex: 1 1 0; min-width: 0; padding: 0; }
   .strip-actions { display: grid; grid-template-columns: 1fr 1fr; padding-left: 0; }
+  .take-note { padding-left: 0; }
   .copy { padding-top: 0; }
   .lede { max-width: none; }
 }
