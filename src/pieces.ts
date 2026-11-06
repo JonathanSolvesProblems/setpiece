@@ -14,8 +14,10 @@ import {
   AudioSource,
   AudioUtils,
   Box3,
+  CapsuleGeometry,
   createSystem,
   CylinderGeometry,
+  Group,
   DoubleSide,
   Entity,
   Grabbed,
@@ -89,6 +91,11 @@ const FALL_FROM = 0.015;
 /** Let go this far below the top of something, a piece goes beside or inside it, not onto it. */
 const STACK_SLACK = 0.03;
 const NO_RAYCAST = (): void => {};
+/** The ghost pinch over the piece the call sheet is asking for: a finger and a thumb, closing. */
+const GHOST_RATE = 2.4;
+const GHOST_OPEN = 0.5;
+const GHOST_SHUT = 0.1;
+const GHOST_ABOVE = 0.012;
 /** The camera whose tilt is kept between visits. */
 const FIRST_CAMERA = 'camera:Camera';
 
@@ -153,6 +160,9 @@ export class PiecesSystem extends createSystem({
   private near: Record<Side, number> = { left: -1, right: -1 };
   private rayAside: Record<Side, boolean> = { left: false, right: false };
   private drops: Drop[] = [];
+  private ghost: Group | null = null;
+  private ghostFinger: Mesh | null = null;
+  private ghostThumb: Mesh | null = null;
   private point = new Vector3();
   private local = new Vector3();
   private padAt = new Vector3();
@@ -448,12 +458,16 @@ export class PiecesSystem extends createSystem({
     // The call sheet names one kind of piece at a time; the first of that kind is the one marked.
     const wanted = (this.globals as Globals).coachTarget.peek();
     let beckoned = false;
+    if (this.ghost != null) this.ghost.visible = false;
     for (let i = 0; i < this.dressed.length; i++) {
       const piece = this.dressed[i];
       const held = piece.hasComponent(Held);
       const touched = held || piece.hasComponent(Hovered) || this.near.left === i || this.near.right === i;
       const beckon = !beckoned && wanted !== '' && piece.object3D?.visible === true && piece.getValue(SetPiece, 'role') === wanted;
-      if (beckon) beckoned = true;
+      if (beckon) {
+        beckoned = true;
+        this.showGhost(i, time);
+      }
       const ring = this.rings[i];
       ring.visible = touched || beckon;
       ring.scale.setScalar(beckon && !touched ? 1 + BECKON_SWELL * (0.5 + 0.5 * Math.sin(time * BECKON_RATE)) : 1);
@@ -483,6 +497,37 @@ export class PiecesSystem extends createSystem({
         piece.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, tilt)));
       }
     }
+  }
+
+  /** Shows the gesture over the piece it is for, opening and closing, until a hand has it. */
+  private showGhost(index: number, time: number): void {
+    const piece = this.dressed[index];
+    const object = piece.object3D;
+    const parent = object?.parent;
+    if (object == null || parent == null || piece.hasComponent(Held) || this.near.left === index || this.near.right === index) return;
+    // A controller's trigger is not a pinch, so this is only for hands.
+    if (!this.input.xr.isPrimary('hand', 'left') && !this.input.xr.isPrimary('hand', 'right')) return;
+    if (this.ghost == null) {
+      const material = new MeshBasicMaterial({ color: 0xf6f7ef, toneMapped: false, transparent: true, opacity: 0.8 });
+      const finger = new CapsuleGeometry(0.0055, 0.04, 3, 8);
+      finger.translate(0, 0.025, 0);
+      this.ghostFinger = new Mesh(finger, material);
+      this.ghostThumb = new Mesh(finger, material);
+      this.ghost = new Group();
+      this.ghost.name = 'GhostPinch';
+      for (const part of [this.ghostFinger, this.ghostThumb]) {
+        part.raycast = NO_RAYCAST;
+        this.ghost.add(part);
+      }
+      parent.add(this.ghost);
+      this.world.getSystem(ViewfinderSystem)?.hideFromLens(this.ghost);
+    }
+    const close = 0.5 + 0.5 * Math.sin(time * GHOST_RATE * Math.PI);
+    const angle = GHOST_SHUT + (GHOST_OPEN - GHOST_SHUT) * close;
+    this.ghostFinger!.rotation.z = -angle;
+    this.ghostThumb!.rotation.z = angle;
+    this.ghost.position.set(object.position.x, object.position.y + this.bounds[index].max.y * object.scale.y + GHOST_ABOVE, object.position.z);
+    this.ghost.visible = true;
   }
 
   /** The unseen cylinder that makes a piece easy to catch, and the ring that says it is caught. */

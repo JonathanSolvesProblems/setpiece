@@ -9,6 +9,7 @@ Second pass, 2026-11-05 (see ../direction-2.md). Laws 1, 7, 9, 11 and 16 below a
 - **16b. Never pure white and never pure black.** The whitest thing is chalk #f6f7ef; the darkest is the cloth #1b1411, measured from a stage floor under spike tape.
 - **19. The ground is black cloth, never grey and never glass.** No translucent panel, no blur.
 - **20. Light means live.** Marks dim to 45% while their actor is in the air; nothing glows for decoration.
+- **22. Everything on the slate starts as a maquette: bare basswood for vehicles and sets, carved wood for creatures.** Paint is the wearer's choice, in muted enamels. A scene from the library paints one piece at most. (Blind critic, 2026-11-05: toy-coloured models broke the set's one material language.)
 - **21. A tape mark is a T, torn square, one per performer, flat on the floor, and out of the lens's picture.**
 
 

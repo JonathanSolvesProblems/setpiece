@@ -25,7 +25,7 @@ import {
 import { bevelBox } from './lib/hardsurface.js';
 import { BEAD, Kit, SIDES, ball, idleGroup, limb, loft, plate, sec, v } from './lib/kit.js';
 
-const primer = new MeshStandardMaterial({ color: 0x8b8f94, roughness: 0.62 });
+const primer = new MeshStandardMaterial({ color: 0xc9ae8f, roughness: 0.72 });
 const glass = new MeshStandardMaterial({ color: 0x20262e, roughness: 0.25, metalness: 0.3 });
 const rubber = new MeshStandardMaterial({ color: 0x17191c, roughness: 0.9 });
 const steel = new MeshStandardMaterial({ color: 0x4a4f55, roughness: 0.45, metalness: 0.6 });

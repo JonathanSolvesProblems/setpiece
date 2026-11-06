@@ -1,5 +1,5 @@
 /**
- * Creature maquettes at 1:10 for blocking a shot: generic forms in grey primer,
+ * Creature maquettes at 1:10 for blocking a shot: generic forms in carved wood, not primer,
  * read by silhouette from a metre away, never a likeness of anyone's design.
  * Origin at floor contact, front along +Z, Y up.
  *
@@ -42,7 +42,8 @@ import {
   type Ring,
 } from './lib/kit.js';
 
-const primer = new MeshStandardMaterial({ color: 0x8b8f94, roughness: 0.62 });
+/** Carved, like the lay figures: a creature is a wooden maquette until someone paints it. */
+const primer = new MeshStandardMaterial({ color: 0xa98567, roughness: 0.72 });
 const horn = new MeshStandardMaterial({ color: 0x3a332d, roughness: 0.55 });
 const bone = new MeshStandardMaterial({ color: 0xe4dac2, roughness: 0.5 });
 const eyeGlow = new MeshStandardMaterial({ color: 0xffb347, emissive: 0xff9a1f, emissiveIntensity: 0.8, roughness: 0.3 });

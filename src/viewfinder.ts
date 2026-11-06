@@ -767,10 +767,10 @@ export class ViewfinderSystem extends createSystem({
     const g = canvas.getContext('2d');
     if (g) {
       const gradient = g.createLinearGradient(0, 0, 0, 256);
-      gradient.addColorStop(0, '#1a1d23');
-      gradient.addColorStop(0.46, '#2a2d33');
-      gradient.addColorStop(0.5, '#3a3936');
-      gradient.addColorStop(1, '#45423f');
+      gradient.addColorStop(0, '#140f0c');
+      gradient.addColorStop(0.46, '#1b1411');
+      gradient.addColorStop(0.5, '#2a211c');
+      gradient.addColorStop(1, '#3a2d25');
       g.fillStyle = gradient;
       g.fillRect(0, 0, 4, 256);
     }
@@ -1162,7 +1162,7 @@ export class ViewfinderSystem extends createSystem({
     const shadowAutoUpdate = renderer.shadowMap.autoUpdate;
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(this.target);
-    renderer.setClearColor(0x0f1114, 1);
+    renderer.setClearColor(0x140f0c, 1);
     renderer.autoClear = true;
     renderer.render(this.scene, this.lensCamera);
 

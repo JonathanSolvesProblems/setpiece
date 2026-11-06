@@ -439,10 +439,8 @@ export class ControlsSystem extends createSystem({
       if (page >= pages) page = 0;
       const on = g.trayOn.peek();
       for (const name of SHELF_TABS) {
-        panel.getElementById(`shelf-${name}`)?.setProperties({
-          backgroundColor: name === shelf ? OPTIC_YELLOW : BLOCK,
-          color: name === shelf ? CLOTH : CHALK,
-        });
+        // Filled yellow is the top level; a shelf is the level below it, so it only takes an edge.
+        panel.getElementById(`shelf-${name}`)?.setProperties({ borderColor: name === shelf ? OPTIC_YELLOW : BLOCK });
       }
       const searching = shelf === 'Search';
       panel.getElementById('search-box')?.setProperties({ display: searching ? 'flex' : 'none' });

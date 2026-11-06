@@ -73,9 +73,9 @@ function wallTexture(): CanvasTexture {
   const g = canvas.getContext('2d');
   if (g) {
     const gradient = g.createLinearGradient(0, 0, 0, 256);
-    gradient.addColorStop(0, '#1a1d23');
-    gradient.addColorStop(0.55, '#2a2d33');
-    gradient.addColorStop(1, '#45423f');
+    gradient.addColorStop(0, '#140f0c');
+    gradient.addColorStop(0.55, '#1b1411');
+    gradient.addColorStop(1, '#3a2d25');
     g.fillStyle = gradient;
     g.fillRect(0, 0, 4, 256);
   }

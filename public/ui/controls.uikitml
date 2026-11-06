@@ -84,6 +84,8 @@
     padding-left: 4px;
     padding-right: 4px;
     height: 30px;
+    border-width: 2px;
+    border-color: #2a211c;
     justify-content: center;
     align-items: center;
     border-radius: 2px;
@@ -332,14 +334,14 @@
       <div id="cast-line" class="line">Pick up a piece to change it</div>
     </div>
     <div id="paint-row" class="chips" style="display: none">
-      <div id="paint-0" class="chip" style="background-color: #8b8f94"></div>
-      <div id="paint-1" class="chip" style="background-color: #b3312a"></div>
-      <div id="paint-2" class="chip" style="background-color: #d9772b"></div>
-      <div id="paint-3" class="chip" style="background-color: #e3c23c"></div>
-      <div id="paint-4" class="chip" style="background-color: #3f7d4e"></div>
-      <div id="paint-5" class="chip" style="background-color: #2f5f9e"></div>
-      <div id="paint-6" class="chip" style="background-color: #e6e4da"></div>
-      <div id="paint-7" class="chip" style="background-color: #26282c"></div>
+      <div id="paint-0" class="chip" style="background-color: #c9ae8f"></div>
+      <div id="paint-1" class="chip" style="background-color: #9c3a2e"></div>
+      <div id="paint-2" class="chip" style="background-color: #b86f33"></div>
+      <div id="paint-3" class="chip" style="background-color: #c4a23f"></div>
+      <div id="paint-4" class="chip" style="background-color: #4c6e52"></div>
+      <div id="paint-5" class="chip" style="background-color: #3d5b7c"></div>
+      <div id="paint-6" class="chip" style="background-color: #d8d3c4"></div>
+      <div id="paint-7" class="chip" style="background-color: #2a2826"></div>
     </div>
     <div id="held-row" class="takes" style="display: none">
       <div id="btn-size" class="word">Size</div>

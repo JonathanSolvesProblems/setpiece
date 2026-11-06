@@ -397,8 +397,7 @@ export class TraySystem extends createSystem({
     this.cast.clear();
     this.finish.clear();
     for (const placed of scene.pieces) {
-      const asset = assetByLabel(placed.label);
-      this.finish.set(placed.label, [placed.paint ?? asset?.coat ?? 0, placed.size ?? 0, placed.style ?? 0]);
+      this.finish.set(placed.label, [placed.paint ?? 0, placed.size ?? 0, placed.style ?? 0]);
       if (placed.pose != null || placed.look != null) this.cast.set(placed.label, [placed.pose ?? 0, placed.look ?? 0]);
     }
     this.wear({ cast: Object.fromEntries(this.cast), finish: Object.fromEntries(this.finish) });
@@ -465,7 +464,7 @@ export class TraySystem extends createSystem({
 
   /** How a piece is finished: what the wearer chose, or the paint it comes in. */
   private finishOf(key: string): Finish {
-    return this.finish.get(key) ?? [assetByLabel(key)?.coat ?? 0, 0, 0];
+    return this.finish.get(key) ?? [0, 0, 0];
   }
 
   /** Paint is chosen; size and fitting step to the next. */

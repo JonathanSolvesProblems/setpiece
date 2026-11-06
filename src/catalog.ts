@@ -18,8 +18,6 @@ export type Asset = {
   grab?: [number, number];
   /** Its body takes a coat of paint. */
   paint?: boolean;
-  /** The paint it comes in, as an index into PAINTS. Without one it comes in primer. */
-  coat?: number;
   /** Named fittings, one of which shows: the first is the plain one. */
   styles?: string[];
   /** Other pieces can be set down on top of it. */
@@ -66,33 +64,33 @@ export const ASSETS: Asset[] = [
   { label: 'Lamp post', shelf: 'Set', grab: [0.05, 0.42], aliases: ['street light', 'lamp'] },
   { label: 'Tree', shelf: 'Set', grab: [0.08, 0.4] },
   { label: 'Crate', shelf: 'Props', grab: [0.05, 0.08], solid: true, aliases: ['box'] },
-  { label: 'Dragon', shelf: 'Creatures', grab: [0.14, 0.29], paint: true, coat: 1, mover: true },
-  { label: 'Troll', shelf: 'Creatures', grab: [0.12, 0.4], paint: true, coat: 4, mover: true, aliases: ['ogre'] },
-  { label: 'Dinosaur', shelf: 'Creatures', grab: [0.12, 0.28], paint: true, coat: 4, mover: true, aliases: ['dino', 'rex'] },
-  { label: 'Robot', shelf: 'Creatures', grab: [0.1, 0.35], paint: true, coat: 5, mover: true, aliases: ['mech'] },
-  { label: 'Alien', shelf: 'Creatures', grab: [0.04, 0.24], paint: true, coat: 4 },
-  { label: 'Ghost', shelf: 'Creatures', grab: [0.06, 0.2], paint: true, coat: 6 },
-  { label: 'Spider', shelf: 'Creatures', grab: [0.12, 0.12], paint: true, coat: 7, mover: true },
-  { label: 'Kraken', shelf: 'Creatures', grab: [0.12, 0.35], paint: true, coat: 2, aliases: ['tentacles', 'octopus', 'squid'] },
-  { label: 'Horse', shelf: 'Cast', grab: [0.07, 0.17], paint: true, coat: 6, mover: true, styles: ['Plain', 'Unicorn'], aliases: ['unicorn'] },
-  { label: 'Wolf', shelf: 'Cast', grab: [0.06, 0.1], paint: true, coat: 7, mover: true, aliases: ['dog'] },
-  { label: 'Truck', shelf: 'Vehicles', grab: [0.15, 0.33], paint: true, coat: 6, solid: true, mover: true, styles: ['Box', 'Flatbed', 'Tanker'], aliases: ['lorry'] },
-  { label: 'Pickup', shelf: 'Vehicles', grab: [0.13, 0.18], paint: true, coat: 5, solid: true, mover: true },
-  { label: 'Bus', shelf: 'Vehicles', grab: [0.16, 0.33], paint: true, coat: 3, solid: true, mover: true, aliases: ['coach'] },
-  { label: 'Helicopter', shelf: 'Vehicles', grab: [0.2, 0.27], paint: true, coat: 3, mover: true, aliases: ['chopper'] },
-  { label: 'Boat', shelf: 'Vehicles', grab: [0.13, 0.15], paint: true, coat: 6, solid: true, mover: true, aliases: ['ship'] },
-  { label: 'Saucer', shelf: 'Vehicles', title: 'Flying saucer', grab: [0.18, 0.16], paint: true, coat: 6, mover: true, aliases: ['ufo', 'spaceship'] },
-  { label: 'Bicycle', shelf: 'Vehicles', grab: [0.06, 0.1], paint: true, coat: 1, mover: true, aliases: ['cycle'] },
-  { label: 'Tank', shelf: 'Vehicles', grab: [0.16, 0.21], paint: true, coat: 4, solid: true, mover: true },
-  { label: 'House', shelf: 'Set', title: 'House front', grab: [0.2, 0.56], paint: true, coat: 6, solid: true, aliases: ['building'] },
+  { label: 'Dragon', shelf: 'Creatures', grab: [0.14, 0.29], paint: true, mover: true },
+  { label: 'Troll', shelf: 'Creatures', grab: [0.12, 0.4], paint: true, mover: true, aliases: ['ogre'] },
+  { label: 'Dinosaur', shelf: 'Creatures', grab: [0.12, 0.28], paint: true, mover: true, aliases: ['dino', 'rex'] },
+  { label: 'Robot', shelf: 'Creatures', grab: [0.1, 0.35], paint: true, mover: true, aliases: ['mech'] },
+  { label: 'Alien', shelf: 'Creatures', grab: [0.04, 0.24], paint: true },
+  { label: 'Ghost', shelf: 'Creatures', grab: [0.06, 0.2], paint: true },
+  { label: 'Spider', shelf: 'Creatures', grab: [0.12, 0.12], paint: true, mover: true },
+  { label: 'Kraken', shelf: 'Creatures', grab: [0.12, 0.35], paint: true, aliases: ['tentacles', 'octopus', 'squid'] },
+  { label: 'Horse', shelf: 'Cast', grab: [0.07, 0.17], paint: true, mover: true, styles: ['Plain', 'Unicorn'], aliases: ['unicorn'] },
+  { label: 'Wolf', shelf: 'Cast', grab: [0.06, 0.1], paint: true, mover: true, aliases: ['dog'] },
+  { label: 'Truck', shelf: 'Vehicles', grab: [0.15, 0.33], paint: true, solid: true, mover: true, styles: ['Box', 'Flatbed', 'Tanker'], aliases: ['lorry'] },
+  { label: 'Pickup', shelf: 'Vehicles', grab: [0.13, 0.18], paint: true, solid: true, mover: true },
+  { label: 'Bus', shelf: 'Vehicles', grab: [0.16, 0.33], paint: true, solid: true, mover: true, aliases: ['coach'] },
+  { label: 'Helicopter', shelf: 'Vehicles', grab: [0.2, 0.27], paint: true, mover: true, aliases: ['chopper'] },
+  { label: 'Boat', shelf: 'Vehicles', grab: [0.13, 0.15], paint: true, solid: true, mover: true, aliases: ['ship'] },
+  { label: 'Saucer', shelf: 'Vehicles', title: 'Flying saucer', grab: [0.18, 0.16], paint: true, mover: true, aliases: ['ufo', 'spaceship'] },
+  { label: 'Bicycle', shelf: 'Vehicles', grab: [0.06, 0.1], paint: true, mover: true, aliases: ['cycle'] },
+  { label: 'Tank', shelf: 'Vehicles', grab: [0.16, 0.21], paint: true, solid: true, mover: true },
+  { label: 'House', shelf: 'Set', title: 'House front', grab: [0.2, 0.56], paint: true, solid: true, aliases: ['building'] },
   { label: 'Fence', shelf: 'Set', grab: [0.1, 0.11], paint: true },
   { label: 'Stairs', shelf: 'Set', grab: [0.1, 0.36], solid: true, aliases: ['steps'] },
-  { label: 'Door', shelf: 'Set', grab: [0.05, 0.21], paint: true, coat: 1 },
+  { label: 'Door', shelf: 'Set', grab: [0.05, 0.21], paint: true },
   { label: 'Pillar', shelf: 'Set', grab: [0.08, 0.35], solid: true, aliases: ['column'] },
   { label: 'Barrier', shelf: 'Props', grab: [0.08, 0.08], solid: true },
   { label: 'Bench', shelf: 'Props', grab: [0.07, 0.09], solid: true },
   { label: 'Cone', shelf: 'Props', grab: [0.03, 0.07], paint: true },
-  { label: 'Dumpster', shelf: 'Props', grab: [0.09, 0.12], paint: true, coat: 4, solid: true, aliases: ['bin', 'skip'] },
+  { label: 'Dumpster', shelf: 'Props', grab: [0.09, 0.12], paint: true, solid: true, aliases: ['bin', 'skip'] },
   { label: 'Rock', shelf: 'Props', grab: [0.09, 0.12], solid: true, aliases: ['boulder'] },
 ];
 
@@ -129,16 +127,16 @@ export function searchAssets(query: string): Asset[] {
   return [...named, ...within];
 }
 
-/** Paint for anything with a body: the first is the primer it comes in. */
+/** Model maker's enamels: everything comes in bare wood, and colour is a choice. */
 export const PAINTS = [
-  { name: 'Primer', hex: 0 },
-  { name: 'Red', hex: 0xb3312a },
-  { name: 'Orange', hex: 0xd9772b },
-  { name: 'Yellow', hex: 0xe3c23c },
-  { name: 'Green', hex: 0x3f7d4e },
-  { name: 'Blue', hex: 0x2f5f9e },
-  { name: 'White', hex: 0xe6e4da },
-  { name: 'Black', hex: 0x26282c },
+  { name: 'Bare wood', hex: 0 },
+  { name: 'Red', hex: 0x9c3a2e },
+  { name: 'Orange', hex: 0xb86f33 },
+  { name: 'Yellow', hex: 0xc4a23f },
+  { name: 'Green', hex: 0x4c6e52 },
+  { name: 'Blue', hex: 0x3d5b7c },
+  { name: 'White', hex: 0xd8d3c4 },
+  { name: 'Black', hex: 0x2a2826 },
 ] as const;
 export const SIZES = [
   { name: 'Normal', scale: 1 },

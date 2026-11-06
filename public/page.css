@@ -391,7 +391,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
 .board li {
   position: relative;
   aspect-ratio: 16 / 9;
-  border: 1px dashed var(--rule);
+  border: 1px solid var(--rule);
+  background: var(--block, transparent);
   border-radius: 2px;
   overflow: hidden;
 }
