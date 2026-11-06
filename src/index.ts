@@ -1,6 +1,6 @@
 import { placingPieces, setFailed, setReady } from './loader.js';
 import './fonts.js';
-import { VisibilityState, World } from '@iwsdk/core';
+import { DepthSensingSystem, VisibilityState, World } from '@iwsdk/core';
 import { signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';
 import projectOptions from 'virtual:iwsdk-project';
@@ -26,10 +26,21 @@ import type { Shot } from './viewfinder.js';
 
 const BOARD_SLOTS = 6;
 
-World.create(
-  document.getElementById('scene-container') as HTMLDivElement,
-  projectOptions,
-).then((world) => {
+// Real hands in front of the miniatures, on trial: add ?occlude, or ?occlude=soft, to the address.
+// Without it nothing about the session changes, and it stays optional so no headset is turned away.
+const occlusion = new URLSearchParams(location.search).get('occlude');
+const options =
+  occlusion == null
+    ? projectOptions
+    : {
+        ...projectOptions,
+        xr: {
+          ...projectOptions.xr,
+          features: { ...(projectOptions.xr ? projectOptions.xr.features : undefined), depthSensing: { required: false, usage: 'gpu-optimized', format: 'float32' } },
+        },
+      };
+
+World.create(document.getElementById('scene-container') as HTMLDivElement, options as typeof projectOptions).then((world) => {
   // Shared state between the control panel and the viewfinder.
   const globals = world.globals as Record<string, unknown>;
   globals.lensMm = signal(35);
@@ -52,6 +63,7 @@ World.create(
   globals.trayToggle = signal('');
   globals.trayOn = signal<string[]>([]);
   globals.setReady = signal(false);
+  globals.occlusion = signal(occlusion);
   globals.effectsOn = signal(0);
   globals.poseRequested = signal(0);
   globals.squirmOn = signal(loadJson<{ squirm: boolean }>(StoreKey.Settings)?.squirm !== false);
@@ -95,6 +107,9 @@ World.create(
   globals.playRequested = signal(0);
 
   placingPieces();
+  if (occlusion != null) {
+    world.registerSystem(DepthSensingSystem, { configData: { enableDepthTexture: true, enableOcclusion: true, useFloat32: true, blurRadius: 20 } });
+  }
   world
     .registerSystem(PlacementSystem, { priority: 10 })
     .registerSystem(PiecesSystem, { priority: 12 })

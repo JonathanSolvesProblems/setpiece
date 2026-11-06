@@ -5,7 +5,7 @@
  * and the parts of a creature that move on their own are the only things here
  * that run by themselves, so this is also where their clock lives.
  */
-import { createSystem, Entity, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial } from '@iwsdk/core';
+import { createSystem, DepthOccludable, Entity, Mesh, MeshStandardMaterial, Object3D, OcclusionShadersMode, ShaderMaterial } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { CAMERAS, Rig, SENSORS } from './camera-formats.js';
 import { assetByLabel, assetTitle, PAINTS, sparesOf, SIZES, STARTING_ASSETS } from './catalog.js';
@@ -62,6 +62,7 @@ type Globals = {
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
   setReady: Signal<boolean>;
+  occlusion: Signal<string | null>;
   trayRestore: Signal<string[] | null>;
   trayDress: Signal<Dress>;
   trayDressRestore: Signal<Dress | null>;
@@ -228,7 +229,20 @@ export class TraySystem extends createSystem({
     if (saved?.rig === Rig.Drone) g.cameraRig.value = Rig.Drone;
     else this.applyRig(g.cameraRig.peek());
     this.publish();
+    this.occlude();
     return true;
+  }
+
+  /** On trial, see index.ts: solid pieces go behind the wearer's real hands. Effects draw their own way. */
+  private occlude(): void {
+    const mode = (this.globals as Globals).occlusion.peek();
+    if (mode == null) return;
+    for (const piece of this.managed) {
+      if (assetByLabel(this.key(piece))?.shelf === 'Effects') continue;
+      piece.addComponent(DepthOccludable, {
+        mode: mode === 'soft' ? OcclusionShadersMode.SoftOcclusion : OcclusionShadersMode.HardOcclusion,
+      });
+    }
   }
 
   /**
