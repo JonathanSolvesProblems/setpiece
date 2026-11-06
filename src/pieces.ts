@@ -338,7 +338,10 @@ export class PiecesSystem extends createSystem({
     if (letGo || carry.lost > LOST_HAND_SECONDS || carry.piece.object3D == null) {
       this.carrying[side] = null;
       this.setRayAside(side, false);
-      if (carry.piece.hasComponent(Held)) carry.piece.removeComponent(Held);
+      // The other hand may still have it, by its own reach or by the ray.
+      const other = this.carrying[side === 'left' ? 'right' : 'left'];
+      const stillHeld = other?.piece === carry.piece || carry.piece.hasComponent(Grabbed);
+      if (!stillHeld && carry.piece.hasComponent(Held)) carry.piece.removeComponent(Held);
       return;
     }
     this.setRayAside(side, true);

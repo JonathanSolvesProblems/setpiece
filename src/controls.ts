@@ -29,7 +29,7 @@ const PANEL_OFFSET = new Vector3(-0.38, 0.33, -0.16);
  * and the tabs stay put when a page changes the panel's height. Metres per
  * panel unit is measured from the panel as it is scaled in the scene.
  */
-const PANEL_TOP = 0.68;
+const PANEL_TOP = 0.71;
 const LIFE_CONFIRM_MS = 3000;
 const PANEL_UNIT = 0.00101;
 /** At full size the table is left behind, so the panel stays with the wearer: this far ahead, this far off centre, this far below the eyes. */

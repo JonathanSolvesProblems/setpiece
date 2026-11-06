@@ -170,10 +170,11 @@ export class MarksSystem extends createSystem({
         mark.settled = false;
         continue;
       }
-      // In the air the actor has left the mark; the mark waits where they stood.
-      const away = mark.piece.hasComponent(Held) || object.position.y > 0.02;
+      // In the hand the actor has left the mark, and the mark waits where they stood.
+      const carried = mark.piece.hasComponent(Held);
+      const away = carried || object.position.y > 0.02;
       mark.material.opacity += ((away ? WAITING : 1) - mark.material.opacity) * ease;
-      if (away && mark.settled) continue;
+      if (carried && mark.settled) continue;
       if (!mark.settled) {
         mesh.position.set(object.position.x, TAPE_LIFT, object.position.z);
         mesh.quaternion.copy(object.quaternion);

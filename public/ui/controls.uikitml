@@ -58,6 +58,7 @@
   .takes { flex-direction: row; gap: 4px; flex-grow: 1; justify-content: flex-start; }
   .tabs { flex-direction: row; gap: 3px; width: 100%; justify-content: space-between; }
   .tab {
+    text-align: center;
     font-family: "Grotesk";
     font-weight: 600;
     font-size: 13px;
@@ -72,6 +73,7 @@
     cursor: pointer;
   }
   .shelf {
+    text-align: center;
     font-family: "Grotesk";
     font-weight: 600;
     font-size: 13px;
@@ -107,6 +109,7 @@
   }
   .assetrow { flex-direction: row; gap: 6px; width: 100%; }
   .asset {
+    text-align: center;
     font-family: "Grotesk";
     font-weight: 500;
     font-size: 14px;
@@ -114,7 +117,7 @@
     color: #f6f7ef;
     background-color: #2a211c;
     width: 121px;
-    height: 34px;
+    height: 32px;
     justify-content: center;
     align-items: center;
     border-width: 2px;
@@ -151,6 +154,7 @@
     cursor: pointer;
   }
   .word {
+    text-align: center;
     font-family: "Grotesk";
     font-weight: 600;
     font-size: 14px;
@@ -342,13 +346,15 @@
       <div class="label short">ACTORS</div>
       <div id="btn-squirm" class="word">Squirm when held: on</div>
     </div>
+    <div class="field">
+      <div class="label short">LEAVE</div>
+      <div id="exit-button" class="word">Exit to browser</div>
+    </div>
     <div id="voice-row" class="field" style="display: none">
       <div class="label short">VOICE</div>
       <div id="btn-voice" class="word">Say a scene</div>
     </div>
     <div id="voice-line" class="line muted" style="display: none"> </div>
   </div>
-  <div class="rule"></div>
-  <div id="xr-button" class="primary">Enter XR</div>
-  <div id="exit-button" class="word" style="display: none">Exit to browser</div>
+  <div id="xr-button" class="primary" style="display: none">Enter XR</div>
 </div>
