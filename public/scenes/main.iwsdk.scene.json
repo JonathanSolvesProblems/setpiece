@@ -2260,6 +2260,580 @@
           }
         },
         {
+          "id": "prop-tree-2",
+          "name": "Tree 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "tree",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Tree 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-tree-3",
+          "name": "Tree 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "tree",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Tree 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-rock-2",
+          "name": "Rock 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "rock",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Rock 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-rock-3",
+          "name": "Rock 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "rock",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Rock 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-crate-2",
+          "name": "Crate 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "crate",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Crate 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-crate-3",
+          "name": "Crate 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "crate",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Crate 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-cone-2",
+          "name": "Cone 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "cone",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Cone 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-cone-3",
+          "name": "Cone 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "cone",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Cone 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-barrier-2",
+          "name": "Barrier 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "barrier",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Barrier 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-barrier-3",
+          "name": "Barrier 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "barrier",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Barrier 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-car-2",
+          "name": "Car 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "car",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Car 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-car-3",
+          "name": "Car 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "car",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Car 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-wolf-2",
+          "name": "Wolf 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "wolf",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Wolf 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-wolf-3",
+          "name": "Wolf 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "wolf",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.05
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Wolf 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
           "id": "cue-pick",
           "name": "Cue pick",
           "transform": {

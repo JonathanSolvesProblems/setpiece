@@ -8,7 +8,7 @@
 import { createSystem, Entity, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { CAMERAS, Rig, SENSORS } from './camera-formats.js';
-import { assetByLabel, assetTitle, PAINTS, SIZES, STARTING_ASSETS } from './catalog.js';
+import { assetByLabel, assetTitle, PAINTS, sparesOf, SIZES, STARTING_ASSETS } from './catalog.js';
 import { Held, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { SCENES } from './scenes.js';
 import type { Spoken } from './scene-request.js';
@@ -64,6 +64,10 @@ type Globals = {
   clearSet: Signal<number>;
   selectedIsActor: Signal<boolean>;
   selectedPaint: Signal<number>;
+  selectedLabel: Signal<string>;
+  selectedCopies: Signal<boolean>;
+  copyRequested: Signal<number>;
+  trayPress: Signal<string>;
   selectedStyles: Signal<boolean>;
   poseRequested: Signal<number>;
   lookRequested: Signal<number>;
@@ -92,7 +96,7 @@ export class TraySystem extends createSystem({
   private finish = new Map<string, Finish>();
   private selected: Entity | null = null;
   private ready = false;
-  private seen = { pose: 0, look: 0, board: 0, remove: 0, clear: 0, size: 0, style: 0 };
+  private seen = { pose: 0, look: 0, board: 0, remove: 0, clear: 0, size: 0, style: 0, copy: 0 };
 
   init(): void {
     const g = this.globals as Globals;
@@ -107,6 +111,19 @@ export class TraySystem extends createSystem({
         if (label === '') return;
         g.trayToggle.value = '';
         if (this.ready) this.toggle(label);
+      }),
+      // Pressing a piece on the shelf: off the set it goes on, on the set it is chosen, and chosen it comes off.
+      g.trayPress.subscribe((label) => {
+        if (label === '') return;
+        g.trayPress.value = '';
+        if (!this.ready) return;
+        const piece = this.managed.find((entity) => this.key(entity) === label);
+        if (this.on.has(label) && piece != null && piece !== this.selected) {
+          this.selected = piece;
+          this.publishSelected();
+          return;
+        }
+        this.toggle(label);
       }),
       g.trayRestore.subscribe((list) => {
         if (list == null) return;
@@ -137,6 +154,7 @@ export class TraySystem extends createSystem({
       counter(g.lookRequested, 'look', () => this.step(1, LOOKS.length)),
       counter(g.sizeRequested, 'size', () => this.refinish(1, -1)),
       counter(g.styleRequested, 'style', () => this.refinish(2, -1)),
+      counter(g.copyRequested, 'copy', () => this.copy()),
       counter(g.removeSelected, 'remove', () => {
         if (this.selected != null) this.toggle(this.key(this.selected));
       }),
@@ -237,30 +255,68 @@ export class TraySystem extends createSystem({
     else next.add(label);
     const added = next.has(label);
     this.setOn(next);
-    if (added) this.clearSpot(label);
+    if (!added) return;
+    this.clearSpot(label);
+    // What was just added is what the panel offers to change.
+    this.selected = this.managed.find((entity) => this.key(entity) === label) ?? this.selected;
+    this.publishSelected();
   }
 
-  /** A piece put on the set from the shelf goes where nothing else is standing. */
+  /** Spares of this piece that are off the set, next first. */
+  private freeSpares(label: string): string[] {
+    const base = assetByLabel(label)?.spareOf ?? label;
+    return [base, ...sparesOf(base)].filter((name) => name !== label && !this.on.has(name) && assetByLabel(name) != null);
+  }
+
+  /** Another of the chosen piece, dressed the same. */
+  private copy(): void {
+    const piece = this.selected;
+    if (piece == null) return;
+    const label = this.key(piece);
+    const spare = this.freeSpares(label)[0];
+    if (spare == null) return;
+    this.finish.set(spare, [...this.finishOf(label)]);
+    const copy = this.managed.find((entity) => this.key(entity) === spare);
+    if (copy != null) {
+      this.coat(copy, this.finishOf(spare));
+      copy.object3D?.quaternion.copy(piece.object3D!.quaternion);
+      copy.object3D?.position.copy(piece.object3D!.position);
+    }
+    this.toggle(spare);
+  }
+
+  /** A piece put on the set from the shelf goes where nothing else is standing, or as near to that as there is. */
   private clearSpot(label: string): void {
     const piece = this.managed.find((entity) => this.key(entity) === label);
     const object = piece?.object3D;
     if (piece == null || object == null) return;
     const reach = (assetByLabel(label)?.grab?.[0] ?? DEFAULT_REACH) * object.scale.x;
-    const clear = (x: number, z: number): boolean => {
+    /** How much room is left at a spot once everything standing near it has had its share; below zero it overlaps. */
+    const room = (x: number, z: number): number => {
+      let least = Infinity;
       for (const other of this.queries.pieces.entities) {
         const there = other.object3D;
         if (other === piece || there == null || !there.visible || there.parent !== object.parent) continue;
-        const room = reach + (assetByLabel(this.key(other))?.grab?.[0] ?? DEFAULT_REACH) * there.scale.x * 0.7;
-        if (Math.hypot(there.position.x - x, there.position.z - z) < room) return false;
+        const needs = reach + (assetByLabel(this.key(other))?.grab?.[0] ?? DEFAULT_REACH) * there.scale.x * 0.7;
+        least = Math.min(least, Math.hypot(there.position.x - x, there.position.z - z) - needs);
       }
-      return true;
+      return least;
     };
-    if (clear(object.position.x, object.position.z)) return;
-    for (const [x, z] of reach >= BIG ? BACK_SPOTS : SPOTS) {
-      if (!clear(x, z)) continue;
-      object.position.set(x, 0, z);
-      return;
+    if (room(object.position.x, object.position.z) >= 0) return;
+    let best: [number, number] | null = null;
+    let bestRoom = -Infinity;
+    for (const spot of reach >= BIG ? BACK_SPOTS : SPOTS) {
+      const here = room(spot[0], spot[1]);
+      if (here >= 0) {
+        best = spot;
+        break;
+      }
+      if (here > bestRoom) {
+        bestRoom = here;
+        best = spot;
+      }
     }
+    if (best != null) object.position.set(best[0], 0, best[1]);
   }
 
   /**
@@ -282,15 +338,23 @@ export class TraySystem extends createSystem({
       if (asset == null || asset.shelf === 'Kit') continue;
       if (!this.on.has(item.label)) placed.push(item.label);
       next.add(item.label);
-      if (item.count > 1) onlyOne = true;
+      // More than one: as many spares as the kit has.
+      const spares = sparesOf(item.label).slice(0, item.count - 1);
+      for (const spare of spares) {
+        if (!this.on.has(spare)) placed.push(spare);
+        next.add(spare);
+      }
+      if (item.count - 1 > spares.length) onlyOne = true;
       const finish: Finish = [...this.finishOf(item.label)];
       const paint = item.colour == null ? -1 : PAINTS.findIndex((p) => p.name.toLowerCase() === item.colour);
       const size = item.size == null ? -1 : SIZES.findIndex((s) => s.name.toLowerCase() === item.size);
       if (paint >= 0 && asset.paint === true) finish[0] = paint;
       if (size >= 0) finish[1] = size;
       if ((paint >= 0 && asset.paint === true) || size >= 0) {
-        this.finish.set(item.label, finish);
-        refinished.push(item.label);
+        for (const name of [item.label, ...spares]) {
+          this.finish.set(name, [...finish]);
+          refinished.push(name);
+        }
       }
     }
     for (const piece of this.managed) if (refinished.includes(this.key(piece))) this.coat(piece, this.finishOf(this.key(piece)));
@@ -305,12 +369,15 @@ export class TraySystem extends createSystem({
     }
     this.world.getSystem(ViewfinderSystem)?.refresh();
 
-    const names = request.items.map((item) => assetTitle(item.label));
+    // One line for each kind of thing, however many times it was named.
+    const counted = new Map<string, number>();
+    for (const item of request.items) counted.set(item.label, (counted.get(item.label) ?? 0) + item.count);
+    const names = [...counted].map(([label, count]) => (count > 1 ? `${count} x ${assetTitle(label)}` : assetTitle(label)));
     const listed = names.length > NAMED_AT_MOST ? `${names.slice(0, NAMED_AT_MOST).join(', ')} and ${names.length - NAMED_AT_MOST} more` : names.join(', ');
     const parts: string[] = [];
     if (listed !== '') parts.push(`On the set: ${listed}.`);
     if (request.remove.length > 0) parts.push(`Off: ${request.remove.map((label) => assetTitle(label)).join(', ')}.`);
-    if (onlyOne) parts.push('There is one of each in the kit.');
+    if (onlyOne) parts.push('That is all the kit has of those.');
     if (request.unknown.length > 0) parts.push(`Not in the kit: ${request.unknown.join(', ')}.`);
     if (parts.length === 0 && request.clear) parts.push('The set is clear.');
     if (parts.length === 0) {
@@ -503,6 +570,8 @@ export class TraySystem extends createSystem({
       g.selectedIsActor.value = false;
       g.selectedPaint.value = -1;
       g.selectedStyles.value = false;
+      g.selectedCopies.value = false;
+      g.selectedLabel.value = '';
       return;
     }
     const actor = piece.getValue(SetPiece, 'role') === SetRole.Actor;
@@ -518,6 +587,8 @@ export class TraySystem extends createSystem({
     g.selectedIsActor.value = actor;
     g.selectedPaint.value = asset.paint === true ? paint : -1;
     g.selectedStyles.value = (asset.styles?.length ?? 0) > 1;
+    g.selectedCopies.value = this.freeSpares(key).length > 0;
+    g.selectedLabel.value = key;
   }
 
   /** The same camera on legs or in the air. A flown camera goes up on its own; a landed one comes down. */

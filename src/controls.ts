@@ -85,6 +85,10 @@ type Globals = {
   clearSet: Signal<number>;
   selectedIsActor: Signal<boolean>;
   selectedPaint: Signal<number>;
+  selectedLabel: Signal<string>;
+  selectedCopies: Signal<boolean>;
+  copyRequested: Signal<number>;
+  trayPress: Signal<string>;
   selectedStyles: Signal<boolean>;
   poseRequested: Signal<number>;
   lookRequested: Signal<number>;
@@ -451,10 +455,14 @@ export class ControlsSystem extends createSystem({
         const at = page * slots() + i;
         const scene = scenes ? SCENES[at] : undefined;
         const item = !scenes && i < slots() ? all[at] : undefined;
+        // An edge says it is on the set; filled says it is the one the row below will change.
+        const selected = item != null && item.label === g.selectedLabel.peek();
         panel.getElementById<UIKit.Text>(`asset-${i}`)?.setProperties({
           display: item || scene ? 'flex' : 'none',
           text: scene ? scene.title : item ? assetTitle(item.label) : '',
           borderColor: item && on.includes(item.label) ? OPTIC_YELLOW : CHALK_HAZE,
+          backgroundColor: selected ? OPTIC_YELLOW : BLOCK,
+          color: selected ? CLOTH : CHALK,
         });
       }
       panel.getElementById('shelf-pager')?.setProperties({ display: pages > 1 ? 'flex' : 'none' });
@@ -496,7 +504,7 @@ export class ControlsSystem extends createSystem({
           return;
         }
         const item = onShelf()[at];
-        if (item) g.trayToggle.value = item.label;
+        if (item) g.trayPress.value = item.label;
       });
     }
     for (let i = 0; i < PAINTS.length; i++) {
@@ -504,6 +512,9 @@ export class ControlsSystem extends createSystem({
         g.paintPick.value = i;
       });
     }
+    wire('btn-copy', () => {
+      g.copyRequested.value = g.copyRequested.peek() + 1;
+    });
     wire('btn-size', () => {
       g.sizeRequested.value = g.sizeRequested.peek() + 1;
     });
@@ -527,7 +538,7 @@ export class ControlsSystem extends createSystem({
       g.trayOn.subscribe(showShelf),
       g.castLine.subscribe((line) => {
         const selected = line !== '';
-        cast?.setProperties({ text: selected ? line : 'Pick up a piece to change it' });
+        cast?.setProperties({ text: selected ? line : 'Press a piece here, or pick it up' });
         panel.getElementById('held-row')?.setProperties({ display: selected ? 'flex' : 'none' });
       }),
       g.selectedPaint.subscribe((paint) => {
@@ -535,6 +546,10 @@ export class ControlsSystem extends createSystem({
         for (let i = 0; i < PAINTS.length; i++) {
           panel.getElementById(`paint-${i}`)?.setProperties({ borderColor: i === paint ? CHALK : CLOTH });
         }
+      }),
+      g.selectedLabel.subscribe(showShelf),
+      g.selectedCopies.subscribe((has) => {
+        panel.getElementById('btn-copy')?.setProperties({ display: has ? 'flex' : 'none' });
       }),
       g.selectedStyles.subscribe((has) => {
         panel.getElementById('btn-style')?.setProperties({ display: has ? 'flex' : 'none' });

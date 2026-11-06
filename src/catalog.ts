@@ -5,7 +5,7 @@
  */
 export const SHELVES = ['Cast', 'Creatures', 'Vehicles', 'Effects', 'Set', 'Props'] as const;
 /** Kit is the camera department's own: on the set from the Shoot page, never on a shelf. */
-export type Shelf = (typeof SHELVES)[number] | 'Kit';
+export type Shelf = (typeof SHELVES)[number] | 'Kit' | 'Spare';
 
 export type Asset = {
   /** The piece's label, which is also its name on the panel unless `title` says otherwise. */
@@ -30,6 +30,8 @@ export type Asset = {
   tape?: string;
   /** Other words a person might say for it. */
   aliases?: string[];
+  /** A second or third of something: not on a shelf, reached by Copy or by asking for more than one. */
+  spareOf?: string;
 };
 
 /**
@@ -94,6 +96,19 @@ export const ASSETS: Asset[] = [
   { label: 'Rock', shelf: 'Props', grab: [0.09, 0.12], solid: true, aliases: ['boulder'] },
 ];
 
+/** The pieces a set wants more than one of. Each has two spares waiting off the set. */
+const SPARE_OF = ['Tree', 'Rock', 'Crate', 'Cone', 'Barrier', 'Car', 'Wolf'];
+for (const label of SPARE_OF) {
+  const base = ASSETS.find((asset) => asset.label === label)!;
+  for (const n of [2, 3]) {
+    ASSETS.push({ ...base, label: `${label} ${n}`, title: `${base.title ?? label} ${n}`, shelf: 'Spare', spareOf: label, aliases: undefined, starts: false });
+  }
+}
+export const sparesOf = (label: string): string[] => ASSETS.filter((asset) => asset.spareOf === label).map((asset) => asset.label);
+const onShelf = (asset: Asset): boolean => (SHELVES as readonly string[]).includes(asset.shelf);
+/** What can be named, found or put on from a shelf. */
+export const SHELF_ASSETS = ASSETS.filter(onShelf);
+
 export const assetByLabel = (label: string): Asset | undefined => ASSETS.find((asset) => asset.label === label);
 export const assetTitle = (label: string): string => assetByLabel(label)?.title ?? label;
 export const STARTING_ASSETS = ASSETS.filter((asset) => asset.starts).map((asset) => asset.label);
@@ -108,7 +123,7 @@ export const SHELF_SLOTS = 8;
 export function searchAssets(query: string): Asset[] {
   const q = query.toLowerCase();
   const words = (asset: Asset): string[] => [assetTitle(asset.label), asset.label, ...(asset.aliases ?? [])].flatMap((name) => name.toLowerCase().split(' '));
-  const kit = ASSETS.filter((asset) => asset.shelf !== 'Kit');
+  const kit = SHELF_ASSETS;
   const named = kit.filter((asset) => words(asset).some((word) => word.startsWith(q)));
   const within = kit.filter((asset) => !named.includes(asset) && q.length > 1 && words(asset).some((word) => word.includes(q)));
   return [...named, ...within];

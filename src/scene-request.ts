@@ -3,13 +3,13 @@
  * asset library and nothing else: a request can only name what is in the kit,
  * and whatever it names that is not there is said back, not invented.
  */
-import { ASSETS, assetTitle } from './catalog.js';
+import { assetTitle, SHELF_ASSETS } from './catalog.js';
 import { parseRequest, speechWords } from './scene-words.js';
 import type { Request, Vocab } from './scene-words.js';
 
 export type Spoken = { request: Request; text: string };
 
-const VOCAB: Vocab = ASSETS.filter((asset) => asset.shelf !== 'Kit').map((asset) => ({
+const VOCAB: Vocab = SHELF_ASSETS.map((asset) => ({
   label: asset.label,
   title: assetTitle(asset.label),
   shelf: asset.shelf,

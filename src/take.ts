@@ -309,6 +309,8 @@ export class TakeSystem extends createSystem({
       }
       if (track.touched) {
         this.readPose(track, track.data, index * STRIDE);
+        // An actor is carried through the air to block a walk; the take keeps the walk, on the floor.
+        if (track.piece.getValue(SetPiece, 'role') === SetRole.Actor) track.data[index * STRIDE + 1] = track.start[1];
         if (track.piece.hasComponent(ShotCamera)) this.rig = (this.globals as Globals).cameraRig.peek();
       }
     }

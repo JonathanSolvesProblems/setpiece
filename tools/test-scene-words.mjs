@@ -19,10 +19,10 @@ async function load(path) {
 }
 
 const { parseRequest, speechWords } = await load('src/scene-words.ts');
-const { ASSETS } = await load('src/catalog.ts');
+const { SHELF_ASSETS } = await load('src/catalog.ts');
 
 // The library as it ships, with the other words the catalog gives each piece.
-const REAL = ASSETS.filter((asset) => asset.shelf !== 'Kit').map((asset) => ({
+const REAL = SHELF_ASSETS.map((asset) => ({
   label: asset.label,
   title: asset.title ?? asset.label,
   shelf: asset.shelf,

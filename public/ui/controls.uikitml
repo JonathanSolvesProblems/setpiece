@@ -344,6 +344,7 @@
     <div id="held-row" class="takes" style="display: none">
       <div id="btn-size" class="word">Size</div>
       <div id="btn-style" class="word" style="display: none">Fit</div>
+      <div id="btn-copy" class="word" style="display: none">Copy</div>
       <div id="btn-pose" class="word" style="display: none">Pose</div>
       <div id="btn-look" class="word" style="display: none">Look</div>
       <div id="btn-remove" class="word">Remove</div>
