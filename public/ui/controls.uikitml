@@ -38,9 +38,9 @@
   .label {
     font-family: "Shoulders";
     font-weight: 700;
-    font-size: 13px;
-    line-height: 15px;
-    color: #c7c7b7;
+    font-size: 15px;
+    line-height: 17px;
+    color: #f6f7ef;
     width: 64px;
   }
   .status {
@@ -83,6 +83,8 @@
     padding-left: 4px;
     padding-right: 4px;
     height: 30px;
+    border-bottom-width: 3px;
+    border-color: #1b1411;
     justify-content: center;
     align-items: center;
     border-radius: 2px;

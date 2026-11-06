@@ -454,10 +454,8 @@ export class ControlsSystem extends createSystem({
       if (page >= pages) page = 0;
       const on = g.trayOn.peek();
       for (const name of SHELF_TABS) {
-        panel.getElementById(`shelf-${name}`)?.setProperties({
-          backgroundColor: name === shelf ? OPTIC_YELLOW : undefined,
-          color: name === shelf ? CLOTH : CHALK,
-        });
+        // Tabs fill; a shelf is one level down, so it only takes a line under it.
+        panel.getElementById(`shelf-${name}`)?.setProperties({ borderColor: name === shelf ? OPTIC_YELLOW : CLOTH });
       }
       const searching = shelf === 'Search';
       panel.getElementById('search-box')?.setProperties({ display: searching ? 'flex' : 'none' });

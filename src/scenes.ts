@@ -69,7 +69,7 @@ export const SCENES: Scene[] = [
     camera: [-0.24, 0.18, -45],
     pieces: [
       { label: 'Saucer', x: 0.12, z: -0.05, size: 1 },
-      { label: 'Alien', x: 0.02, z: 0.1, yaw: -30, paint: 4 },
+      { label: 'Alien', x: 0.02, z: 0.1, yaw: -30 },
       { label: 'Fog', x: 0.1, z: -0.02 },
       { label: 'Dust', x: 0.13, z: 0.04 },
       { label: 'A', x: -0.14, z: 0.07, yaw: 110, pose: 2 },
@@ -81,7 +81,7 @@ export const SCENES: Scene[] = [
     lens: 24,
     camera: [-0.26, 0.16, -55],
     pieces: [
-      { label: 'Robot', x: 0.095, z: -0.06, yaw: -110, paint: 5 },
+      { label: 'Robot', x: 0.095, z: -0.06, yaw: -110 },
       { label: 'Tank', x: -0.06, z: 0.07, yaw: 90, size: 1 },
       { label: 'Explosion', x: 0.02, z: -0.08 },
       { label: 'Smoke', x: 0.08, z: -0.14 },
@@ -107,7 +107,7 @@ export const SCENES: Scene[] = [
     lens: 24,
     camera: [-0.24, 0.17, -35],
     pieces: [
-      { label: 'Kraken', x: 0.1, z: -0.05, paint: 2 },
+      { label: 'Kraken', x: 0.1, z: -0.05 },
       { label: 'Boat', x: -0.1, z: 0.04, yaw: 70, size: 1 },
       { label: 'Water', x: 0, z: -0.02 },
       { label: 'Rain', x: 0, z: 0 },
@@ -119,7 +119,7 @@ export const SCENES: Scene[] = [
     lens: 24,
     camera: [-0.25, 0.17, -50],
     pieces: [
-      { label: 'Dinosaur', x: 0.1, z: -0.04, yaw: -100, paint: 4, size: 1 },
+      { label: 'Dinosaur', x: 0.1, z: -0.04, yaw: -100, size: 1 },
       { label: 'Fence', x: 0.02, z: -0.17 },
       { label: 'Truck', x: -0.08, z: 0.11, yaw: 90, size: 1, style: 1 },
       { label: 'Dust', x: 0.06, z: -0.02 },
@@ -137,7 +137,7 @@ export const SCENES: Scene[] = [
       { label: 'Embers', x: 0.02, z: 0.02 },
       { label: 'A', x: -0.08, z: 0.05, yaw: 80 },
       { label: 'Tree', x: 0.16, z: -0.1 },
-      { label: 'Wolf', x: 0.14, z: 0.05, yaw: -90, paint: 7 },
+      { label: 'Wolf', x: 0.14, z: 0.05, yaw: -90 },
       { label: 'Rock', x: -0.17, z: -0.1 },
     ],
   },
