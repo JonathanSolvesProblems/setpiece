@@ -13,6 +13,8 @@ import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } fro
 import { LifeSizeSystem } from './life-size.js';
 import { TakeState, TakeSystem } from './take.js';
 import { ReactionsSystem } from './reactions.js';
+import { understand } from './scene-request.js';
+import type { Spoken } from './scene-request.js';
 import { SquirmSystem } from './squirm.js';
 import { loadJson, StoreKey } from './store.js';
 import { TraySystem } from './tray.js';
@@ -51,6 +53,7 @@ World.create(
   globals.poseRequested = signal(0);
   globals.squirmOn = signal(loadJson<{ squirm: boolean }>(StoreKey.Settings)?.squirm !== false);
   globals.selectedPaint = signal(-1);
+  globals.sceneRequest = signal<Spoken | null>(null);
   globals.cameraOn = signal<string>(CAMERAS[0]);
   globals.selectedStyles = signal(false);
   globals.paintPick = signal(-1);
@@ -296,5 +299,12 @@ World.create(
   });
 
   // Debug and test hook: lets scripts drive the app from the page.
-  (globalThis as Record<string, unknown>).setpiece = { world, viewfinder: world.getSystem(ViewfinderSystem) };
+  (globalThis as Record<string, unknown>).setpiece = {
+    world,
+    viewfinder: world.getSystem(ViewfinderSystem),
+    // The same thing the voice button does, from typed words.
+    say: (text: string) => {
+      (globals.sceneRequest as Signal<Spoken | null>).value = understand(String(text));
+    },
+  };
 });

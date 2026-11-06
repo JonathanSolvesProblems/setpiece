@@ -15,7 +15,14 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: process.env.NODE_ENV !== 'production',
     target: 'esnext',
-    rollupOptions: { input: './index.html' },
+    rollupOptions: {
+      // The second entry is the script for public/voice-test.html. It keeps a
+      // fixed name, because a page in public/ cannot know a hashed one.
+      input: ['./index.html', './src/voice-test.ts'],
+      output: {
+        entryFileNames: (chunk) => (chunk.name === 'voice-test' ? 'voice-test.js' : 'assets/[name]-[hash].js'),
+      },
+    },
   },
   esbuild: { target: 'esnext' },
   // @drawcall/uikitml otherwise pulls a second three/@pmndrs/uikit graph

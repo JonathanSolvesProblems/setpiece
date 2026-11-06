@@ -1,19 +1,24 @@
 /*
-  Setpiece, the 2D entry page.
+  Setpiece, the 2D entry page. Second pass: the marks are down.
 
-  Convention avoided: grey dolls on a blue grid under default lighting, a white
-  rounded panel with pill buttons in a neo-grotesk, a dark glass menu, and the
-  text-left image-right hero.
-  Metaphor: the stage is a clapper slate. The viewport's frame is a slate too:
-  the clapper stripe is the bar across its top and the lens, the frame count and
-  the eyeline are written along its bottom, because a slate carries its fields
-  on its face.
-  The live stage is the hero's one object, because evidence beats illustration.
-  The storyboard sits under the frame and the shot list beside it, at page
-  scale, because those two things are what the visitor leaves with.
-  The only colours are the optic yellow of the eyeline ball and the red of the
-  tally, because on a black slate the eye should go to the eyeline and to recording.
-  Charter: .design/brand/CHARTER.md
+  Convention avoided: a white rounded panel with pill buttons, the blue grid
+  floor, and inside this family the cyan hologram (thin lines, glass, glow on
+  everything). Also the text-left image-right hero.
+  Metaphor: a stage with the work lights off. Each performer has a mark on the
+  floor in their own colour of spike tape, and the controls hang on a
+  blacked-out flag beside the set.
+
+  The ground is black cloth, never grey and never glass, because only true dark
+  lets a colour read as light. On paper the set keeps its own black flag for
+  the same reason: tape on a pale floor does not read.
+  One tape colour belongs to one actor, because that is what the colours on a
+  real floor mean. The row of four marks is the only place they appear.
+  Yellow marks what is selected and red marks recording, because light means live.
+  A thing that presses is a block with an edge and a thing that informs is
+  plain chalk, because the reader has to know what is pressable at a glance.
+  The live stage is the page's one object, because evidence beats illustration.
+
+  Tokens: .design/manifest.json, second_pass.tokens. Laws: .design/brand/CHARTER.md
 */
 
 @font-face {
@@ -35,26 +40,35 @@
   font-display: swap;
 }
 
+/* Every colour on the page is named here and nowhere else. */
 :root {
-  --slate: #3f4044;
-  --slate-shadow: #1e232b;
+  /* The stage: floor, the floor one step lit, the floor where light catches it. */
+  --cloth: #1b1411;
+  --block: #2a211c;
+  --seam: #5a4b3d;
   --chalk: #f6f7ef;
   --chalk-dust: #c7c7b7;
-  --chalk-haze: #6f6c6b;
+  /* Spike tape. One colour, one actor. */
+  --tape-a: #e49a4f;
+  --tape-b: #5ca0cb;
+  --tape-c: #e8719f;
+  --tape-d: #6cc47c;
+  /* Live states. */
+  --selected: #d6e13c;
+  --recording: #e0352b;
+  /* The storyboard page, for the light theme. */
   --paper: #f5f6e5;
+  --paper-ink: #1e232b;
   --pencil: #585752;
   --paper-rule: #c7c7b7;
-  --optic-yellow: #d6e13c;
-  --tally-red: #e0352b;
-  --screen: #2a2d33;
 
-  --ground: var(--slate);
+  --ground: var(--cloth);
   --ink: var(--chalk);
   --ink-muted: var(--chalk-dust);
-  --rule: var(--chalk-haze);
-  --frame-ink: var(--chalk);
-  --frame-muted: var(--chalk-dust);
-  --haze-opacity: 0.07;
+  --rule: var(--seam);
+  --flag: transparent;
+  --haze-opacity: 0.045;
+  --haze-blend: screen;
 
   --display: "Big Shoulders Stencil", "Arial Narrow", sans-serif;
   --label: "Big Shoulders", "Arial Narrow", sans-serif;
@@ -62,38 +76,39 @@
   --base: 17px;
   --s1: 1.333rem;
   --s2: 1.777rem;
-  --s3: 2.369rem;
-  --s4: 3.157rem;
-  --s5: 4.209rem;
   --unit: 4px;
+  --pad: calc(var(--unit) * 8);
+  --label-col: 2.6rem;
   --ease: cubic-bezier(0.2, 0, 0, 1);
   color-scheme: dark;
+  accent-color: var(--selected);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --ground: var(--paper);
-    --ink: var(--slate-shadow);
+    --ink: var(--paper-ink);
     --ink-muted: var(--pencil);
     --rule: var(--paper-rule);
-    --frame-ink: var(--slate-shadow);
-    --frame-muted: var(--pencil);
+    --flag: var(--cloth);
     --haze-opacity: 0.05;
+    --haze-blend: multiply;
     color-scheme: light;
   }
 }
 :root[data-theme="light"] {
   --ground: var(--paper);
-  --ink: var(--slate-shadow);
+  --ink: var(--paper-ink);
   --ink-muted: var(--pencil);
   --rule: var(--paper-rule);
-  --frame-ink: var(--slate-shadow);
-  --frame-muted: var(--pencil);
+  --flag: var(--cloth);
   --haze-opacity: 0.05;
+  --haze-blend: multiply;
   color-scheme: light;
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { font-size: var(--base); scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
 body {
   margin: 0;
@@ -105,12 +120,12 @@ body {
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }
-::selection { background: var(--optic-yellow); color: var(--slate-shadow); }
-a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: 0.14em; }
-a:hover { text-decoration-color: currentColor; }
-:focus-visible { outline: 2px solid var(--optic-yellow); outline-offset: 3px; border-radius: 2px; }
-button { font-feature-settings: "tnum"; }
+::selection { background: var(--selected); color: var(--cloth); }
+a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: 0.16em; }
+a:hover { color: var(--ink); text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
 
+/* The nap of the cloth: one fixed layer, under everything. */
 .haze {
   position: fixed;
   inset: 0;
@@ -118,48 +133,26 @@ button { font-feature-settings: "tnum"; }
   height: 100%;
   pointer-events: none;
   opacity: var(--haze-opacity);
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--haze-blend);
   z-index: 0;
 }
-@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .haze { mix-blend-mode: multiply; } }
-:root[data-theme="light"] .haze { mix-blend-mode: multiply; }
 
 .top, main, .foot { position: relative; z-index: 1; }
 
+/* The small header, the loud stencil title and the stripe: the not-found page uses these. */
 .top {
   display: flex;
   align-items: flex-end;
-  padding: calc(var(--unit) * 6) calc(var(--unit) * 8) 0;
+  padding: calc(var(--unit) * 6) var(--pad) 0;
   max-width: 1240px;
   margin: 0 auto;
 }
-.wordmark img { display: block; width: 136px; height: auto; }
+.top .wordmark img { display: block; width: 136px; height: auto; }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .wordmark img { content: url("/wordmark-ink.svg"); }
+  :root:not([data-theme="dark"]) .top .wordmark img { content: url("/wordmark-ink.svg"); }
 }
-:root[data-theme="light"] .wordmark img { content: url("/wordmark-ink.svg"); }
-
-main { max-width: 1240px; margin: 0 auto; padding: 0 calc(var(--unit) * 8); }
-
-/* The hero: one object, the live stage inside a slate frame, the storyboard
-   under it and the shot list beside it. The frame spans the first two rows;
-   the slack goes to the copy row, so the headline stays tight to the lede and
-   the shot list ends on the same line as the board. */
-.hero {
-  --copy-w: 440px;
-  --overshoot: 56px;
-  display: grid;
-  grid-template-columns: var(--copy-w) minmax(0, 1fr);
-  grid-template-rows: auto 1fr auto;
-  column-gap: calc(var(--unit) * 8);
-  padding-top: calc(var(--unit) * 7);
-  padding-bottom: calc(var(--unit) * 8);
-  align-items: start;
-}
+:root[data-theme="light"] .top .wordmark img { content: url("/wordmark-ink.svg"); }
 h1 {
-  grid-column: 1;
-  grid-row: 1;
-  width: var(--copy-w);
   font-family: var(--display);
   font-weight: 900;
   font-optical-sizing: auto;
@@ -168,139 +161,231 @@ h1 {
   letter-spacing: -0.01em;
   margin: -2px 0 calc(var(--unit) * 5);
   text-transform: uppercase;
+  text-wrap: balance;
 }
-.copy { grid-column: 1; grid-row: 2; width: var(--copy-w); }
-.lede { font-size: 1.12rem; line-height: 1.45; margin: 0 0 calc(var(--unit) * 6); text-wrap: pretty; max-width: 42ch; }
-.actions { display: grid; justify-items: start; gap: calc(var(--unit) * 2); margin-bottom: calc(var(--unit) * 6); }
-/* One button family: filled for the page's action, outline for the stage's, text for undo. */
-.primary {
-  font: 600 0.98rem var(--text);
-  color: var(--ground);
-  background: var(--ink);
-  border: 0;
-  border-radius: 2px;
-  padding: 13px 24px;
-  min-height: 48px;
-  cursor: pointer;
-  transition: transform 120ms var(--ease), opacity 120ms var(--ease);
-}
-.primary:hover { opacity: 0.92; }
-.primary:active { transform: translateY(1px); }
-.hint { margin: 0; color: var(--ink-muted); font-size: 0.9rem; line-height: 1.35; max-width: 40ch; text-wrap: pretty; }
-.try {
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: 0.95rem;
-  line-height: 1.4;
-  max-width: 42ch;
-  text-wrap: pretty;
-}
-.shotlist { grid-column: 1; grid-row: 3; align-self: start; width: var(--copy-w); padding-top: calc(var(--unit) * 6); }
-.shotlist .label span { color: var(--ink); margin-left: var(--unit); }
-.shotlist ol { list-style: none; margin: calc(var(--unit) * 1) 0 0; padding: 0; font-size: 0.92rem; line-height: 1.5; }
-.shotlist li { display: grid; grid-template-columns: 1.4em 1fr; gap: calc(var(--unit) * 2); border-top: 1px solid var(--rule); padding: 3px 0; }
-.shotlist li .i { font-family: var(--label); font-weight: 700; color: var(--ink-muted); }
-.shotlist li.empty { display: block; color: var(--ink-muted); border-top-color: transparent; padding-top: 0; }
-
-.slate-frame {
-  grid-column: 2;
-  grid-row: 1 / 3;
-  position: relative;
-  margin-top: 12px;
-  background: var(--slate-shadow);
-  padding: 12px 12px 8px;
-  border-radius: 4px;
-}
-/* The clapper: the bar across the whole top of the slate, hanging past its left edge the way the sticks do. */
 .stripe {
-  position: absolute;
-  left: calc(var(--overshoot) * -1);
-  right: 0;
-  top: -9px;
   height: 14px;
-  background: repeating-linear-gradient(45deg, var(--chalk) 0 14px, var(--slate-shadow) 14px 28px);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 99%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 99%, transparent);
+  background: repeating-linear-gradient(45deg, var(--ink) 0 14px, var(--ground) 14px 28px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, var(--cloth) 3%, var(--cloth) 99%, transparent);
+  mask-image: linear-gradient(90deg, transparent, var(--cloth) 3%, var(--cloth) 99%, transparent);
 }
-#scene-container {
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  background: var(--screen);
-  border-radius: 2px;
-  overflow: hidden;
+
+main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
+
+/* The first view: the set on its flag to the left, bleeding off the top and
+   the left of the window; what to do about it to the right. */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(288px, 368px);
+  column-gap: calc(var(--unit) * 10);
+  padding: calc(var(--unit) * 6) 0 calc(var(--unit) * 10);
+}
+
+.flag {
   position: relative;
+  z-index: 0;
+  align-self: start;
+  container-type: inline-size;
+  padding: 0 calc(var(--unit) * 7) calc(var(--unit) * 6) 0;
+  color: var(--chalk);
 }
+.flag::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -200px 0 0 -100vw;
+  background: var(--flag);
+}
+.flag :focus-visible { outline-color: var(--chalk); }
+
+/* The one loud line. The name stands on the top edge of the stage and the
+   tail of its p hangs over into the picture. */
+.band {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 58% minmax(0, 1fr);
+  column-gap: calc(var(--unit) * 6);
+  align-items: end;
+  margin-bottom: calc(var(--unit) * 2);
+}
+.band .wordmark { display: block; color: var(--chalk); border-radius: 2px; }
+.band .wordmark svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: -6.974%;
+  overflow: visible;
+  pointer-events: none;
+}
+.wordmark .letters { fill: currentColor; }
+.wordmark .ball { fill: var(--selected); }
+.band h1 {
+  font-family: var(--text);
+  font-weight: 640;
+  font-size: clamp(0.94rem, 3.8cqi, var(--s2));
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  text-transform: none;
+  margin: 0 0 -0.22em;
+  max-width: 12em;
+}
+
+.stage {
+  position: relative;
+  z-index: 1;
+  border: 2px solid var(--seam);
+  border-radius: 2px;
+  background: var(--block);
+  overflow: hidden;
+}
+/* Until the stage is on the page, say so where it will be. */
+.stage::before {
+  content: "Setting the stage.";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--chalk-dust);
+  font-size: 0.9rem;
+}
+.stage:has(canvas)::before { content: none; }
+#scene-container { width: 100%; aspect-ratio: 16 / 9; position: relative; }
 #scene-container canvas { display: block; width: 100% !important; height: 100% !important; }
 
-/* The slate's face: lens, frames and eyeline, and the two things you can do. */
-.strip {
+/* The floor in front of the set: who has a mark, and where each of them is looking. */
+.floor {
   display: flex;
-  align-items: center;
-  gap: calc(var(--unit) * 4);
-  padding: 6px 2px 0;
-  color: var(--frame-ink);
   flex-wrap: wrap;
+  align-items: center;
+  gap: 0 calc(var(--unit) * 6);
+  margin-top: calc(var(--unit) * 2);
 }
-.field { display: flex; align-items: center; gap: calc(var(--unit) * 2); }
+.field { display: flex; align-items: center; gap: calc(var(--unit) * 3); min-height: 44px; }
 .label {
   font-family: var(--label);
   font-weight: 700;
   font-size: 0.88rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--frame-muted);
+  color: var(--chalk-dust);
+  white-space: nowrap;
 }
-.shotlist .label { color: var(--ink-muted); }
+/* One label column, so the first mark and the first lens start on the same line. */
+.floor > .field:first-child > .label, .strip > .field > .label { flex: none; width: var(--label-col); }
 .value { font-family: var(--label); font-weight: 700; font-size: 1.12rem; white-space: nowrap; }
-.lenses { display: flex; gap: 0; }
-.lens {
+.unit { font-family: var(--label); font-weight: 700; font-size: 0.88rem; color: var(--chalk-dust); }
+
+/* The signature device, once: a T of tape per actor, torn square at the ends. */
+.marks { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--unit) calc(var(--unit) * 5); }
+.mark {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 2);
   font-family: var(--label);
   font-weight: 700;
   font-size: 1.12rem;
-  color: var(--frame-ink);
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  padding: 6px 5px 3px;
-  min-height: 36px;
-  cursor: pointer;
+  white-space: nowrap;
+  animation: lay 240ms var(--ease) backwards;
 }
-.lens[aria-pressed="true"] { border-bottom-color: var(--optic-yellow); }
-.lens:hover { border-bottom-color: var(--frame-muted); }
-.strip-actions { margin-left: auto; display: flex; align-items: center; gap: calc(var(--unit) * 2); }
-.snap {
-  font: 600 0.98rem var(--text);
-  color: var(--frame-ink);
-  background: none;
-  border: 1.5px solid var(--frame-ink);
+.mark-a { color: var(--tape-a); }
+.mark-b { color: var(--tape-b); animation-delay: 90ms; }
+.mark-c { color: var(--tape-c); animation-delay: 180ms; }
+.mark-d { color: var(--tape-d); animation-delay: 270ms; }
+.tee { display: block; width: 40px; height: auto; flex: none; fill: currentColor; }
+.mark-a .tee { rotate: -3deg; }
+.mark-b .tee { rotate: 2deg; }
+.mark-c .tee { rotate: -1.5deg; }
+.mark-d .tee { rotate: 2.5deg; }
+/* A mark whose actor is not on the floor waits at this strength. */
+.mark-c .tee, .mark-d .tee { opacity: 0.45; }
+@keyframes lay {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+.eyes { margin-left: auto; }
+.marks-note {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--chalk-dust);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+/* A narrow flag stacks its fields in one label column: marks, what they mean, eyes. */
+@container (max-width: 700px) {
+  .eyes { margin-left: 0; flex-basis: 100%; order: 3; }
+  .eyes > .label { flex: none; width: var(--label-col); }
+  .marks-note { order: 2; margin-top: var(--unit); }
+}
+
+/* Lens and take. Everything here presses, so everything here is a block. */
+.strip { display: grid; row-gap: calc(var(--unit) * 2); margin-top: calc(var(--unit) * 3); }
+.lenses { display: flex; gap: var(--unit); }
+.strip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--unit) * 2);
+  padding-left: calc(var(--label-col) + var(--unit) * 3);
+}
+.lens, .block {
+  font: 600 1rem/1.2 var(--text);
+  color: var(--chalk);
+  background: var(--block);
+  border: 2px solid var(--seam);
   border-radius: 2px;
-  padding: 6px 12px;
-  min-height: 36px;
+  min-height: 44px;
+  padding: 0 calc(var(--unit) * 4);
   cursor: pointer;
   white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 120ms var(--ease), border-color 120ms var(--ease), color 120ms var(--ease), transform 120ms var(--ease);
 }
-.snap:hover { background: rgba(246, 247, 239, 0.12); }
-.reset {
-  font: 600 0.98rem var(--text);
-  color: var(--frame-muted);
-  background: none;
-  border: 0;
-  padding: 7px 8px;
-  min-height: 36px;
-  cursor: pointer;
+.lens { font: 700 1.12rem/1 var(--label); min-width: 44px; padding: 0 calc(var(--unit) * 1.5); }
+.lens:hover, .block:hover { border-color: var(--chalk-dust); }
+.lens:active, .block:active { transform: translateY(1px); }
+.lens[aria-pressed="true"] { background: var(--selected); border-color: var(--selected); color: var(--cloth); }
+.record[aria-pressed="true"] {
+  background: var(--recording);
+  border-color: var(--recording);
+  color: var(--chalk);
+  font-weight: 700;
+  font-size: 1.1rem;
 }
-.reset:hover { color: var(--frame-ink); }
+.block:disabled { color: var(--chalk-dust); border-style: dashed; cursor: progress; }
+.block:disabled:hover { border-color: var(--seam); }
+.block:disabled:active { transform: none; }
 
-/* The storyboard at page scale, six frames, pencil-numbered until snapped. */
+/* Beside the set, on the ground: what it is, the one filled button, and what you leave with. */
+.copy { padding-top: 2px; }
+.pitch { margin-bottom: calc(var(--unit) * 9); }
+.lede { font-size: 1.18rem; line-height: 1.42; margin: 0 0 calc(var(--unit) * 6); text-wrap: pretty; max-width: 42ch; }
+.actions { display: grid; gap: calc(var(--unit) * 3); }
+.primary {
+  font: 600 1.06rem/1.2 var(--text);
+  color: var(--ground);
+  background: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  padding: calc(var(--unit) * 3) calc(var(--unit) * 6);
+  min-height: 56px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 120ms var(--ease), border-color 120ms var(--ease), transform 120ms var(--ease);
+}
+.primary:hover { background: var(--ink-muted); border-color: var(--ink-muted); color: var(--ground); }
+.primary:active { transform: translateY(1px); }
+.primary[aria-busy="true"] { background: var(--ink-muted); border-color: var(--ink-muted); cursor: progress; }
+/* Three lines held, because this line changes while the headset is asked. */
+.hint { margin: 0; min-height: 4.2em; color: var(--ink-muted); font-size: 0.9rem; line-height: 1.4; text-wrap: pretty; }
+.try { margin: 0 0 calc(var(--unit) * 4); color: var(--ink-muted); font-size: 0.9rem; line-height: 1.4; text-wrap: pretty; }
+
+/* The storyboard: six frames, numbered until snapped. */
 .board {
-  grid-column: 2;
-  grid-row: 3;
-  align-self: start;
   list-style: none;
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: calc(var(--unit) * 2);
 }
 .board li {
@@ -310,7 +395,7 @@ h1 {
   border-radius: 2px;
   overflow: hidden;
 }
-.board li.filled { border: 1px solid var(--slate-shadow); }
+.board li.filled { border: 1px solid var(--rule); }
 .board img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .board .n {
   position: absolute;
@@ -321,7 +406,7 @@ h1 {
   font-size: 0.8rem;
   color: var(--ink-muted);
 }
-.board .filled .n { color: var(--chalk); text-shadow: 0 0 3px rgba(30, 35, 43, 0.9); }
+.board .filled .n { color: var(--chalk); text-shadow: 0 0 3px var(--cloth); }
 .board .cap {
   position: absolute;
   left: 0;
@@ -333,54 +418,47 @@ h1 {
   font-size: 0.74rem;
   letter-spacing: 0.02em;
   color: var(--chalk);
-  background: rgba(30, 35, 43, 0.78);
+  background: color-mix(in srgb, var(--cloth) 82%, transparent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* On paper the frame is drawn, not pasted: a pencil-weight outline around the
-   screen, and the stage stays dark inside it, because a stage is dark. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .slate-frame { background: var(--paper); border: 3px solid var(--slate-shadow); padding: 9px 9px 6px; }
-  :root:not([data-theme="dark"]) .stripe { top: -11px; }
-  :root:not([data-theme="dark"]) .snap:hover { background: rgba(30, 35, 43, 0.08); }
-}
-:root[data-theme="light"] .slate-frame { background: var(--paper); border: 3px solid var(--slate-shadow); padding: 9px 9px 6px; }
-:root[data-theme="light"] .stripe { top: -11px; }
-:root[data-theme="light"] .snap:hover { background: rgba(30, 35, 43, 0.08); }
+.shotlist { margin-top: calc(var(--unit) * 4); }
+.shotlist .label { color: var(--ink-muted); }
+.shotlist .label span { color: var(--ink); margin-left: var(--unit); }
+.shotlist ol { list-style: none; margin: var(--unit) 0 0; padding: 0; font-size: 0.85rem; line-height: 1.5; }
+.shotlist li { display: grid; grid-template-columns: 1.4em 1fr; gap: calc(var(--unit) * 2); border-top: 1px solid var(--rule); padding: 3px 0; }
+.shotlist li .i { font-family: var(--label); font-weight: 700; color: var(--ink-muted); }
+.shotlist li.empty { display: block; color: var(--ink-muted); border-top-color: transparent; padding-top: 0; }
 
 .foot {
   max-width: 1240px;
   margin: 0 auto;
-  padding: calc(var(--unit) * 6) calc(var(--unit) * 8) calc(var(--unit) * 10);
+  padding: calc(var(--unit) * 6) var(--pad) calc(var(--unit) * 10);
   border-top: 1px solid var(--rule);
   color: var(--ink-muted);
+  font-size: 0.92rem;
 }
 .foot p { margin: 0 0 calc(var(--unit) * 2); max-width: 70ch; text-wrap: pretty; }
 .foot .small { font-size: 0.85rem; }
 
 @media (max-width: 900px) {
-  .top { padding-left: 16px; padding-right: 16px; }
-  .wordmark img { width: 104px; }
-  main { padding: 0 16px; }
-  .foot { padding-left: 16px; padding-right: 16px; }
-  .hero { --copy-w: 100%; --overshoot: 0px; grid-template-columns: 1fr; grid-template-rows: repeat(7, auto); padding-top: calc(var(--unit) * 5); }
-  h1 { grid-row: 1; width: 100%; margin: 0 0 calc(var(--unit) * 4); }
-  .copy { display: contents; }
-  .actions { grid-column: 1; grid-row: 2; margin-bottom: calc(var(--unit) * 5); }
-  .try { grid-column: 1; grid-row: 3; max-width: none; margin-bottom: calc(var(--unit) * 2); }
-  .slate-frame { grid-column: 1; grid-row: 4; margin-top: 10px; }
-  .board { grid-column: 1; grid-row: 5; align-self: start; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .lede { grid-column: 1; grid-row: 6; margin: calc(var(--unit) * 7) 0 calc(var(--unit) * 3); max-width: none; }
-  .shotlist { grid-column: 1; grid-row: 7; align-self: start; width: 100%; }
-  #scene-container { aspect-ratio: 4 / 5; }
-  .stripe { left: 8px; right: 8px; }
-  .strip { gap: calc(var(--unit) * 3) calc(var(--unit) * 5); }
-  .strip-actions { margin-left: 0; width: 100%; }
-  .lens, .snap, .reset { min-height: 44px; }
-  .snap { flex: 1; }
+  :root { --pad: calc(var(--unit) * 4); }
+  .top .wordmark img { width: 104px; }
+  .hero { grid-template-columns: minmax(0, 1fr); row-gap: calc(var(--unit) * 7); padding-top: calc(var(--unit) * 4); }
+  .flag { padding-right: 0; padding-bottom: calc(var(--unit) * 5); }
+  .flag::before { right: calc(var(--pad) * -1); }
+  .band { grid-template-columns: 60% minmax(0, 1fr); column-gap: calc(var(--unit) * 4); }
+  /* The tall picture ends in empty dark under the table edge; the frame clips that strip. */
+  #scene-container { aspect-ratio: 4 / 5; margin-bottom: -30%; }
+  .lenses { flex: 1; }
+  .lens { flex: 1 1 0; min-width: 0; padding: 0; }
+  .strip-actions { display: grid; grid-template-columns: 1fr 1fr; padding-left: 0; }
+  .copy { padding-top: 0; }
+  .lede { max-width: none; }
 }
+
 @media (prefers-reduced-motion: reduce) {
-  .primary { transition: none; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -10,6 +10,7 @@ import type { Signal } from '@preact/signals-core';
 import { CAMERAS, Rig, SENSORS } from './camera-formats.js';
 import { assetByLabel, assetTitle, PAINTS, SIZES, STARTING_ASSETS } from './catalog.js';
 import { Held, SetPiece, SetRole, ShotCamera } from './set-components.js';
+import type { Spoken } from './scene-request.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 
@@ -33,6 +34,11 @@ const ROTOR_SPEED = 60;
 const SPOTS: [number, number][] = [];
 for (const z of [0.08, -0.04, 0.16, -0.12]) for (const x of [0, 0.12, -0.12, 0.22, -0.22]) SPOTS.push([x, z]);
 const DEFAULT_REACH = 0.05;
+/** Where something big goes first: the back of the slate, behind where the actors stand. */
+const BACK_SPOTS: [number, number][] = [[0, -0.08], [0.17, -0.1], [-0.17, -0.1], [0.1, 0.05], [-0.12, 0.05], ...SPOTS];
+const BIG = 0.1;
+const NAMED_AT_MOST = 5;
+const BURNING = /\b(burning|on fire|in flames|ablaze)\b/;
 
 /** Paint, size and fitting, each an index. */
 type Finish = [number, number, number];
@@ -41,6 +47,8 @@ type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: 
 export type Dress = { cast: Record<string, [number, number]>; finish: Record<string, Finish> };
 type Saved = { on: string[]; sensor: number; rig: string } & Partial<Dress>;
 type Globals = {
+  sceneRequest: Signal<Spoken | null>;
+  coachNote: Signal<string>;
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
   trayRestore: Signal<string[] | null>;
@@ -100,6 +108,11 @@ export class TraySystem extends createSystem({
         if (list == null) return;
         g.trayRestore.value = null;
         if (this.ready) this.setOn(new Set(list));
+      }),
+      g.sceneRequest.subscribe((spoken) => {
+        if (spoken == null) return;
+        g.sceneRequest.value = null;
+        if (this.ready) this.build(spoken);
       }),
       g.trayDressRestore.subscribe((dress) => {
         if (dress == null) return;
@@ -234,11 +247,69 @@ export class TraySystem extends createSystem({
       return true;
     };
     if (clear(object.position.x, object.position.z)) return;
-    for (const [x, z] of SPOTS) {
+    for (const [x, z] of reach >= BIG ? BACK_SPOTS : SPOTS) {
       if (!clear(x, z)) continue;
       object.position.set(x, 0, z);
       return;
     }
+  }
+
+  /**
+   * A set described in words: what was named goes on, where there is room,
+   * painted and sized as asked. Only what is in the library can be named, and
+   * what was named that is not there is said back.
+   */
+  private build({ request, text }: Spoken): void {
+    const g = this.globals as Globals;
+    const next = request.clear ? new Set<string>() : new Set(this.on);
+    // Starting over clears the dressing, not the camera department.
+    if (request.clear) for (const label of this.on) if (assetByLabel(label)?.shelf === 'Kit') next.add(label);
+    for (const label of request.remove) next.delete(label);
+    const placed: string[] = [];
+    const refinished: string[] = [];
+    let onlyOne = false;
+    for (const item of request.items) {
+      const asset = assetByLabel(item.label);
+      if (asset == null || asset.shelf === 'Kit') continue;
+      if (!this.on.has(item.label)) placed.push(item.label);
+      next.add(item.label);
+      if (item.count > 1) onlyOne = true;
+      const finish: Finish = [...this.finishOf(item.label)];
+      const paint = item.colour == null ? -1 : PAINTS.findIndex((p) => p.name.toLowerCase() === item.colour);
+      const size = item.size == null ? -1 : SIZES.findIndex((s) => s.name.toLowerCase() === item.size);
+      if (paint >= 0 && asset.paint === true) finish[0] = paint;
+      if (size >= 0) finish[1] = size;
+      if ((paint >= 0 && asset.paint === true) || size >= 0) {
+        this.finish.set(item.label, finish);
+        refinished.push(item.label);
+      }
+    }
+    for (const piece of this.managed) if (refinished.includes(this.key(piece))) this.coat(piece, this.finishOf(this.key(piece)));
+    this.setOn(next);
+    for (const label of placed) this.clearSpot(label);
+    // "A burning car": the fire goes on the thing that was named before it.
+    const fire = request.items.findIndex((item) => item.label === 'Fire');
+    if (fire > 0 && BURNING.test(text)) {
+      const on = this.managed.find((piece) => this.key(piece) === request.items[fire - 1].label)?.object3D;
+      const flames = this.managed.find((piece) => this.key(piece) === 'Fire')?.object3D;
+      if (on != null && flames != null) flames.position.set(on.position.x, 0, on.position.z);
+    }
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+
+    const names = request.items.map((item) => assetTitle(item.label));
+    const listed = names.length > NAMED_AT_MOST ? `${names.slice(0, NAMED_AT_MOST).join(', ')} and ${names.length - NAMED_AT_MOST} more` : names.join(', ');
+    const parts: string[] = [];
+    if (listed !== '') parts.push(`On the set: ${listed}.`);
+    if (request.remove.length > 0) parts.push(`Off: ${request.remove.map((label) => assetTitle(label)).join(', ')}.`);
+    if (onlyOne) parts.push('There is one of each in the kit.');
+    if (request.unknown.length > 0) parts.push(`Not in the kit: ${request.unknown.join(', ')}.`);
+    if (parts.length === 0 && request.clear) parts.push('The set is clear.');
+    if (parts.length === 0) {
+      g.coachNote.value = 'DID NOT CATCH THAT | Name pieces from the library: a dragon, two actors, a red car.';
+      return;
+    }
+    const nothingDone = names.length === 0 && request.remove.length === 0 && !request.clear;
+    g.coachNote.value = `${nothingDone ? 'NOT IN THE KIT' : 'SET FROM YOUR WORDS'} | ${parts.join(' ')}`;
   }
 
   /** The set as it should stand: everything listed on it, everything else back on the shelf. */

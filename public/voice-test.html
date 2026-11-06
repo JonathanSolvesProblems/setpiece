@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Setpiece voice test</title>
+    <style>
+      body { font: 16px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+      button { font: inherit; padding: 0.6rem 1.4rem; margin-right: 0.5rem; }
+      dt { font-weight: 600; margin-top: 0.8rem; }
+      dd { margin: 0; min-height: 1.5em; }
+      progress { width: 14rem; vertical-align: middle; }
+      pre { background: #f2f2f2; padding: 1rem; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Voice test</h1>
+    <p>
+      A bare page for trying the voice outside the app. Press Start, allow the microphone, and say what you want on
+      the set: "make me a scene with two actors and a burning car". It stops when you pause, or when you press Stop.
+      The first Start downloads the speech model (41 MB) and keeps it on this device. Nothing you say leaves it.
+    </p>
+    <p>
+      <button id="start" type="button">Start</button>
+      <button id="stop" type="button">Stop</button>
+    </p>
+    <dl>
+      <dt>State</dt>
+      <dd id="state">idle</dd>
+      <dt>Model</dt>
+      <dd><progress id="progress" max="1" value="0"></progress> <span id="progress-text"></span></dd>
+      <dt>Heard</dt>
+      <dd id="heard"></dd>
+      <dt>Timing</dt>
+      <dd id="timing"></dd>
+      <dt>This browser</dt>
+      <dd id="browser"></dd>
+    </dl>
+    <h2>Request</h2>
+    <pre id="request"></pre>
+    <script type="module">
+      // The built script sits beside this page. Under the dev server it is not built, so the source is loaded.
+      import('./voice-test.js').catch(() => import('/src/voice-test.ts'));
+    </script>
+  </body>
+</html>

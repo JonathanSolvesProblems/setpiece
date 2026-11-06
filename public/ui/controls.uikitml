@@ -195,7 +195,11 @@
   .muted { color: #c7c7b7; }
 </style>
 <div id="panel-root" class="slate">
-  <div id="panel-title" class="title">SETPIECE</div>
+  <div class="field">
+    <div id="panel-title" class="title">SETPIECE</div>
+    <div id="btn-voice" class="word" style="display: none">Say a scene</div>
+  </div>
+  <div id="voice-line" class="line muted" style="display: none"> </div>
   <div class="field">
     <div class="label short">STAGE</div>
     <div id="stage-status" class="status">Floating. Not on your table yet.</div>
@@ -350,11 +354,6 @@
       <div class="label short">LEAVE</div>
       <div id="exit-button" class="word">Exit to browser</div>
     </div>
-    <div id="voice-row" class="field" style="display: none">
-      <div class="label short">VOICE</div>
-      <div id="btn-voice" class="word">Say a scene</div>
-    </div>
-    <div id="voice-line" class="line muted" style="display: none"> </div>
   </div>
   <div id="xr-button" class="primary" style="display: none">Enter XR</div>
 </div>

@@ -65,7 +65,7 @@ export const ASSETS: Asset[] = [
   { label: 'Tree', shelf: 'Set', grab: [0.08, 0.4] },
   { label: 'Crate', shelf: 'Props', grab: [0.05, 0.08], solid: true, aliases: ['box'] },
   { label: 'Dragon', shelf: 'Creatures', grab: [0.14, 0.29], paint: true, coat: 1, mover: true },
-  { label: 'Troll', shelf: 'Creatures', grab: [0.12, 0.4], paint: true, coat: 4, mover: true, aliases: ['giant', 'ogre'] },
+  { label: 'Troll', shelf: 'Creatures', grab: [0.12, 0.4], paint: true, coat: 4, mover: true, aliases: ['ogre'] },
   { label: 'Dinosaur', shelf: 'Creatures', grab: [0.12, 0.28], paint: true, coat: 4, mover: true, aliases: ['dino', 'rex'] },
   { label: 'Robot', shelf: 'Creatures', grab: [0.1, 0.35], paint: true, coat: 5, mover: true, aliases: ['mech'] },
   { label: 'Alien', shelf: 'Creatures', grab: [0.04, 0.24], paint: true, coat: 4 },

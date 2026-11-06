@@ -16,8 +16,12 @@ import { assetByLabel, ASSETS, assetTitle, PAINTS, SHELF_SLOTS, SHELVES } from '
 import type { Shelf } from './catalog.js';
 import { CAMERAS, LENSES, Rig, SENSORS } from './camera-formats.js';
 import { StageStatus } from './placement.js';
+import { understand, wordsToHear } from './scene-request.js';
+import type { Spoken } from './scene-request.js';
 import { SetPiece, StageAnchor } from './set-components.js';
 import { saveJson, StoreKey } from './store.js';
+import { Voice } from './voice.js';
+import type { VoiceState } from './voice.js';
 
 /**
  * Where the panel sits relative to the stage, as the scene authors it: left of
@@ -85,6 +89,7 @@ type Globals = {
   styleRequested: Signal<number>;
   squirmOn: Signal<boolean>;
   cameraOn: Signal<string>;
+  sceneRequest: Signal<Spoken | null>;
   castLine: Signal<string>;
   sensorIndex: Signal<number>;
   cameraRig: Signal<string>;
@@ -332,6 +337,51 @@ export class ControlsSystem extends createSystem({
       g.sensorIndex.subscribe((i) => format?.setProperties({ text: SENSORS[i]?.name ?? '' })),
       g.cameraRig.subscribe((value) => rig?.setProperties({ text: value === Rig.Drone ? 'Drone' : 'Tripod' })),
     );
+
+    // Say what should be on the set. The listening runs on the headset itself, from files that
+    // ship with the app, and it is fetched the first time the button is pressed.
+    const voiceButton = panel.getElementById<UIKit.Text>('btn-voice');
+    const voiceLine = panel.getElementById<UIKit.Text>('voice-line');
+    if (voiceButton != null && Voice.supported()) {
+      voiceButton.setProperties({ display: 'flex' });
+      let voice: Voice | null = null;
+      let busy = false;
+      const tell = (text: string): void => {
+        voiceLine?.setProperties({ display: text === '' ? 'none' : 'flex', text });
+      };
+      const WORDS: Record<VoiceState, string> = {
+        idle: 'Say a scene',
+        loading: 'Getting ready',
+        listening: 'Listening',
+        thinking: 'One moment',
+        error: 'Say a scene',
+      };
+      wire('btn-voice', () => {
+        voice ??= new Voice({
+          words: wordsToHear(),
+          onState: (state, detail) => {
+            busy = state === 'loading' || state === 'listening' || state === 'thinking';
+            voiceButton.setProperties({
+              text: WORDS[state],
+              backgroundColor: state === 'listening' ? OPTIC_YELLOW : BLOCK,
+              color: state === 'listening' ? CLOTH : CHALK,
+            });
+            if (state === 'listening') tell('Say what should be on the set, then stop talking.');
+            if (state === 'error') tell(detail ?? 'The microphone did not start.');
+          },
+          onProgress: (fraction) => tell(`Fetching the listener, ${Math.round(fraction * 100)}%. This happens once.`),
+          onText: (text, final) => {
+            if (text !== '') tell(`Heard: ${text}`);
+            if (!final) return;
+            if (text === '') tell('Heard nothing. Press it and try again.');
+            else g.sceneRequest.value = understand(text);
+          },
+        });
+        if (busy) voice.stop();
+        else void voice.start();
+      });
+      this.cleanupFuncs.push(() => voice?.dispose());
+    }
 
     // Two cameras, one live. Pressing the other is a cut, and a take that is recording keeps it.
     wire('btn-cam-a', () => {

@@ -6,7 +6,7 @@
     <title>Setpiece</title>
     <meta name="description" content="Block a VFX shot on your kitchen table with your hands. A 1:10 set on a slate, a 35 mm camera, lenses, eyelines, and a storyboard at the end." />
     <meta name="color-scheme" content="dark light" />
-    <meta name="theme-color" content="#3f4044" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#1b1411" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f5f6e5" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png" />
@@ -16,7 +16,7 @@
     <meta property="og:image" content="https://setpiece-xr.vercel.app/og.png" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preload" href="/ui/fonts/BigShouldersStencil.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="/ui/fonts/BigShoulders.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="preload" href="/ui/fonts/SchibstedGrotesk.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/page.css" />
   </head>
@@ -29,40 +29,59 @@
       <rect width="100%" height="100%" filter="url(#chalk)" />
     </svg>
 
-    <header class="top">
-      <a class="wordmark" href="/" aria-label="Setpiece, home">
-        <img src="/wordmark.svg" alt="" width="301" height="100" />
-      </a>
-    </header>
-
     <main>
       <section class="hero" aria-labelledby="hero-heading">
-        <h1 id="hero-heading">Block the shot on<br />your kitchen table</h1>
-        <div class="copy">
-          <p class="lede">
-            A 1:10 film set on a slate, placed on your own table. You move wooden stand-ins and a
-            35 mm camera with your hands, look through the lens, snap, and leave with the storyboard
-            and the shot list.
-          </p>
-          <div class="actions">
-            <button id="enter-xr" class="primary" type="button">Enter XR</button>
-            <p class="hint" id="xr-hint">Open this page in the Meta Quest Browser, point at any table and pinch: the set lands on it.</p>
+        <div class="flag" role="group" aria-label="The stage, running in this page">
+          <div class="band">
+            <a class="wordmark" href="/" aria-label="Setpiece, home">
+              <svg viewBox="14 -1740 6309 2180" aria-hidden="true" focusable="false">
+                <g class="letters">
+                  <path d="M406 18Q225 8 147 -81Q70 -170 62 -362Q61 -399 61 -439Q61 -479 63 -520Q65 -560 69 -597H328Q324 -521 323 -448Q322 -374 328 -312Q332 -272 351 -246Q370 -221 406 -211ZM504 18V-211Q538 -222 555 -247Q573 -272 577 -312Q580 -349 582 -384Q583 -419 582 -455Q580 -490 577 -528Q573 -575 551 -612Q530 -648 480 -661L325 -700Q225 -726 167 -775Q110 -824 84 -897Q58 -970 55 -1069Q54 -1116 54 -1157Q54 -1198 55 -1240Q62 -1432 141 -1520Q220 -1608 406 -1618V-1389Q371 -1379 353 -1355Q335 -1330 330 -1290Q324 -1235 324 -1180Q324 -1124 330 -1069Q335 -1021 357 -987Q379 -952 432 -939L567 -907Q674 -881 735 -831Q796 -780 823 -705Q849 -629 853 -528Q854 -500 854 -472Q854 -444 853 -417Q852 -390 851 -362Q844 -170 765 -81Q686 8 504 18ZM578 -1007Q581 -1078 582 -1149Q583 -1220 580 -1290Q578 -1329 559 -1354Q539 -1378 504 -1388V-1618Q678 -1608 758 -1519Q838 -1431 845 -1240Q847 -1195 846 -1130Q845 -1065 842 -1007Z" />
+                  <path d="M961 -320Q959 -361 958 -435Q957 -509 957 -595Q957 -680 958 -756Q959 -832 961 -876Q973 -1048 1050 -1128Q1126 -1208 1290 -1218V-1006Q1263 -998 1250 -977Q1237 -956 1236 -918Q1234 -841 1233 -762Q1232 -683 1232 -603Q1232 -523 1233 -445Q1234 -367 1236 -291Q1237 -251 1250 -227Q1263 -204 1290 -195V18Q1124 7 1047 -72Q970 -151 961 -320ZM1388 18V-194Q1414 -203 1426 -227Q1439 -250 1441 -291Q1443 -317 1443 -361Q1443 -405 1441 -458H1708Q1710 -443 1711 -398Q1712 -354 1710 -320Q1703 -150 1627 -70Q1552 9 1388 18ZM1328 -553V-743H1443Q1443 -784 1442 -821Q1442 -857 1442 -883Q1441 -909 1441 -918Q1439 -954 1427 -975Q1414 -996 1388 -1005V-1217Q1552 -1208 1627 -1130Q1702 -1053 1710 -887Q1711 -864 1712 -808Q1712 -752 1712 -683Q1711 -615 1708 -553Z" />
+                  <path d="M1768 -992V-1200H1877V-1540H2152V-289Q2152 -232 2176 -209Q2201 -185 2279 -185Q2303 -185 2325 -186Q2347 -187 2374 -188V9Q2353 15 2329 17Q2306 19 2279 19Q2063 19 1970 -60Q1877 -139 1877 -320V-992ZM2246 -992V-1200H2354V-992Z" />
+                  <path d="M2461 400V-1200H2736V400ZM2834 -185Q2841 -184 2850 -183Q2859 -182 2869 -182Q2917 -182 2947 -206Q2978 -230 2980 -280Q2984 -347 2986 -428Q2988 -510 2988 -597Q2988 -684 2986 -768Q2984 -851 2980 -920Q2978 -970 2956 -994Q2935 -1018 2887 -1018Q2861 -1018 2834 -1009V-1157Q2861 -1187 2899 -1203Q2937 -1219 2995 -1219Q3116 -1219 3181 -1145Q3247 -1070 3255 -896Q3257 -846 3259 -768Q3260 -689 3260 -602Q3260 -515 3259 -435Q3257 -356 3255 -304Q3247 -131 3174 -56Q3101 19 2981 19Q2894 19 2834 -44Z" />
+                  <path d="M3395 0V-1200H3670V0Z" />
+                  <path d="M3806 -320Q3804 -361 3803 -435Q3802 -509 3802 -595Q3802 -680 3803 -756Q3804 -832 3806 -876Q3818 -1048 3895 -1128Q3971 -1208 4135 -1218V-1006Q4108 -998 4095 -977Q4082 -956 4081 -918Q4079 -841 4078 -762Q4077 -683 4077 -603Q4077 -523 4078 -445Q4079 -367 4081 -291Q4082 -251 4095 -227Q4108 -204 4135 -195V18Q3969 7 3892 -72Q3815 -151 3806 -320ZM4234 18V-194Q4259 -203 4271 -227Q4284 -250 4286 -291Q4288 -317 4288 -361Q4288 -405 4286 -458H4553Q4555 -443 4556 -398Q4557 -354 4555 -320Q4548 -150 4472 -70Q4397 9 4234 18ZM4173 -553V-743H4288Q4288 -784 4288 -821Q4287 -857 4287 -883Q4286 -909 4286 -918Q4285 -954 4272 -975Q4259 -996 4234 -1005V-1217Q4397 -1208 4472 -1130Q4547 -1053 4555 -887Q4556 -864 4557 -808Q4557 -752 4557 -683Q4556 -615 4553 -553Z" />
+                  <path d="M4669 -320Q4667 -361 4666 -435Q4665 -509 4665 -595Q4665 -680 4666 -756Q4667 -832 4669 -876Q4681 -1048 4758 -1128Q4834 -1208 4998 -1218V-1006Q4971 -998 4958 -977Q4945 -956 4944 -918Q4942 -841 4941 -762Q4940 -683 4940 -603Q4940 -523 4941 -445Q4942 -367 4944 -291Q4945 -251 4958 -228Q4971 -204 4998 -195V18Q4832 7 4755 -72Q4678 -151 4669 -320ZM5096 18V-194Q5122 -203 5135 -227Q5147 -250 5149 -291Q5151 -317 5151 -361Q5151 -405 5149 -458H5416Q5418 -443 5419 -398Q5420 -354 5418 -320Q5411 -150 5335 -70Q5260 9 5096 18ZM5149 -746Q5150 -766 5150 -801Q5151 -836 5150 -869Q5150 -902 5149 -918Q5147 -956 5135 -977Q5122 -998 5096 -1005V-1218Q5261 -1208 5336 -1130Q5411 -1053 5418 -887Q5420 -853 5419 -808Q5418 -762 5416 -746Z" />
+                  <path d="M5531 -320Q5529 -361 5528 -435Q5527 -509 5527 -595Q5527 -680 5528 -756Q5529 -832 5531 -876Q5543 -1048 5620 -1128Q5697 -1208 5861 -1218V-1006Q5833 -998 5820 -977Q5807 -956 5806 -918Q5804 -841 5803 -762Q5802 -683 5802 -603Q5802 -523 5803 -445Q5804 -367 5806 -291Q5807 -251 5820 -227Q5833 -204 5861 -195V18Q5694 7 5617 -72Q5540 -151 5531 -320ZM5959 18V-194Q5984 -203 5997 -227Q6009 -250 6011 -291Q6013 -317 6013 -361Q6013 -405 6011 -458H6279Q6281 -443 6282 -398Q6283 -354 6281 -320Q6273 -150 6197 -70Q6122 9 5959 18ZM5898 -553V-743H6013Q6013 -784 6013 -821Q6012 -857 6012 -883Q6011 -909 6011 -918Q6010 -954 5997 -975Q5984 -996 5959 -1005V-1217Q6123 -1208 6197 -1130Q6272 -1053 6281 -887Q6282 -864 6282 -808Q6283 -752 6282 -683Q6282 -615 6279 -553Z" />
+                </g>
+                <circle class="ball" cx="3532.3" cy="-1532" r="194.8" />
+              </svg>
+            </a>
+            <h1 id="hero-heading">Block the shot on your kitchen table</h1>
           </div>
-          <p class="try">
-            Try it here first: drag a figure, pick a lens, snap a frame. The eyeline from each actor to
-            the creature's eyes updates as you move them, in degrees and in metres on the real set.
-          </p>
-        </div>
-        <div class="shotlist">
-          <span class="label">Shot list <span id="f-shot">0 of 6</span></span>
-          <ol id="shotlist" aria-live="polite">
-            <li class="empty">No frames yet. Pick a lens and snap one.</li>
-          </ol>
-        </div>
-        <div class="slate-frame" aria-label="The stage, running in this page">
-          <div class="stripe" aria-hidden="true"></div>
-          <div id="scene-container"></div>
-          <div class="strip" role="group" aria-label="Lens, frames and eyeline">
+
+          <div class="stage">
+            <div id="scene-container"></div>
+          </div>
+
+          <div class="floor">
+            <div class="field">
+              <span class="label" id="marks-label">Marks</span>
+              <ul class="marks" aria-labelledby="marks-label">
+                <li class="mark mark-a">
+                  <svg class="tee" viewBox="0 0 60 47" width="60" height="47" aria-hidden="true" focusable="false"><path d="M2 2H57.3L57.9 3.1 57.1 3.9 57.6 5.8 58.5 6.4 57.4 7.7 57.8 9.9 57 11H34.5V44.1L33.6 44.9 32.2 44.2 31.5 45.4 29.4 44.8 28.7 45.6 27.1 44.5 25.5 45V11H2.8L2.1 9.8 2.9 8.9 1.5 7.6 2.2 5.4 1.4 4.7 2.4 3.2Z" /></svg>
+                  <span class="tag">Actor A</span>
+                </li>
+                <li class="mark mark-b">
+                  <svg class="tee" viewBox="0 0 60 47" width="60" height="47" aria-hidden="true" focusable="false"><path d="M2.6 2H57.8L57 2.9 58.2 4.6 57.5 5.2 57.9 7.3 56.8 8.1 57.6 9.4 57.3 11H34.5V45L33.1 44.3 32.4 45.3 30.6 44.6 29.8 45.5 28.3 44.4 26.6 45.1 25.5 44.3V11H2.3L3 10.1 1.6 8.6 2.5 7.9 1.9 5.7 2.9 4.8 1.7 3.4Z" /></svg>
+                  <span class="tag">Actor B</span>
+                </li>
+                <li class="mark mark-c">
+                  <svg class="tee" viewBox="0 0 60 47" width="60" height="47" aria-hidden="true" focusable="false"><path d="M2.9 2H57L58.1 3.4 57.3 4.2 58.4 6.1 57.2 6.9 57.7 8.8 56.9 9.6 57.5 11H34.5V44.4L33.8 45.5 31.9 44.7 31 45.2 29.2 44.1 28.1 45.3 26.9 44.8 25.5 45.4V11H2.5L1.4 9.5 2.3 8.7 2.8 6.6 1.6 5.9 2.4 4.1 1.8 3.3Z" /></svg>
+                  <span class="tag">Actor C</span>
+                </li>
+                <li class="mark mark-d">
+                  <svg class="tee" viewBox="0 0 60 47" width="60" height="47" aria-hidden="true" focusable="false"><path d="M2.3 2H57.5L56.9 3.6 57.8 4.3 57.2 6.4 58.3 7 57.6 8.6 58.1 10 57.1 11H34.5V44.8L33.3 44.1 32.6 45.2 30.8 45.6 29.9 44.4 28.2 44.9 27.3 45.5 25.5 44.6V11H2.1L2.7 9.3 1.5 8.4 2.6 6.9 1.9 6 2.8 4.2 1.6 3Z" /></svg>
+                  <span class="tag">Actor D</span>
+                </li>
+              </ul>
+            </div>
+            <div class="field eyes"><span class="label">Eyes</span><span class="value" id="f-eyeline" aria-live="polite">place an actor</span></div>
+            <p class="marks-note">One tape colour per actor, so nobody walks to the wrong mark. C and D come off the Cast shelf in the headset.</p>
+          </div>
+
+          <div class="strip" role="group" aria-label="Lens and take">
             <div class="field">
               <span class="label" id="lens-label">Lens</span>
               <div class="lenses" role="group" aria-labelledby="lens-label">
@@ -73,27 +92,53 @@
                 <button class="lens" type="button" data-lens="85">85</button>
                 <button class="lens" type="button" data-lens="135">135</button>
               </div>
+              <span class="unit">mm</span>
             </div>
-            <div class="field"><span class="label">Eyelines</span><span class="value" id="f-eyeline" aria-live="polite">place an actor</span></div>
             <div class="strip-actions">
-              <button id="page-snap" class="snap" type="button">Snap frame</button>
-              <button id="page-record" class="reset" type="button">Record a take</button>
-              <button id="page-play" class="reset" type="button" hidden>Play take</button>
-              <button id="page-reset" class="reset" type="button">Start over</button>
-              <button id="page-save-board" class="reset" type="button" hidden>Save board</button>
-              <button id="page-save-list" class="reset" type="button" hidden>Save shot list</button>
-              <button id="page-save-take" class="reset" type="button" hidden>Save animatic</button>
+              <button id="page-snap" class="block" type="button">Snap frame</button>
+              <button id="page-record" class="block record" type="button">Record a take</button>
+              <button id="page-play" class="block" type="button" hidden>Play take</button>
+              <button id="page-reset" class="block" type="button">Start over</button>
+              <button id="page-save-board" class="block" type="button" hidden>Save board</button>
+              <button id="page-save-list" class="block" type="button" hidden>Save shot list</button>
+              <button id="page-save-take" class="block" type="button" hidden>Save animatic</button>
             </div>
           </div>
         </div>
-        <ol class="board" id="board" aria-label="Storyboard, the last six frames">
-          <li><span class="n">1</span></li>
-          <li><span class="n">2</span></li>
-          <li><span class="n">3</span></li>
-          <li><span class="n">4</span></li>
-          <li><span class="n">5</span></li>
-          <li><span class="n">6</span></li>
-        </ol>
+
+        <div class="copy">
+          <div class="pitch">
+            <p class="lede">
+              A 1:10 film set on a slate, placed on your own table. You move wooden stand-ins and a
+              35&nbsp;mm camera with your hands, look through the lens, snap, and leave with the storyboard
+              and the shot list.
+            </p>
+            <div class="actions">
+              <button id="enter-xr" class="primary" type="button">Enter XR</button>
+              <p class="hint" id="xr-hint">Open this page in the Meta Quest Browser, point at any table and pinch: the set lands on it.</p>
+            </div>
+          </div>
+          <div class="leave">
+            <p class="try">
+              Try it here first: drag a figure, pick a lens, snap a frame. The eyeline from each actor to
+              the creature’s eyes updates as you move them, in degrees and in metres on the real set.
+            </p>
+            <ol class="board" id="board" aria-label="Storyboard, the last six frames">
+              <li><span class="n">1</span></li>
+              <li><span class="n">2</span></li>
+              <li><span class="n">3</span></li>
+              <li><span class="n">4</span></li>
+              <li><span class="n">5</span></li>
+              <li><span class="n">6</span></li>
+            </ol>
+            <div class="shotlist">
+              <span class="label">Shot list <span id="f-shot">0 of 6</span></span>
+              <ol id="shotlist" aria-live="polite">
+                <li class="empty">No frames yet. Pick a lens and snap one.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 
