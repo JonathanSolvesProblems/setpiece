@@ -34,6 +34,9 @@ export const Placement = {
 } as const;
 
 /** Where the stage sits, and whether its pose is saved between sessions. */
+/** A hand has this piece, by the ray or by reaching in and closing on it. */
+export const Held = createComponent('Held', {});
+
 export const StageAnchor = createComponent('StageAnchor', {
   placement: { type: Types.Enum, enum: Placement, default: Placement.Floating },
   persist: { type: Types.Boolean, default: true },

@@ -9,7 +9,6 @@ import {
   CanvasTexture,
   createSystem,
   Entity,
-  Grabbed,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
@@ -17,7 +16,7 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { Placement, SetPiece, SetRole, StageAnchor } from './set-components.js';
+import { Placement, Held, SetPiece, SetRole, StageAnchor } from './set-components.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { BRIEFS } from './briefs.js';
 import { TAKE_MAX_SECONDS, TakeState } from './take.js';
@@ -70,7 +69,7 @@ type CoachState = { done: boolean };
 
 export class CoachSystem extends createSystem({
   stages: { required: [SetPiece, StageAnchor] },
-  held: { required: [SetPiece, Grabbed] },
+  held: { required: [SetPiece, Held] },
 }) {
   private canvas!: HTMLCanvasElement;
   private texture!: CanvasTexture;

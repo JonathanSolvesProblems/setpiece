@@ -1,0 +1,239 @@
+/**
+ * A held actor is alive. Lifted off the slate it hangs from the hand and swings
+ * with it, kicks its legs and waves its arms, and goes quiet when it is set
+ * down. It is all on the figure's own parts, so it never touches where the
+ * piece stands or what a take records, and a setting on the panel turns it off.
+ * Only actors do this: a camera in the hand stays a camera.
+ */
+import { createSystem, Entity, Euler, Matrix4, Object3D, Quaternion, Vector3 } from '@iwsdk/core';
+import type { Signal } from '@preact/signals-core';
+import { Held, SetPiece, SetRole } from './set-components.js';
+
+const SWING_STIFFNESS = 60;
+const SWING_DAMPING = 3.5;
+const SWING_GAIN = 12;
+const SWING_LIMIT = 0.9;
+const IDLE_SWAY = 0.07;
+const ACCEL_LIMIT = 8;
+const KICK_RATE = 13;
+const FAST_KICK_RATE = 19;
+const LEG_KICK = 0.6;
+const ARM_WAVE = 0.8;
+const ARM_SPLAY = 0.4;
+const HEAD_ROLL = 0.2;
+const REST = 0.01;
+const X = new Vector3(1, 0, 0);
+
+type Limb = { parts: Object3D[]; bases: Matrix4[]; pivot: Vector3; wave: number; phase: number; splay: number; axis: Vector3 };
+type Rig = { pose: Object3D; base: Matrix4; grip: Vector3; limbs: Limb[]; stand: Object3D[] };
+type State = {
+  entity: Entity;
+  rigs: Rig[];
+  rig: Rig | null;
+  amount: number;
+  clock: number;
+  fresh: boolean;
+  last: Vector3;
+  velocity: Vector3;
+  swingX: number;
+  swingZ: number;
+  speedX: number;
+  speedZ: number;
+};
+
+const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
+  arm: new RegExp(`^(Shoulder${tag}|Arm${tag}Upper|Elbow${tag}|Arm${tag}Lower|Hand${tag})$`),
+  leg: new RegExp(`^(Leg${tag}Upper|Knee${tag}|Leg${tag}Lower|Foot${tag})$`),
+});
+
+function rigFor(pose: Object3D): Rig {
+  const byName = (pattern: RegExp): Object3D[] => pose.children.filter((part) => pattern.test(part.name));
+  const limb = (parts: Object3D[], pivot: Vector3, wave: number, phase: number, splay: number, axis: Vector3 = X): Limb => ({
+    parts,
+    bases: parts.map((part) => part.matrix.clone()),
+    pivot,
+    wave,
+    phase,
+    splay,
+    axis,
+  });
+  const pelvis = pose.getObjectByName('Pelvis')!;
+  const head = pose.getObjectByName('Head')!;
+  const neck = pose.getObjectByName('Neck')!;
+  const limbs: Limb[] = [];
+  [-1, 1].forEach((side, i) => {
+    const { arm, leg } = NAMES(side < 0 ? 'L' : 'R');
+    const arms = byName(arm);
+    const legs = byName(leg);
+    const shoulder = arms.find((part) => part.name.startsWith('Shoulder'))!;
+    const knee = legs.find((part) => part.name.startsWith('Knee'))!;
+    limbs.push(
+      limb(legs, new Vector3(knee.position.x, pelvis.position.y, 0), LEG_KICK, i * Math.PI, 0),
+      limb(arms, shoulder.position.clone(), ARM_WAVE, i * Math.PI + Math.PI / 2, side * ARM_SPLAY),
+    );
+  });
+  limbs.push(limb(byName(/^(Neck|Head|Hair)$/), neck.position.clone(), HEAD_ROLL, 0.8, 0, new Vector3(0, 0, 1)));
+  return {
+    pose,
+    base: pose.matrix.clone(),
+    grip: head.position.clone(),
+    limbs,
+    stand: byName(/^(Base|Post)$/),
+  };
+}
+
+export class SquirmSystem extends createSystem({
+  held: { required: [SetPiece, Held] },
+}) {
+  private states = new Map<Entity, State>();
+  private moving: State[] = [];
+  private turn = new Quaternion();
+  private euler = new Euler();
+  private spin = new Quaternion();
+  private matrix = new Matrix4();
+  private rotate = new Matrix4();
+  private there = new Matrix4();
+  private back = new Matrix4();
+  private place = new Vector3();
+  private step = new Vector3();
+  private push = new Vector3();
+  private one = new Vector3(1, 1, 1);
+
+  init(): void {
+    this.cleanupFuncs.push(
+      this.queries.held.subscribe('qualify', (piece) => {
+        if (piece.getValue(SetPiece, 'role') !== SetRole.Actor) return;
+        if (!(this.globals as { squirmOn: Signal<boolean> }).squirmOn.peek() || piece.object3D == null) return;
+        let state = this.states.get(piece);
+        if (state == null) {
+          state = {
+            entity: piece,
+            rigs: [],
+            rig: null,
+            amount: 0,
+            clock: 0,
+            fresh: true,
+            last: new Vector3(),
+            velocity: new Vector3(),
+            swingX: 0,
+            swingZ: 0,
+            speedX: 0,
+            speedZ: 0,
+          };
+          this.states.set(piece, state);
+        }
+        state.fresh = true;
+        if (!this.moving.includes(state)) this.moving.push(state);
+      }),
+    );
+  }
+
+  update(delta: number): void {
+    if (delta <= 0) return;
+    for (let i = this.moving.length - 1; i >= 0; i--) {
+      const state = this.moving[i];
+      if (this.animate(state, delta)) continue;
+      this.moving.splice(i, 1);
+    }
+  }
+
+  private currentRig(state: State): Rig | null {
+    const object = state.entity.object3D!;
+    for (let i = 0; i < object.children.length; i++) {
+      const child = object.children[i];
+      if (!child.visible || !child.name.startsWith('Pose')) continue;
+      for (let r = 0; r < state.rigs.length; r++) if (state.rigs[r].pose === child) return state.rigs[r];
+      const rig = rigFor(child);
+      state.rigs.push(rig);
+      return rig;
+    }
+    return null;
+  }
+
+  private rest(rig: Rig): void {
+    rig.pose.matrix.copy(rig.base);
+    rig.pose.matrixWorldNeedsUpdate = true;
+    for (let i = 0; i < rig.limbs.length; i++) {
+      const limb = rig.limbs[i];
+      for (let p = 0; p < limb.parts.length; p++) {
+        limb.parts[p].matrix.copy(limb.bases[p]);
+        limb.parts[p].matrixWorldNeedsUpdate = true;
+      }
+    }
+    for (let i = 0; i < rig.stand.length; i++) rig.stand[i].visible = true;
+  }
+
+  /** False once the figure is back at rest and needs no more of this. */
+  private animate(state: State, delta: number): boolean {
+    const object = state.entity.object3D;
+    if (object == null) return false;
+    const wanted = state.entity.hasComponent(Held) && (this.globals as { squirmOn: Signal<boolean> }).squirmOn.peek();
+    state.amount += ((wanted ? 1 : 0) - state.amount) * Math.min(1, delta * (wanted ? 12 : 8));
+    const rig = this.currentRig(state);
+    if (rig !== state.rig) {
+      if (state.rig != null) this.rest(state.rig);
+      state.rig = rig;
+    }
+    if (rig == null) return wanted;
+    if (!wanted && state.amount < REST) {
+      this.rest(rig);
+      state.swingX = state.swingZ = state.speedX = state.speedZ = 0;
+      return false;
+    }
+
+    object.getWorldPosition(this.place);
+    if (state.fresh) {
+      state.fresh = false;
+      state.last.copy(this.place);
+      state.velocity.set(0, 0, 0);
+    }
+    this.step.copy(this.place).sub(state.last).divideScalar(delta);
+    state.last.copy(this.place);
+    this.push.copy(this.step).sub(state.velocity).divideScalar(delta);
+    state.velocity.lerp(this.step, Math.min(1, delta * 30));
+    // The hand's push, as the figure feels it.
+    this.push.applyQuaternion(this.turn.copy(object.getWorldQuaternion(this.turn)).invert());
+    const ax = Math.max(-ACCEL_LIMIT, Math.min(ACCEL_LIMIT, this.push.x));
+    const az = Math.max(-ACCEL_LIMIT, Math.min(ACCEL_LIMIT, this.push.z));
+    state.speedX += (-SWING_STIFFNESS * state.swingX - SWING_DAMPING * state.speedX + az * SWING_GAIN) * delta;
+    state.speedZ += (-SWING_STIFFNESS * state.swingZ - SWING_DAMPING * state.speedZ - ax * SWING_GAIN) * delta;
+    state.swingX = Math.max(-SWING_LIMIT, Math.min(SWING_LIMIT, state.swingX + state.speedX * delta));
+    state.swingZ = Math.max(-SWING_LIMIT, Math.min(SWING_LIMIT, state.swingZ + state.speedZ * delta));
+
+    const speed = Math.min(1, state.velocity.length() * 3);
+    state.clock += delta * (KICK_RATE + (FAST_KICK_RATE - KICK_RATE) * speed);
+    const clock = state.clock;
+    const amount = state.amount;
+
+    // The whole figure hangs from where a hand would hold it.
+    this.euler.set(amount * (state.swingX + IDLE_SWAY * Math.sin(clock * 0.31)), 0, amount * (state.swingZ + IDLE_SWAY * Math.cos(clock * 0.23)));
+    this.about(rig.grip, this.euler, rig.pose.matrix, rig.base);
+    rig.pose.matrixWorldNeedsUpdate = true;
+
+    const energy = amount * (0.75 + 0.35 * speed);
+    for (let i = 0; i < rig.limbs.length; i++) {
+      const limb = rig.limbs[i];
+      const angle = Math.sin(clock + limb.phase) * limb.wave * energy;
+      if (limb.axis === X) this.euler.set(angle, 0, limb.splay * amount);
+      else this.euler.set(0, 0, angle);
+      for (let p = 0; p < limb.parts.length; p++) {
+        this.about(limb.pivot, this.euler, limb.parts[p].matrix, limb.bases[p]);
+        limb.parts[p].matrixWorldNeedsUpdate = true;
+      }
+    }
+    const lifted = amount > 0.05;
+    for (let i = 0; i < rig.stand.length; i++) rig.stand[i].visible = !lifted;
+    return true;
+  }
+
+  /** out = base turned by this rotation about a point. */
+  private about(pivot: Vector3, rotation: Euler, out: Matrix4, base: Matrix4): void {
+    this.spin.setFromEuler(rotation);
+    this.there.makeTranslation(pivot.x, pivot.y, pivot.z);
+    this.back.makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+    this.rotate.compose(this.step.set(0, 0, 0), this.spin, this.one);
+    this.matrix.multiplyMatrices(this.there, this.rotate);
+    this.matrix.multiply(this.back);
+    out.multiplyMatrices(this.matrix, base);
+  }
+}

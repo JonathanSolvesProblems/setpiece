@@ -29,6 +29,7 @@ const PANEL_OFFSET = new Vector3(-0.38, 0.33, -0.16);
  * panel unit is measured from the panel as it is scaled in the scene.
  */
 const PANEL_TOP = 0.68;
+const LIFE_CONFIRM_MS = 3000;
 const PANEL_UNIT = 0.00101;
 /** At full size the table is left behind, so the panel stays with the wearer: this far ahead, this far off centre, this far below the eyes. */
 const WALK_AHEAD = 0.6;
@@ -260,10 +261,26 @@ export class ControlsSystem extends createSystem({
     showTab('shoot');
 
     // The full-size set, and the way back to the table.
+    // Growing the whole set is not something to do by a stray pinch: it takes a second press.
+    const life = panel.getElementById<UIKit.Text>('btn-life');
+    let lifeArmed: ReturnType<typeof setTimeout> | null = null;
+    const disarmLife = (): void => {
+      if (lifeArmed != null) clearTimeout(lifeArmed);
+      lifeArmed = null;
+    };
+    this.cleanupFuncs.push(disarmLife);
     wire('btn-life', () => {
+      if (!g.lifeSize.peek() && lifeArmed == null) {
+        life?.setProperties({ text: 'Press again to go full size', borderColor: OPTIC_YELLOW });
+        lifeArmed = setTimeout(() => {
+          lifeArmed = null;
+          if (!g.lifeSize.peek()) life?.setProperties({ text: 'Stand in the shot', borderColor: CHALK_HAZE });
+        }, LIFE_CONFIRM_MS);
+        return;
+      }
+      disarmLife();
       g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
     });
-    const life = panel.getElementById<UIKit.Text>('btn-life');
     this.cleanupFuncs.push(
       g.lifeSize.subscribe((on) => {
         life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });

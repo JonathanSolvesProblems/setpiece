@@ -14,9 +14,9 @@
  * Nothing here is drawn or generated: a take is the poses the wearer's own
  * hands gave the pieces, and it can only replay those.
  */
-import { AudioSource, AudioUtils, createSystem, Entity, Grabbed, Quaternion } from '@iwsdk/core';
+import { AudioSource, AudioUtils, createSystem, Entity, Quaternion } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { CAMERA_TILT_LIMIT, Cue, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
+import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
 export const TakeState = { Idle: 'idle', Recording: 'recording', Playing: 'playing' } as const;
@@ -53,7 +53,7 @@ type Globals = {
 
 export class TakeSystem extends createSystem({
   pieces: { required: [SetPiece] },
-  held: { required: [SetPiece, Grabbed] },
+  held: { required: [SetPiece, Held] },
   cues: { required: [SoundCue, AudioSource] },
   cams: { required: [ShotCamera, AudioSource] },
 }) {
@@ -244,7 +244,7 @@ export class TakeSystem extends createSystem({
     for (let i = 0; i < this.tracks.length; i++) {
       const track = this.tracks[i];
       if (track.piece.object3D == null) continue;
-      if (!track.touched && track.piece.hasComponent(Grabbed)) {
+      if (!track.touched && track.piece.hasComponent(Held)) {
         track.touched = true;
         if (!track.recorded) {
           // Until it was picked up, the piece stood where the pass found it.
@@ -332,7 +332,7 @@ export class TakeSystem extends createSystem({
     if (this.length === 0) return;
     for (let i = 0; i < this.tracks.length; i++) {
       const track = this.tracks[i];
-      if (track.recorded && !track.piece.hasComponent(Grabbed)) this.applyAt(track, 0);
+      if (track.recorded && !track.piece.hasComponent(Held)) this.applyAt(track, 0);
     }
   }
 

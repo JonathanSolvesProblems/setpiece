@@ -11,6 +11,7 @@ import { SlateSystem } from './slate.js';
 import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
 import { LifeSizeSystem } from './life-size.js';
 import { TakeState, TakeSystem } from './take.js';
+import { SquirmSystem } from './squirm.js';
 import { TraySystem } from './tray.js';
 import { Rig } from './camera-formats.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -45,6 +46,7 @@ World.create(
   globals.trayOn = signal<string[]>([]);
   globals.effectsOn = signal(0);
   globals.poseRequested = signal(0);
+  globals.squirmOn = signal(true);
   globals.lookRequested = signal(0);
   globals.castLine = signal('');
   globals.lifeSize = signal(false);
@@ -73,6 +75,7 @@ World.create(
     .registerSystem(TakeSystem, { priority: 14 })
     .registerSystem(TraySystem, { priority: 15 })
     .registerSystem(LifeSizeSystem, { priority: 16 })
+    .registerSystem(SquirmSystem, { priority: 17 })
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })

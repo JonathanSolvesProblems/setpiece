@@ -4,11 +4,11 @@
  * is kept between visits. Effects and rotors are the only things here that run
  * on their own, so this is also where their clock lives.
  */
-import { createSystem, Entity, Grabbed, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial } from '@iwsdk/core';
+import { createSystem, Entity, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { Rig, SENSORS } from './camera-formats.js';
 import { assetByLabel, assetTitle, STARTING_ASSETS } from './catalog.js';
-import { SetPiece, SetRole, ShotCamera } from './set-components.js';
+import { Held, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 
@@ -48,7 +48,7 @@ type Globals = {
 
 export class TraySystem extends createSystem({
   pieces: { required: [SetPiece] },
-  held: { required: [SetPiece, Grabbed] },
+  held: { required: [SetPiece, Held] },
   cams: { required: [ShotCamera] },
 }) {
   private managed: Entity[] = [];

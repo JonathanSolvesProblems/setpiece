@@ -50,7 +50,7 @@ import type { Signal } from '@preact/signals-core';
 import { HandTurn } from './hand-turn.js';
 import { LandingGuide } from './landing.js';
 import { STAGE_DEPTH, STAGE_WIDTH } from './scene-assets/rig.scene-asset.js';
-import { Placement, SetPiece, StageAnchor } from './set-components.js';
+import { Placement, Held, SetPiece, StageAnchor } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 
@@ -177,6 +177,7 @@ export class PlacementSystem extends createSystem({
   stages: { required: [SetPiece, StageAnchor] },
   heldStages: { required: [StageAnchor, Grabbed] },
   grabbed: { required: [Grabbed] },
+  carried: { required: [Held] },
   pressed: { required: [Pressed] },
   meshes: { required: [XRMesh] },
   planes: { required: [XRPlane] },
@@ -518,6 +519,7 @@ export class PlacementSystem extends createSystem({
 
   /** True when a pinch has hold of something other than the slate itself. */
   private claimedElsewhere(stage: Entity): boolean {
+    if (this.queries.carried.entities.size > 0) return true;
     for (const entity of this.queries.grabbed.entities) if (entity !== stage) return true;
     for (const entity of this.queries.pressed.entities) if (entity !== stage) return true;
     return false;
@@ -839,6 +841,7 @@ export class PlacementSystem extends createSystem({
       this.holding ||
       this.glide > 0 ||
       this.queries.grabbed.entities.size > 0 ||
+      this.queries.carried.entities.size > 0 ||
       this.world.visibilityState.peek() !== VisibilityState.Visible ||
       ((this.globals as Globals).takeState?.peek() ?? 'idle') !== 'idle';
     if (!follows || busy) {

@@ -4,10 +4,16 @@
  * straightens and keeps the height you gave it, because a high or a low angle
  * is a choice. Each piece knocks softly when it is lifted and when it lands.
  * Where every piece stands is kept between visits.
+ *
+ * Two ways to take a piece. From afar the hand's ray and a pinch, as ever. Up
+ * close, the way anyone reaches for a miniature: put the fingers on it and pinch,
+ * or close the hand around it, with a controller's grip or trigger doing the
+ * same. Near a piece the ray steps aside, so what the hand is on is what it gets.
  */
 import {
   AudioSource,
   AudioUtils,
+  Box3,
   createSystem,
   CylinderGeometry,
   DoubleSide,
@@ -15,8 +21,11 @@ import {
   Grabbed,
   GrabSystem,
   Hovered,
+  InputComponent,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   Quaternion,
   RingGeometry,
   Vector3,
@@ -24,8 +33,9 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { assetByLabel } from './catalog.js';
+import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
-import { CAMERA_TILT_LIMIT, Cue, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
+import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 
@@ -66,11 +76,24 @@ const TILT_TAKEOVER = 0.1;
  */
 const INPUT_GUARD_SECONDS = 0.8;
 const OPTIC_YELLOW = 0xd6e13c;
+/** How close a hand has to be to a piece to take it, and how far it has to go to stop being near. */
+const REACH = 0.035;
+const REACH_RELEASE = 0.06;
+/** Hand tracking drops out for a moment when fingers close: a held piece waits this long for it. */
+const LOST_HAND_SECONDS = 0.5;
+const HAND_SMOOTHING = 45;
+/** A piece let go above the slate falls to it. */
+const FALL = 5;
+const FALL_FROM = 0.015;
 const NO_RAYCAST = (): void => {};
 
 /** Position then quaternion, in the stage's own space. */
 type Pose = number[];
 type SavedPieces = Record<string, Pose>;
+type Side = 'left' | 'right';
+const SIDES: Side[] = ['left', 'right'];
+type Carry = { piece: Entity; by: 'pinch' | 'fist' | 'pad'; offset: Vector3; at: Vector3; lost: number };
+type Drop = { piece: Entity; speed: number };
 type Globals = {
   newBoardRequested: Signal<number>;
   coachTarget: Signal<string>;
@@ -90,7 +113,8 @@ const isPose = (value: unknown): value is Pose =>
 
 export class PiecesSystem extends createSystem({
   pieces: { required: [SetPiece] },
-  held: { required: [SetPiece, Grabbed] },
+  grabbed: { required: [SetPiece, Grabbed] },
+  held: { required: [SetPiece, Held] },
   cues: { required: [SoundCue, AudioSource] },
 }) {
   private authored = new Map<string, Pose>();
@@ -111,6 +135,17 @@ export class PiecesSystem extends createSystem({
   private upright = new Quaternion();
   private right = new Vector3();
   private rigTurn = new Quaternion();
+  /** The space each piece fills, in its own frame, by index with `dressed`. */
+  private bounds: Box3[] = [];
+  private readings: Record<Side, HandReading> = { left: new HandReading(), right: new HandReading() };
+  private carrying: Record<Side, Carry | null> = { left: null, right: null };
+  /** The piece each hand is on, by index, or -1. */
+  private near: Record<Side, number> = { left: -1, right: -1 };
+  private rayAside: Record<Side, boolean> = { left: false, right: false };
+  private drops: Drop[] = [];
+  private point = new Vector3();
+  private local = new Vector3();
+  private padAt = new Vector3();
 
   init(): void {
     const g = this.globals as Globals;
@@ -119,21 +154,23 @@ export class PiecesSystem extends createSystem({
       this.world.visibilityState.subscribe((state) => {
         if (state === VisibilityState.Visible) this.guard = INPUT_GUARD_SECONDS;
       }),
-      this.queries.held.subscribe('qualify', (piece) => {
+      this.queries.grabbed.subscribe('qualify', (piece) => {
         if (this.isStage(piece)) return;
         if (this.guard > 0) {
           this.ignored.add(piece);
           this.grab?.forceRelease(piece);
           return;
         }
-        this.knock(Cue.Pick, piece);
+        if (!piece.hasComponent(Held)) piece.addComponent(Held);
       }),
-      // The grab writes the piece's pose once more as it lets go, so settle on the next update.
-      this.queries.held.subscribe('disqualify', (piece) => {
+      this.queries.grabbed.subscribe('disqualify', (piece) => {
         if (this.isStage(piece)) return;
         if (this.ignored.delete(piece)) return;
-        this.released.push(piece);
+        if (this.sideCarrying(piece) == null && piece.hasComponent(Held)) piece.removeComponent(Held);
       }),
+      this.queries.held.subscribe('qualify', (piece) => this.knock(Cue.Pick, piece)),
+      // The grab writes the piece's pose once more as it lets go, so settle on the next update.
+      this.queries.held.subscribe('disqualify', (piece) => this.released.push(piece)),
       g.newBoardRequested.subscribe((n) => {
         if (n > this.boardSeen) {
           this.boardSeen = n;
@@ -160,15 +197,166 @@ export class PiecesSystem extends createSystem({
       return;
     }
     if (this.guard > 0) this.guard -= delta;
+    this.reachWith('left', delta);
+    this.reachWith('right', delta);
     this.followHands(delta, time);
+    if (this.drops.length > 0) this.fall(delta);
     if (this.released.length === 0) return;
     for (const piece of this.released) {
       if (piece.object3D == null) continue;
       this.settle(piece);
-      this.knock(Cue.Place, piece);
     }
     this.released.length = 0;
     this.save();
+  }
+
+  private sideCarrying(piece: Entity): Side | null {
+    if (this.carrying.left?.piece === piece) return 'left';
+    if (this.carrying.right?.piece === piece) return 'right';
+    return null;
+  }
+
+  /** The ray is already holding something for this hand: it is not reaching for anything else. */
+  private rayBusy(side: Side): boolean {
+    for (const entity of this.queries.grabbed.entities) if (this.grab?.getHolderHand(entity) === side) return true;
+    return false;
+  }
+
+  private setRayAside(side: Side, aside: boolean): void {
+    if (this.rayAside[side] === aside) return;
+    // A pinch already closed on the ray stays with the ray until it lets go.
+    if (aside && this.input.xr.gamepads[side]?.getSelecting()) return;
+    this.rayAside[side] = aside;
+    this.input.xr.multiPointers[side].toggleSubPointer('ray', !aside);
+  }
+
+  /** The nearest piece this point is on, by index, or -1. */
+  private nearestTo(point: Vector3, reach: number): number {
+    const lifeSize = (this.globals as { lifeSize?: Signal<boolean> }).lifeSize?.peek() === true;
+    if (lifeSize) return -1;
+    let best = -1;
+    let bestScore = Infinity;
+    for (let i = 0; i < this.dressed.length; i++) {
+      const piece = this.dressed[i];
+      const object = piece.object3D;
+      if (object == null || !object.visible || object.parent?.visible !== true) continue;
+      if ((object as { pointerEvents?: string }).pointerEvents === 'none') continue;
+      if (piece.hasComponent(Held)) continue;
+      object.worldToLocal(this.local.copy(point));
+      const box = this.bounds[i];
+      const gap = box.distanceToPoint(this.local);
+      if (gap > reach) continue;
+      // Inside two pieces at once, the one whose middle is closest.
+      box.getCenter(this.point);
+      const score = gap + 0.01 * this.point.distanceTo(this.local);
+      if (score < bestScore) {
+        bestScore = score;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  /** One hand, up close: is it on a piece, did it just close on one, is it carrying one. */
+  private reachWith(side: Side, delta: number): void {
+    const xr = this.input.xr;
+    const reading = this.readings[side];
+    const pad = xr.gamepads[side];
+    const byHand = xr.isPrimary('hand', side);
+    let pinchAt = this.padAt;
+    let fistAt = this.padAt;
+    let live = true;
+    if (byHand) {
+      const renderer = this.world.renderer;
+      const frame = renderer.xr.getFrame?.();
+      const base = renderer.xr.getReferenceSpace();
+      if (frame != null && base != null) reading.read(frame, base, xr.getPrimaryInputSource(side), this.player);
+      else reading.tracked = false;
+      live = reading.tracked;
+      pinchAt = reading.pinchAt;
+      fistAt = reading.fistAt;
+    } else if (xr.isPrimary('controller', side)) {
+      this.player.gripSpaces[side].getWorldPosition(this.padAt);
+    } else {
+      live = false;
+    }
+
+    const carry = this.carrying[side];
+    if (carry != null) {
+      this.carry(side, carry, byHand, live, carry.by === 'fist' ? fistAt : pinchAt, delta);
+      return;
+    }
+    if (!live || this.rayBusy(side)) {
+      this.near[side] = -1;
+      this.setRayAside(side, false);
+      return;
+    }
+    const reach = this.near[side] >= 0 ? REACH_RELEASE : REACH;
+    let index = this.nearestTo(pinchAt, reach);
+    let fromFist = false;
+    if (index < 0 && byHand) {
+      index = this.nearestTo(fistAt, reach);
+      fromFist = index >= 0;
+    }
+    this.near[side] = index;
+    this.setRayAside(side, index >= 0);
+    if (index < 0 || this.guard > 0) return;
+    const pinched = pad?.getSelectStart() === true;
+    const fisted = byHand && reading.fistStart;
+    const squeezed = !byHand && pad?.getButtonDown(InputComponent.Squeeze) === true;
+    if (!pinched && !fisted && !squeezed) return;
+    const by: Carry['by'] = !byHand ? 'pad' : fisted && !pinched ? 'fist' : 'pinch';
+    const point = by === 'fist' || fromFist ? fistAt : pinchAt;
+    this.take(side, this.dressed[index], by, by === 'pinch' && fromFist ? pinchAt : point);
+  }
+
+  private take(side: Side, piece: Entity, by: Carry['by'], point: Vector3): void {
+    const object = piece.object3D!;
+    object.getWorldPosition(this.point);
+    this.carrying[side] = { piece, by, offset: this.point.clone().sub(point), at: point.clone(), lost: 0 };
+    this.near[side] = -1;
+    piece.addComponent(Held);
+  }
+
+  private carry(side: Side, carry: Carry, byHand: boolean, live: boolean, point: Vector3, delta: number): void {
+    const pad = this.input.xr.gamepads[side];
+    let letGo: boolean;
+    if (!byHand) letGo = !live || (pad?.getSelecting() !== true && pad?.getButtonPressed(InputComponent.Squeeze) !== true);
+    else if (carry.by === 'fist') letGo = live && !this.readings[side].shut;
+    else letGo = pad != null && !pad.getSelecting();
+    carry.lost = live ? 0 : carry.lost + delta;
+    if (letGo || carry.lost > LOST_HAND_SECONDS || carry.piece.object3D == null) {
+      this.carrying[side] = null;
+      this.setRayAside(side, false);
+      if (carry.piece.hasComponent(Held)) carry.piece.removeComponent(Held);
+      return;
+    }
+    this.setRayAside(side, true);
+    if (!live) return;
+    carry.at.lerp(point, Math.min(1, delta * HAND_SMOOTHING));
+    const object = carry.piece.object3D;
+    this.point.copy(carry.at).add(carry.offset);
+    object.parent?.worldToLocal(this.point);
+    object.position.copy(this.point);
+  }
+
+  /** A piece let go in the air drops to the slate and knocks when it gets there. */
+  private fall(delta: number): void {
+    for (let i = this.drops.length - 1; i >= 0; i--) {
+      const drop = this.drops[i];
+      const object = drop.piece.object3D;
+      if (object == null || drop.piece.hasComponent(Held)) {
+        this.drops.splice(i, 1);
+        continue;
+      }
+      drop.speed += FALL * delta;
+      object.position.y -= drop.speed * delta;
+      if (object.position.y > 0) continue;
+      object.position.y = 0;
+      this.knock(Cue.Place, drop.piece);
+      this.drops.splice(i, 1);
+      if (this.drops.length === 0) this.save();
+    }
   }
 
   private isStage(piece: Entity): boolean {
@@ -185,8 +373,8 @@ export class PiecesSystem extends createSystem({
     let beckoned = false;
     for (let i = 0; i < this.dressed.length; i++) {
       const piece = this.dressed[i];
-      const held = piece.hasComponent(Grabbed) && !this.ignored.has(piece);
-      const touched = held || piece.hasComponent(Hovered);
+      const held = piece.hasComponent(Held);
+      const touched = held || piece.hasComponent(Hovered) || this.near.left === i || this.near.right === i;
       const beckon = !beckoned && wanted !== '' && piece.object3D?.visible === true && piece.getValue(SetPiece, 'role') === wanted;
       if (beckon) beckoned = true;
       const ring = this.rings[i];
@@ -198,7 +386,7 @@ export class PiecesSystem extends createSystem({
         continue;
       }
       if (!turn.active) {
-        const side = this.grab?.getHolderHand(piece);
+        const side = this.sideCarrying(piece) ?? this.grab?.getHolderHand(piece);
         if (side != null) turn.begin(this.player.gripSpaces[side]);
       }
       const object = piece.object3D;
@@ -227,6 +415,7 @@ export class PiecesSystem extends createSystem({
       assetByLabel(String(piece.getValue(SetPiece, 'label')))?.grab ?? GRAB_VOLUME[piece.getValue(SetPiece, 'role') as string];
     if (size == null) return;
     const [radius, height] = size;
+    this.bounds.push(this.boundsOf(object, radius, height));
     const volume = new Mesh(new CylinderGeometry(radius, radius, height, 14, 1), this.volumeMaterial);
     volume.name = 'GrabVolume';
     volume.position.y = height / 2;
@@ -241,6 +430,25 @@ export class PiecesSystem extends createSystem({
     this.dressed.push(piece);
     this.rings.push(ring);
     this.turns.push(new HandTurn());
+  }
+
+  /** The piece's own shape, and the grab zone around it, in the piece's frame. */
+  private boundsOf(object: Object3D, radius: number, height: number): Box3 {
+    const box = new Box3();
+    const part = new Box3();
+    const toPiece = new Matrix4();
+    object.updateWorldMatrix(true, true);
+    const inverse = object.matrixWorld.clone().invert();
+    object.traverse((child) => {
+      if (!(child instanceof Mesh) || child.name === 'EffectParticles') return;
+      const geometry = child.geometry;
+      if (geometry.boundingBox == null) geometry.computeBoundingBox();
+      if (geometry.boundingBox == null) return;
+      box.union(part.copy(geometry.boundingBox).applyMatrix4(toPiece.multiplyMatrices(inverse, child.matrixWorld)));
+    });
+    box.expandByPoint(this.local.set(radius, height, radius));
+    box.expandByPoint(this.local.set(-radius, 0, -radius));
+    return box;
   }
 
   private key(piece: Entity): string {
@@ -291,6 +499,7 @@ export class PiecesSystem extends createSystem({
     const authored = this.authored.get(this.key(piece));
     if (authored && Math.hypot(object.position.x, object.position.z) > MAX_FROM_CENTRE) {
       this.apply(piece, authored);
+      this.knock(Cue.Place, piece);
       return;
     }
     this.forward.set(0, 0, 1).applyQuaternion(object.quaternion);
@@ -302,8 +511,12 @@ export class PiecesSystem extends createSystem({
       } else {
         object.position.y = y < CAMERA_FLOOR_SNAP ? 0 : Math.min(y, CAMERA_MAX_HEIGHT);
       }
+      this.knock(Cue.Place, piece);
+    } else if (object.position.y > FALL_FROM) {
+      this.drops.push({ piece, speed: 0 });
     } else {
       object.position.y = 0;
+      this.knock(Cue.Place, piece);
     }
   }
 
