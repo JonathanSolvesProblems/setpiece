@@ -324,14 +324,14 @@ export class CoachSystem extends createSystem({
           '2 OF 4 · BLOCK IT',
           this.controllers
             ? 'Hold the trigger on an actor and move it. Turn your wrist to turn it.'
-            : 'Pinch an actor and move it. Turn your wrist to turn it.',
+            : 'Reach in, pinch an actor and move it. Turn your wrist to turn it.',
         ];
       case Step.Frame:
         return [
           '3 OF 4 · FRAME IT',
           this.controllers
             ? 'Hold the trigger on the camera. Turn and tip your wrist to aim it.'
-            : 'Pinch the camera. Turn and tip your wrist to aim it.',
+            : 'Pick up the camera. Turn and tip your wrist to aim it.',
         ];
       case Step.Snap:
         return [
