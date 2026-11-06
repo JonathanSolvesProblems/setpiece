@@ -1,9 +1,11 @@
 /**
- * A held actor is alive. Lifted off the slate it hangs from the hand and swings
- * with it, kicks its legs and waves its arms, and goes quiet when it is set
- * down. It is all on the figure's own parts, so it never touches where the
- * piece stands or what a take records, and a setting on the panel turns it off.
- * Only actors do this: a camera in the hand stays a camera.
+ * A lay figure with some life in it. Lifted off the slate it hangs from the
+ * hand and swings with it, kicks its legs and waves its arms, and goes quiet
+ * when it is set down. Knocked over, it falls the way it was hit and lies
+ * there until a hand stands it up. It is all on the figure's own parts, so it
+ * never touches where the piece stands or what a take records. A setting on
+ * the panel turns the squirming off. Only actors do this: a camera in the hand
+ * stays a camera.
  */
 import { createSystem, Entity, Euler, Matrix4, Object3D, Quaternion, Vector3 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
@@ -22,6 +24,9 @@ const ARM_WAVE = 0.8;
 const ARM_SPLAY = 0.4;
 const HEAD_ROLL = 0.2;
 const REST = 0.01;
+/** Flat on its back, near enough. */
+const FALL_ANGLE = 1.47;
+const FALL_RATE = 9;
 const X = new Vector3(1, 0, 0);
 
 type Limb = { parts: Object3D[]; bases: Matrix4[]; pivot: Vector3; wave: number; phase: number; splay: number; axis: Vector3 };
@@ -39,6 +44,9 @@ type State = {
   swingZ: number;
   speedX: number;
   speedZ: number;
+  down: boolean;
+  fallen: number;
+  fallAxis: Vector3;
 };
 
 const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
@@ -98,34 +106,77 @@ export class SquirmSystem extends createSystem({
   private step = new Vector3();
   private push = new Vector3();
   private one = new Vector3(1, 1, 1);
+  private zero = new Vector3();
 
   init(): void {
     this.cleanupFuncs.push(
       this.queries.held.subscribe('qualify', (piece) => {
-        if (piece.getValue(SetPiece, 'role') !== SetRole.Actor) return;
-        if (!(this.globals as { squirmOn: Signal<boolean> }).squirmOn.peek() || piece.object3D == null) return;
-        let state = this.states.get(piece);
-        if (state == null) {
-          state = {
-            entity: piece,
-            rigs: [],
-            rig: null,
-            amount: 0,
-            clock: 0,
-            fresh: true,
-            last: new Vector3(),
-            velocity: new Vector3(),
-            swingX: 0,
-            swingZ: 0,
-            speedX: 0,
-            speedZ: 0,
-          };
-          this.states.set(piece, state);
-        }
-        state.fresh = true;
-        if (!this.moving.includes(state)) this.moving.push(state);
+        if (piece.getValue(SetPiece, 'role') !== SetRole.Actor || piece.object3D == null) return;
+        const state = this.states.get(piece);
+        // A hand on a fallen actor stands it up, whatever the setting.
+        if (state != null) state.down = false;
+        if (!this.squirms() && state == null) return;
+        const live = state ?? this.stateFor(piece);
+        live.fresh = true;
+        this.wake(live);
       }),
     );
+  }
+
+  private squirms(): boolean {
+    return (this.globals as { squirmOn: Signal<boolean> }).squirmOn.peek();
+  }
+
+  private stateFor(piece: Entity): State {
+    let state = this.states.get(piece);
+    if (state == null) {
+      state = {
+        entity: piece,
+        rigs: [],
+        rig: null,
+        amount: 0,
+        clock: 0,
+        fresh: true,
+        last: new Vector3(),
+        velocity: new Vector3(),
+        swingX: 0,
+        swingZ: 0,
+        speedX: 0,
+        speedZ: 0,
+        down: false,
+        fallen: 0,
+        fallAxis: new Vector3(1, 0, 0),
+      };
+      this.states.set(piece, state);
+    }
+    return state;
+  }
+
+  private wake(state: State): void {
+    if (!this.moving.includes(state)) this.moving.push(state);
+  }
+
+  /** Knock an actor over, away from what hit it. The direction is in the actor's own frame. */
+  knock(piece: Entity, x: number, z: number): boolean {
+    if (piece.object3D == null || piece.hasComponent(Held)) return false;
+    const state = this.stateFor(piece);
+    if (state.down) return false;
+    const length = Math.hypot(x, z);
+    if (length < 1e-4) return false;
+    state.down = true;
+    // Falling towards (x, z) is a turn about the level axis square to it.
+    state.fallAxis.set(z / length, 0, -x / length);
+    this.wake(state);
+    return true;
+  }
+
+  isDown(piece: Entity): boolean {
+    return this.states.get(piece)?.down === true;
+  }
+
+  /** Everyone back on their feet: the start of a take, a new board, a frame recalled. */
+  standAll(): void {
+    for (const state of this.states.values()) state.down = false;
   }
 
   update(delta: number): void {
@@ -167,17 +218,20 @@ export class SquirmSystem extends createSystem({
   private animate(state: State, delta: number): boolean {
     const object = state.entity.object3D;
     if (object == null) return false;
-    const wanted = state.entity.hasComponent(Held) && (this.globals as { squirmOn: Signal<boolean> }).squirmOn.peek();
+    const held = state.entity.hasComponent(Held);
+    const wanted = held && this.squirms();
     state.amount += ((wanted ? 1 : 0) - state.amount) * Math.min(1, delta * (wanted ? 12 : 8));
+    state.fallen += ((state.down ? 1 : 0) - state.fallen) * Math.min(1, delta * FALL_RATE);
     const rig = this.currentRig(state);
     if (rig !== state.rig) {
       if (state.rig != null) this.rest(state.rig);
       state.rig = rig;
     }
-    if (rig == null) return wanted;
-    if (!wanted && state.amount < REST) {
+    if (rig == null) return wanted || state.down;
+    if (!wanted && !state.down && state.amount < REST && state.fallen < REST) {
       this.rest(rig);
       state.swingX = state.swingZ = state.speedX = state.speedZ = 0;
+      state.amount = state.fallen = 0;
       return false;
     }
 
@@ -205,9 +259,13 @@ export class SquirmSystem extends createSystem({
     const clock = state.clock;
     const amount = state.amount;
 
-    // The whole figure hangs from where a hand would hold it.
+    // The whole figure hangs from where a hand would hold it, then lies down if it was knocked over.
     this.euler.set(amount * (state.swingX + IDLE_SWAY * Math.sin(clock * 0.31)), 0, amount * (state.swingZ + IDLE_SWAY * Math.cos(clock * 0.23)));
     this.about(rig.grip, this.euler, rig.pose.matrix, rig.base);
+    if (state.fallen > 0) {
+      this.spin.setFromAxisAngle(state.fallAxis, state.fallen * FALL_ANGLE);
+      rig.pose.matrix.premultiply(this.rotate.compose(this.zero, this.spin, this.one));
+    }
     rig.pose.matrixWorldNeedsUpdate = true;
 
     const energy = amount * (0.75 + 0.35 * speed);
@@ -221,8 +279,8 @@ export class SquirmSystem extends createSystem({
         limb.parts[p].matrixWorldNeedsUpdate = true;
       }
     }
-    const lifted = amount > 0.05;
-    for (let i = 0; i < rig.stand.length; i++) rig.stand[i].visible = !lifted;
+    const offStand = amount > 0.05 || state.fallen > 0.05;
+    for (let i = 0; i < rig.stand.length; i++) rig.stand[i].visible = !offStand;
     return true;
   }
 
@@ -231,7 +289,7 @@ export class SquirmSystem extends createSystem({
     this.spin.setFromEuler(rotation);
     this.there.makeTranslation(pivot.x, pivot.y, pivot.z);
     this.back.makeTranslation(-pivot.x, -pivot.y, -pivot.z);
-    this.rotate.compose(this.step.set(0, 0, 0), this.spin, this.one);
+    this.rotate.compose(this.zero, this.spin, this.one);
     this.matrix.multiplyMatrices(this.there, this.rotate);
     this.matrix.multiply(this.back);
     out.multiplyMatrices(this.matrix, base);

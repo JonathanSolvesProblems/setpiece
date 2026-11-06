@@ -64,7 +64,10 @@ export class LifeSizeSystem extends createSystem({
   private enter(): void {
     const g = this.globals as Globals;
     const stage = this.stage();
-    const cam = this.queries.cams.entities.values().next().value as Entity | undefined;
+    // Stand at the camera that is live.
+    const live = (g as unknown as { cameraOn?: { peek(): string } }).cameraOn?.peek();
+    let cam = this.queries.cams.entities.values().next().value as Entity | undefined;
+    for (const other of this.queries.cams.entities) if (String(other.getValue(SetPiece, 'label')) === live && other.object3D?.visible === true) cam = other;
     const object = stage?.object3D;
     const rig = cam?.object3D;
     if (object == null || rig == null || this.world.visibilityState.peek() === VisibilityState.NonImmersive) return;

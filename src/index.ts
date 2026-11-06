@@ -4,6 +4,7 @@ import type { Signal } from '@preact/signals-core';
 import projectOptions from 'virtual:iwsdk-project';
 import { CoachSystem } from './coach.js';
 import { ControlsSystem } from './controls.js';
+import { MarksSystem } from './marks.js';
 import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
@@ -11,9 +12,11 @@ import { SlateSystem } from './slate.js';
 import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
 import { LifeSizeSystem } from './life-size.js';
 import { TakeState, TakeSystem } from './take.js';
+import { ReactionsSystem } from './reactions.js';
 import { SquirmSystem } from './squirm.js';
+import { loadJson, StoreKey } from './store.js';
 import { TraySystem } from './tray.js';
-import { Rig } from './camera-formats.js';
+import { CAMERAS, Rig } from './camera-formats.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import type { Shot } from './viewfinder.js';
 
@@ -46,7 +49,15 @@ World.create(
   globals.trayOn = signal<string[]>([]);
   globals.effectsOn = signal(0);
   globals.poseRequested = signal(0);
-  globals.squirmOn = signal(true);
+  globals.squirmOn = signal(loadJson<{ squirm: boolean }>(StoreKey.Settings)?.squirm !== false);
+  globals.selectedPaint = signal(-1);
+  globals.cameraOn = signal<string>(CAMERAS[0]);
+  globals.selectedStyles = signal(false);
+  globals.paintPick = signal(-1);
+  globals.sizeRequested = signal(0);
+  globals.styleRequested = signal(0);
+  globals.trayDress = signal({ cast: {}, finish: {} });
+  globals.trayDressRestore = signal(null);
   globals.lookRequested = signal(0);
   globals.castLine = signal('');
   globals.lifeSize = signal(false);
@@ -76,6 +87,8 @@ World.create(
     .registerSystem(TraySystem, { priority: 15 })
     .registerSystem(LifeSizeSystem, { priority: 16 })
     .registerSystem(SquirmSystem, { priority: 17 })
+    .registerSystem(ReactionsSystem, { priority: 18 })
+    .registerSystem(MarksSystem, { priority: 19 })
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })

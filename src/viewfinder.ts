@@ -37,9 +37,11 @@ import {
   WebGLRenderTarget,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { assetByLabel } from './catalog.js';
+import type { Dress } from './tray.js';
 import { BRIEFS } from './briefs.js';
 import type { Measure, PieceInFrame } from './briefs.js';
-import { SENSORS } from './camera-formats.js';
+import { CAMERAS, SENSORS } from './camera-formats.js';
 import { CAMERA_TILT_LIMIT, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
@@ -64,7 +66,7 @@ const CARD_PIXELS = 2048;
 const PAPER = '#dcdccb';
 const PENCIL = '#87877d';
 /** An empty slot is unexposed: slate, with its number and what fills it in chalk. */
-const SLOT_EMPTY = '#3f4044';
+const SLOT_EMPTY = '#2a211c';
 const CHALK = '#f6f7ef';
 const CHALK_DUST = '#c7c7b7';
 const INK = '#1e232b';
@@ -123,6 +125,10 @@ export interface Setup {
   rig?: string;
   /** Which assets were on the set. */
   on?: string[];
+  /** How the actors and props were dressed: pose and look, paint, size and fitting. */
+  dress?: Dress;
+  /** Which camera the frame was taken on. */
+  cam?: string;
 }
 
 /** The board as it is kept between visits: the frames on the card and how many were ever taken. */
@@ -143,6 +149,9 @@ type Globals = {
   effectsOn: Signal<number>;
   trayOn: Signal<string[]>;
   trayRestore: Signal<string[] | null>;
+  trayDress: Signal<Dress>;
+  trayDressRestore: Signal<Dress | null>;
+  cameraOn: Signal<string>;
   briefIndex: Signal<number>;
   briefPrinted: Signal<number>;
   briefSkip: Signal<number>;
@@ -177,6 +186,9 @@ export class ViewfinderSystem extends createSystem({
   private lensCamera!: PerspectiveCamera;
   private monitor: Mesh | null = null;
   private cameraHead: Group | null = null;
+  /** Every camera on the scene with the head it tilts, by index. */
+  private rigs: Entity[] = [];
+  private rigHeads: Group[] = [];
   private backdrop: Mesh | null = null;
   private stageEntity: Entity | null = null;
   private tally: MeshStandardMaterial | null = null;
@@ -258,11 +270,10 @@ export class ViewfinderSystem extends createSystem({
           head.add(part);
         }
       }
-      head.add(this.lensCamera);
-      // Just in front of the lens barrel, so the rig's own body is never in frame.
-      this.lensCamera.position.set(0, 0.118 - HEAD_PIVOT_Y, -0.06);
-      this.lensCamera.rotation.set(0, 0, 0);
-      this.cameraHead = head;
+      this.rigs.push(entity);
+      this.rigHeads.push(head);
+      const live = String(entity.getValue(SetPiece, 'label')) === (this.globals as Globals).cameraOn.peek();
+      if (this.cameraHead == null || live) this.mount(entity);
     };
     this.queries.cams.entities.forEach(attach);
     this.cleanupFuncs.push(
@@ -275,6 +286,26 @@ export class ViewfinderSystem extends createSystem({
 
     const g = this.globals as Globals;
     this.cleanupFuncs.push(
+      // A cut: the lens goes to the other camera, with that camera's own lens on it.
+      g.cameraOn.subscribe((label) => {
+        let live: Entity | undefined;
+        for (let i = 0; i < this.rigs.length; i++) {
+          if (String(this.rigs[i].getValue(SetPiece, 'label')) === label && this.rigs[i].object3D?.visible === true) live = this.rigs[i];
+        }
+        if (live == null) {
+          if (label !== CAMERAS[0]) g.cameraOn.value = CAMERAS[0];
+          return;
+        }
+        if (live === this.shotCamera) return;
+        this.mount(live);
+        const mm = live.getValue(ShotCamera, 'lensMm') ?? 0;
+        if (mm > 0 && mm !== g.lensMm.peek()) g.lensMm.value = mm;
+        this.refresh();
+      }),
+      // The second camera was struck while it was live: the first takes over.
+      g.trayOn.subscribe(() => {
+        if (this.shotCamera?.object3D?.visible === false) g.cameraOn.value = CAMERAS[0];
+      }),
       g.lensMm.subscribe((mm) => this.setLens(mm)),
       g.snapRequested.subscribe((n) => {
         if (n > 0) this.snapPending = true;
@@ -496,6 +527,7 @@ export class ViewfinderSystem extends createSystem({
     if (setup == null || g.takeState.peek() !== 'idle') return false;
     if (setup.rig) g.cameraRig.value = setup.rig;
     if (setup.on) g.trayRestore.value = setup.on;
+    if (setup.dress) g.trayDressRestore.value = setup.dress;
     for (const piece of this.queries.pieces.entities) {
       const object = piece.object3D;
       const pose = setup.pieces[`${piece.getValue(SetPiece, 'role')}:${piece.getValue(SetPiece, 'label')}`];
@@ -503,10 +535,10 @@ export class ViewfinderSystem extends createSystem({
       object.position.fromArray(pose, 0);
       object.quaternion.fromArray(pose, 3);
     }
-    for (const cam of this.queries.cams.entities) {
-      cam.setValue(ShotCamera, 'tilt', setup.tilt);
-      cam.setValue(ShotCamera, 'aimed', setup.aimed);
-    }
+    g.cameraOn.value = setup.cam ?? CAMERAS[0];
+    const live = this.cameraEntity();
+    live?.setValue(ShotCamera, 'tilt', setup.tilt);
+    live?.setValue(ShotCamera, 'aimed', setup.aimed);
     g.lensMm.value = setup.lensMm;
     if (setup.sensor != null) g.sensorIndex.value = setup.sensor;
     this.recalledIndex = shot.index;
@@ -536,6 +568,8 @@ export class ViewfinderSystem extends createSystem({
       sensor: (this.globals as Globals).sensorIndex.peek(),
       rig: (this.globals as Globals).cameraRig.peek(),
       on: (this.globals as Globals).trayOn.peek(),
+      dress: (this.globals as Globals).trayDress.peek(),
+      cam: (this.globals as Globals).cameraOn.peek(),
     };
   }
 
@@ -832,11 +866,12 @@ export class ViewfinderSystem extends createSystem({
     if (g == null) return;
     g.font = '700 84px "Big Shoulders", "Arial Narrow", sans-serif';
     const width = Math.min(240, g.measureText(text).width + 56);
-    g.fillStyle = 'rgba(30, 35, 43, 0.86)';
+    g.fillStyle = 'rgba(27, 20, 17, 0.9)';
     g.beginPath();
     g.roundRect((256 - width) / 2, 8, width, 112, 10);
     g.fill();
-    g.fillStyle = '#f6f7ef';
+    // The tag is written in the performer's own tape colour.
+    g.fillStyle = assetByLabel(String(piece.getValue(SetPiece, 'label')))?.tape ?? '#f6f7ef';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(text, 128, 66);
@@ -854,16 +889,32 @@ export class ViewfinderSystem extends createSystem({
     object.add(tag);
   }
 
+  /** Put the lens on this camera: it is the live one now. */
+  private mount(entity: Entity): void {
+    const head = this.rigHeads[this.rigs.indexOf(entity)];
+    if (head == null) return;
+    head.add(this.lensCamera);
+    // Just in front of the lens barrel, so the rig's own body is never in frame.
+    this.lensCamera.position.set(0, 0.118 - HEAD_PIVOT_Y, -0.06);
+    this.lensCamera.rotation.set(0, 0, 0);
+    this.cameraHead = head;
+    this.shotCamera = entity;
+  }
+
   private setLens(mm: number): void {
     const sensor = SENSORS[(this.globals as Globals).sensorIndex.peek()] ?? SENSORS[0];
     this.lensCamera.fov = (2 * Math.atan(sensor.heightMm / (2 * mm)) * 180) / Math.PI;
     this.lensCamera.updateProjectionMatrix();
-    for (const cam of this.queries.cams.entities) cam.setValue(ShotCamera, 'lensMm', mm);
+    this.cameraEntity()?.setValue(ShotCamera, 'lensMm', mm);
   }
 
   update(_delta: number, time: number): void {
     const cam = this.cameraEntity();
     if (cam?.object3D == null || !this.ensureMonitor()) return;
+    // A camera that is not live still shows the tilt a hand gave it.
+    for (let i = 0; i < this.rigs.length; i++) {
+      if (this.rigs[i] !== cam && this.rigs[i].getValue(ShotCamera, 'aimed')) this.rigHeads[i].rotation.x = this.rigs[i].getValue(ShotCamera, 'tilt') ?? 0;
+    }
     // The tally blinks while a take records, as on a set.
     const recording = (this.globals as Globals).takeState.peek() === 'recording';
     if (recording !== this.tallyBlinking || recording) {
@@ -924,6 +975,7 @@ export class ViewfinderSystem extends createSystem({
   private signature(): number {
     let s = this.lensCamera.fov * 17.3;
     const cam = this.cameraEntity();
+    s += (cam?.index ?? 0) * 41.3;
     // A tilt by hand changes the picture; the camera's own aim follows the pieces, which are counted below.
     if (cam?.getValue(ShotCamera, 'aimed')) s += (cam.getValue(ShotCamera, 'tilt') ?? 0) * 31.7;
     const pieces = this.pieceList();

@@ -16,6 +16,7 @@
  */
 import { AudioSource, AudioUtils, createSystem, Entity, Quaternion } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { CAMERAS } from './camera-formats.js';
 import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
@@ -40,8 +41,9 @@ type Track = {
   /** Where the piece stood when the pass began. */
   start: Float32Array;
 };
-type SavedTake = { rate: number; length: number; tracks: Record<string, number[]>; rig?: string };
+type SavedTake = { rate: number; length: number; tracks: Record<string, number[]>; rig?: string; cuts?: number[] };
 type Globals = {
+  cameraOn: Signal<string>;
   takeState: Signal<string>;
   takeSeconds: Signal<number>;
   takeLength: Signal<number>;
@@ -58,6 +60,11 @@ export class TakeSystem extends createSystem({
   cams: { required: [ShotCamera, AudioSource] },
 }) {
   private tracks: Track[] = [];
+  /** Cuts between cameras, as pairs: the sample a cut lands on, then which camera. */
+  private cuts: number[] = [];
+  private passCuts: number[] = [];
+  private cameraBefore = '';
+  private aimed = new Map<Entity, boolean>();
   private trackedCount = -1;
   private state: string = TakeState.Idle;
   /** Samples in the take; zero when there is none. */
@@ -104,6 +111,10 @@ export class TakeSystem extends createSystem({
         if (n <= this.boardSeen) return;
         this.boardSeen = n;
         this.clear();
+      }),
+      g.cameraOn.subscribe((label) => {
+        if (this.state !== TakeState.Recording) return;
+        this.passCuts.push(Math.max(0, this.written), Math.max(0, CAMERAS.indexOf(label as (typeof CAMERAS)[number])));
       }),
     );
   }
@@ -196,13 +207,26 @@ export class TakeSystem extends createSystem({
 
   private borrowCamera(): void {
     if (this.aimedBefore != null) return;
-    for (const cam of this.queries.cams.entities) this.aimedBefore = cam.getValue(ShotCamera, 'aimed') === true;
+    this.aimedBefore = true;
+    this.cameraBefore = (this.globals as Globals).cameraOn.peek();
+    for (const cam of this.queries.cams.entities) this.aimed.set(cam, cam.getValue(ShotCamera, 'aimed') === true);
   }
 
   private returnCamera(): void {
     if (this.aimedBefore == null) return;
-    for (const cam of this.queries.cams.entities) cam.setValue(ShotCamera, 'aimed', this.aimedBefore);
+    for (const cam of this.queries.cams.entities) cam.setValue(ShotCamera, 'aimed', this.aimed.get(cam) === true);
     this.aimedBefore = null;
+    if (this.cameraBefore !== '') (this.globals as Globals).cameraOn.value = this.cameraBefore;
+  }
+
+  /** The camera that is live at this sample of the take, by the cuts recorded with it. */
+  private cutTo(sample: number): void {
+    if (this.cuts.length === 0) return;
+    let index = this.cuts[1];
+    for (let i = 0; i < this.cuts.length; i += 2) if (this.cuts[i] <= sample) index = this.cuts[i + 1];
+    const label = CAMERAS[index] ?? CAMERAS[0];
+    const g = this.globals as Globals;
+    if (g.cameraOn.peek() !== label) g.cameraOn.value = label;
   }
 
   private startRecording(): void {
@@ -212,6 +236,7 @@ export class TakeSystem extends createSystem({
     this.backToOne();
     this.time = 0;
     this.written = -1;
+    this.passCuts = [0, Math.max(0, CAMERAS.indexOf((this.globals as Globals).cameraOn.peek() as (typeof CAMERAS)[number]))];
     for (let i = 0; i < this.tracks.length; i++) {
       const track = this.tracks[i];
       track.touched = false;
@@ -263,6 +288,10 @@ export class TakeSystem extends createSystem({
     const written = this.written + 1;
     let any = false;
     for (let i = 0; i < this.tracks.length; i++) any = any || this.tracks[i].touched;
+    // A pass in which the camera was cut is a pass worth keeping, and its cuts replace the old ones.
+    const cut = this.passCuts.length > 2;
+    any = any || cut;
+    if (cut || this.cuts.length === 0) this.cuts = this.passCuts;
     if (this.length === 0) {
       if (!any || written < MIN_SAMPLES) {
         // Nothing was carried, or the pass was a slip: there is still no take.
@@ -271,6 +300,7 @@ export class TakeSystem extends createSystem({
           this.tracks[i].touched = false;
         }
         this.time = 0;
+        this.cuts = [];
         this.setSeconds();
         this.setState(TakeState.Idle);
         this.returnCamera();
@@ -316,6 +346,7 @@ export class TakeSystem extends createSystem({
     for (let i = 0; i < this.tracks.length; i++) {
       if (this.tracks[i].recorded) this.applyAt(this.tracks[i], this.time);
     }
+    this.cutTo(Math.floor(this.time * RATE));
     this.setSeconds();
   }
 
@@ -347,6 +378,7 @@ export class TakeSystem extends createSystem({
   private clear(): void {
     this.length = 0;
     this.rig = '';
+    this.cuts = [];
     this.returnCamera();
     this.time = 0;
     for (let i = 0; i < this.tracks.length; i++) {
@@ -369,12 +401,13 @@ export class TakeSystem extends createSystem({
       for (let i = 0; i < count; i++) values[i] = Math.round(track.data[i] * 1e4) / 1e4;
       tracks[track.key] = values;
     }
-    saveJson(StoreKey.Take, { rate: RATE, length: this.length, tracks, rig: this.rig } satisfies SavedTake);
+    saveJson(StoreKey.Take, { rate: RATE, length: this.length, tracks, rig: this.rig, cuts: this.cuts } satisfies SavedTake);
   }
 
   private restore(): void {
     const saved = loadJson<SavedTake>(StoreKey.Take);
     if (saved == null || saved.rate !== RATE) return;
+    this.cuts = Array.isArray(saved.cuts) && saved.cuts.length % 2 === 0 ? saved.cuts : [];
     const length = saved.length;
     if (!Number.isInteger(length) || length < MIN_SAMPLES || length > MAX_SAMPLES) return;
     let any = false;

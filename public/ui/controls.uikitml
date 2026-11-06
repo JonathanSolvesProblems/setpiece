@@ -1,6 +1,9 @@
 <!--
-  The slate panel: field labels in the stencil on the left, values on the right,
-  chalk on slate. Fonts ship with the app (OFL, see fonts/OFL.txt).
+  The panel is a blacked-out flag beside the set: stencil labels on the left,
+  values on the right. Anything that can be pressed is a block with an edge;
+  anything that only informs is plain chalk. Yellow means selected, red means
+  recording, and an actor's line is written in that actor's tape colour.
+  Fonts ship with the app (OFL, see fonts/OFL.txt).
 -->
 <style>
   @font-face { font-family: "Shoulders"; src: url("fonts/BigShoulders-Medium.ttf"); font-weight: 500; }
@@ -13,12 +16,14 @@
   .slate {
     flex-direction: column;
     width: 280px;
-    background-color: #3f4044;
-    border-radius: 2px;
+    background-color: #1b1411;
+    border-radius: 3px;
+    border-width: 2px;
+    border-color: #5a4b3d;
     padding-top: 14px;
     padding-bottom: 14px;
-    padding-left: 18px;
-    padding-right: 18px;
+    padding-left: 16px;
+    padding-right: 16px;
     gap: 8px;
   }
   .title {
@@ -28,7 +33,7 @@
     line-height: 34px;
     color: #f6f7ef;
   }
-  .rule { height: 2px; width: 100%; background-color: #6f6c6b; margin-top: 2px; margin-bottom: 2px; }
+  .rule { height: 2px; width: 100%; background-color: #5a4b3d; margin-top: 2px; margin-bottom: 2px; }
   .field { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
   .label {
     font-family: "Shoulders";
@@ -36,15 +41,7 @@
     font-size: 12px;
     line-height: 15px;
     color: #c7c7b7;
-    width: 72px;
-  }
-  .value {
-    font-family: "Grotesk";
-    font-weight: 500;
-    font-size: 14px;
-    line-height: 18px;
-    color: #f6f7ef;
-    flex-grow: 1;
+    width: 64px;
   }
   .status {
     font-family: "Grotesk";
@@ -55,37 +52,38 @@
     flex-grow: 1;
     padding-left: 8px;
     border-left-width: 3px;
-    border-color: #6f6c6b;
+    border-color: #5a4b3d;
   }
   .lenses { flex-direction: row; gap: 2px; flex-grow: 1; justify-content: flex-start; }
   .takes { flex-direction: row; gap: 4px; flex-grow: 1; justify-content: flex-start; }
-  .tabs { flex-direction: row; gap: 4px; width: 100%; justify-content: space-between; }
+  .tabs { flex-direction: row; gap: 3px; width: 100%; justify-content: space-between; }
   .tab {
     font-family: "Grotesk";
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 18px;
     color: #f6f7ef;
+    background-color: #2a211c;
     flex-grow: 1;
-    height: 34px;
+    height: 36px;
     justify-content: center;
     align-items: center;
-    border-bottom-width: 3px;
-    border-color: #6f6c6b;
+    border-radius: 2px;
     cursor: pointer;
   }
   .shelf {
     font-family: "Grotesk";
     font-weight: 600;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 16px;
-    color: #c7c7b7;
+    color: #f6f7ef;
+    background-color: #2a211c;
     flex-grow: 1;
-    height: 28px;
+    width: 80px;
+    height: 30px;
     justify-content: center;
     align-items: center;
-    border-bottom-width: 2px;
-    border-color: #3f4044;
+    border-radius: 2px;
     cursor: pointer;
   }
   .takebutton {
@@ -94,6 +92,7 @@
     font-size: 15px;
     line-height: 18px;
     color: #f6f7ef;
+    background-color: #2a211c;
     flex-grow: 1;
     flex-shrink: 0;
     min-height: 42px;
@@ -102,7 +101,7 @@
     justify-content: center;
     align-items: center;
     border-width: 2px;
-    border-color: #6f6c6b;
+    border-color: #5a4b3d;
     border-radius: 2px;
     cursor: pointer;
   }
@@ -113,12 +112,22 @@
     font-size: 14px;
     line-height: 18px;
     color: #f6f7ef;
-    width: 119px;
-    height: 32px;
+    background-color: #2a211c;
+    width: 121px;
+    height: 34px;
     justify-content: center;
     align-items: center;
     border-width: 2px;
-    border-color: #6f6c6b;
+    border-color: #5a4b3d;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .chips { flex-direction: row; gap: 4px; width: 100%; justify-content: space-between; }
+  .chip {
+    width: 27px;
+    height: 27px;
+    border-width: 2px;
+    border-color: #1b1411;
     border-radius: 2px;
     cursor: pointer;
   }
@@ -126,20 +135,19 @@
   .short { width: 38px; }
   .wide { width: 100%; }
   .strong { font-weight: 600; font-size: 15px; }
-  .stage-actions { flex-direction: row; gap: 6px; width: 100%; justify-content: flex-end; }
   .lens {
     font-family: "Shoulders";
     font-weight: 700;
     font-size: 17px;
     line-height: 20px;
     color: #f6f7ef;
-    width: 31px;
+    background-color: #2a211c;
+    width: 32px;
     height: 34px;
     justify-content: center;
     align-items: center;
     text-align: center;
-    border-bottom-width: 2px;
-    border-color: #3f4044;
+    border-radius: 2px;
     cursor: pointer;
   }
   .word {
@@ -148,13 +156,15 @@
     font-size: 14px;
     line-height: 18px;
     color: #f6f7ef;
+    background-color: #2a211c;
     height: 34px;
     justify-content: center;
     align-items: center;
-    padding-left: 10px;
-    padding-right: 10px;
-    border-bottom-width: 2px;
-    border-color: #6f6c6b;
+    padding-left: 9px;
+    padding-right: 9px;
+    border-width: 2px;
+    border-color: #5a4b3d;
+    border-radius: 2px;
     cursor: pointer;
   }
   .primary {
@@ -162,13 +172,12 @@
     font-weight: 600;
     font-size: 17px;
     line-height: 22px;
-    color: #1e232b;
+    color: #1b1411;
     background-color: #f6f7ef;
-    height: 44px;
+    height: 46px;
     justify-content: center;
     align-items: center;
     border-radius: 2px;
-    margin-top: 4px;
     text-align: center;
     cursor: pointer;
   }
@@ -183,22 +192,18 @@
 </style>
 <div id="panel-root" class="slate">
   <div id="panel-title" class="title">SETPIECE</div>
-  <div class="rule"></div>
   <div class="field">
-    <div class="label">STAGE</div>
+    <div class="label short">STAGE</div>
     <div id="stage-status" class="status">Floating. Not on your table yet.</div>
   </div>
-  <div class="stage-actions">
-    <div id="btn-find-table" class="word" style="display: none">Find my table</div>
-    <div id="btn-reset-stage" class="word">Reset stage</div>
-  </div>
   <div id="btn-snap" class="primary">Snap frame</div>
-  <div id="btn-life" class="takebutton">Stand in the shot</div>
+  <div id="btn-back" class="primary" style="display: none">Back to the table</div>
   <div class="tabs">
     <div id="tab-shoot" class="tab">Shoot</div>
     <div id="tab-camera" class="tab">Camera</div>
     <div id="tab-assets" class="tab">Assets</div>
     <div id="tab-briefs" class="tab">Briefs</div>
+    <div id="tab-stage" class="tab">Stage</div>
   </div>
   <div id="page-shoot" class="page">
     <div class="field">
@@ -213,26 +218,29 @@
       </div>
     </div>
     <div class="field">
-      <div class="label">TAKE</div>
+      <div class="label short">TAKE</div>
       <div class="takes">
         <div id="btn-record" class="takebutton">Record</div>
         <div id="btn-play" class="takebutton" style="display: none">Play</div>
       </div>
     </div>
     <div class="field">
-      <div class="label">EYELINE</div>
+      <div class="label short">CAM</div>
+      <div class="takes">
+        <div id="btn-cam-a" class="word">Cam A</div>
+        <div id="btn-cam-b" class="word">Add cam B</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="label short">EYES</div>
       <div id="eyeline-a" class="line">A: place the creature and an actor</div>
     </div>
     <div class="field">
-      <div class="label"> </div>
+      <div class="label short"> </div>
       <div id="eyeline-b" class="line"> </div>
     </div>
     <div class="field">
-      <div class="label">BOARD</div>
-      <div id="board-count" class="line">No frames yet</div>
-    </div>
-    <div class="field">
-      <div class="label"> </div>
+      <div id="board-count" class="line muted">No frames yet</div>
       <div id="btn-new-board" class="word">New board</div>
     </div>
   </div>
@@ -245,14 +253,22 @@
       <div class="label">RIG</div>
       <div id="btn-rig" class="word">Tripod</div>
     </div>
+    <div id="strike-row" class="field" style="display: none">
+      <div class="line muted">Second camera</div>
+      <div id="btn-strike-b" class="word">Strike cam B</div>
+    </div>
     <div class="line muted">Same lens, smaller format: a tighter picture. On the drone, carry the camera as high as you can reach, up to 11 m on the real set.</div>
   </div>
   <div id="page-assets" class="page" style="display: none">
     <div class="tabs">
       <div id="shelf-Cast" class="shelf">Cast</div>
+      <div id="shelf-Creatures" class="shelf">Creatures</div>
       <div id="shelf-Vehicles" class="shelf">Vehicles</div>
+    </div>
+    <div class="tabs">
       <div id="shelf-Effects" class="shelf">Effects</div>
       <div id="shelf-Set" class="shelf">Set</div>
+      <div id="shelf-Props" class="shelf">Props</div>
     </div>
     <div class="assetrow">
       <div id="asset-0" class="asset">-</div>
@@ -266,17 +282,37 @@
       <div id="asset-4" class="asset">-</div>
       <div id="asset-5" class="asset">-</div>
     </div>
+    <div class="assetrow">
+      <div id="asset-6" class="asset">-</div>
+      <div id="asset-7" class="asset">-</div>
+    </div>
+    <div id="shelf-pager" class="field" style="display: none">
+      <div id="shelf-page" class="line muted">1 of 2</div>
+      <div id="btn-more" class="word">More</div>
+    </div>
+    <div id="fx-note" class="line muted" style="display: none">Effects are stand-ins, not simulations.</div>
     <div class="rule"></div>
     <div class="field">
       <div class="label short">HELD</div>
-      <div id="cast-line" class="line">Pick up a piece to select it</div>
+      <div id="cast-line" class="line">Pick up a piece to change it</div>
     </div>
-    <div class="takes">
-      <div id="btn-remove" class="word" style="display: none">Remove</div>
+    <div id="paint-row" class="chips" style="display: none">
+      <div id="paint-0" class="chip" style="background-color: #8b8f94"></div>
+      <div id="paint-1" class="chip" style="background-color: #b3312a"></div>
+      <div id="paint-2" class="chip" style="background-color: #d9772b"></div>
+      <div id="paint-3" class="chip" style="background-color: #e3c23c"></div>
+      <div id="paint-4" class="chip" style="background-color: #3f7d4e"></div>
+      <div id="paint-5" class="chip" style="background-color: #2f5f9e"></div>
+      <div id="paint-6" class="chip" style="background-color: #e6e4da"></div>
+      <div id="paint-7" class="chip" style="background-color: #26282c"></div>
+    </div>
+    <div id="held-row" class="takes" style="display: none">
+      <div id="btn-size" class="word">Size</div>
+      <div id="btn-style" class="word" style="display: none">Fit</div>
       <div id="btn-pose" class="word" style="display: none">Pose</div>
       <div id="btn-look" class="word" style="display: none">Look</div>
+      <div id="btn-remove" class="word">Remove</div>
     </div>
-    <div class="line muted">Effects are stand-ins for placing a shot, not simulations.</div>
     <div class="field">
       <div id="assets-count" class="line muted">3 on the set</div>
       <div id="btn-clear-set" class="word">Clear set</div>
@@ -291,6 +327,26 @@
       <div class="label"> </div>
       <div id="btn-skip-brief" class="word">Next shot</div>
     </div>
+  </div>
+  <div id="page-stage" class="page" style="display: none">
+    <div class="field">
+      <div class="label short">TABLE</div>
+      <div class="takes">
+        <div id="btn-reset-stage" class="word">Reset stage</div>
+        <div id="btn-find-table" class="word" style="display: none">Find my table</div>
+      </div>
+    </div>
+    <div id="btn-life" class="takebutton">Stand in the shot</div>
+    <div class="line muted">The set at full size around you, seen from the camera. It takes two presses.</div>
+    <div class="field">
+      <div class="label short">ACTORS</div>
+      <div id="btn-squirm" class="word">Squirm when held: on</div>
+    </div>
+    <div id="voice-row" class="field" style="display: none">
+      <div class="label short">VOICE</div>
+      <div id="btn-voice" class="word">Say a scene</div>
+    </div>
+    <div id="voice-line" class="line muted" style="display: none"> </div>
   </div>
   <div class="rule"></div>
   <div id="xr-button" class="primary">Enter XR</div>

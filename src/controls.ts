@@ -12,11 +12,12 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { BRIEFS } from './briefs.js';
-import { ASSETS, assetTitle, SHELF_SLOTS, SHELVES } from './catalog.js';
+import { assetByLabel, ASSETS, assetTitle, PAINTS, SHELF_SLOTS, SHELVES } from './catalog.js';
 import type { Shelf } from './catalog.js';
-import { LENSES, Rig, SENSORS } from './camera-formats.js';
+import { CAMERAS, LENSES, Rig, SENSORS } from './camera-formats.js';
 import { StageStatus } from './placement.js';
 import { SetPiece, StageAnchor } from './set-components.js';
+import { saveJson, StoreKey } from './store.js';
 
 /**
  * Where the panel sits relative to the stage, as the scene authors it: left of
@@ -40,10 +41,12 @@ const PANEL_YAW = (34 * Math.PI) / 180;
 const UP = new Vector3(0, 1, 0);
 
 const BOARD_SLOTS = 6;
-// Optic yellow marks the selected lens and a stage that is good to go (charter law 7).
+// Yellow is what is selected or good to go; nothing is yellow for decoration.
 const OPTIC_YELLOW = '#d6e13c';
-const SLATE = '#3f4044';
-const CHALK_HAZE = '#6f6c6b';
+/** The flag's black cloth, a block that can be pressed, and the edge of one. */
+const CLOTH = '#1b1411';
+const BLOCK = '#2a211c';
+const CHALK_HAZE = '#5a4b3d';
 const PLACED_STATUSES = new Set<string>([
   StageStatus.Table,
   StageStatus.Touch,
@@ -73,8 +76,15 @@ type Globals = {
   removeSelected: Signal<number>;
   clearSet: Signal<number>;
   selectedIsActor: Signal<boolean>;
+  selectedPaint: Signal<number>;
+  selectedStyles: Signal<boolean>;
   poseRequested: Signal<number>;
   lookRequested: Signal<number>;
+  paintPick: Signal<number>;
+  sizeRequested: Signal<number>;
+  styleRequested: Signal<number>;
+  squirmOn: Signal<boolean>;
+  cameraOn: Signal<string>;
   castLine: Signal<string>;
   sensorIndex: Signal<number>;
   cameraRig: Signal<string>;
@@ -82,7 +92,7 @@ type Globals = {
   briefPrinted: Signal<number>;
   briefSkip: Signal<number>;
 };
-const TABS = ['shoot', 'camera', 'assets', 'briefs'] as const;
+const TABS = ['shoot', 'camera', 'assets', 'briefs', 'stage'] as const;
 /** The tally's red: the record button wears it while a take is being recorded. */
 const TALLY_RED = '#e0352b';
 const CHALK = '#f6f7ef';
@@ -203,7 +213,8 @@ export class ControlsSystem extends createSystem({
       g.lensMm.subscribe((mm) => {
         for (const l of LENSES) {
           panel.getElementById(`lens-${l}`)?.setProperties({
-            borderColor: l === mm ? OPTIC_YELLOW : SLATE,
+            backgroundColor: l === mm ? OPTIC_YELLOW : BLOCK,
+            color: l === mm ? CLOTH : CHALK,
           });
         }
       }),
@@ -254,7 +265,10 @@ export class ControlsSystem extends createSystem({
     const showTab = (tab: string): void => {
       for (const name of TABS) {
         panel.getElementById(`page-${name}`)?.setProperties({ display: name === tab ? 'flex' : 'none' });
-        panel.getElementById(`tab-${name}`)?.setProperties({ borderColor: name === tab ? OPTIC_YELLOW : CHALK_HAZE });
+        panel.getElementById(`tab-${name}`)?.setProperties({
+          backgroundColor: name === tab ? OPTIC_YELLOW : BLOCK,
+          color: name === tab ? CLOTH : CHALK,
+        });
       }
     };
     for (const name of TABS) wire(`tab-${name}`, () => showTab(name));
@@ -281,12 +295,27 @@ export class ControlsSystem extends createSystem({
       disarmLife();
       g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
     });
+    // At full size the way back is the one big button, whichever tab is showing.
+    wire('btn-back', () => {
+      if (g.lifeSize.peek()) g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
+    });
     this.cleanupFuncs.push(
       g.lifeSize.subscribe((on) => {
         life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         // A frame needs the slate under the actors, and the slate is back on the table.
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
+        panel.getElementById('btn-back')?.setProperties({ display: on ? 'flex' : 'none' });
         panel.getElementById('btn-reset-stage')?.setProperties({ display: on ? 'none' : 'flex' });
+      }),
+    );
+    const squirm = panel.getElementById<UIKit.Text>('btn-squirm');
+    wire('btn-squirm', () => {
+      g.squirmOn.value = !g.squirmOn.peek();
+    });
+    this.cleanupFuncs.push(
+      g.squirmOn.subscribe((on) => {
+        squirm?.setProperties({ text: on ? 'Squirm when held: on' : 'Squirm when held: off', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        saveJson(StoreKey.Settings, { squirm: on });
       }),
     );
 
@@ -304,37 +333,90 @@ export class ControlsSystem extends createSystem({
       g.cameraRig.subscribe((value) => rig?.setProperties({ text: value === Rig.Drone ? 'Drone' : 'Tripod' })),
     );
 
+    // Two cameras, one live. Pressing the other is a cut, and a take that is recording keeps it.
+    wire('btn-cam-a', () => {
+      g.cameraOn.value = CAMERAS[0];
+    });
+    wire('btn-cam-b', () => {
+      if (!g.trayOn.peek().includes(CAMERAS[1])) g.trayToggle.value = CAMERAS[1];
+      g.cameraOn.value = CAMERAS[1];
+    });
+    wire('btn-strike-b', () => {
+      if (g.trayOn.peek().includes(CAMERAS[1])) g.trayToggle.value = CAMERAS[1];
+    });
+    const showCameras = (): void => {
+      const second = g.trayOn.peek().includes(CAMERAS[1]);
+      const live = g.cameraOn.peek();
+      panel.getElementById('btn-cam-a')?.setProperties({
+        backgroundColor: live === CAMERAS[0] ? OPTIC_YELLOW : BLOCK,
+        color: live === CAMERAS[0] ? CLOTH : CHALK,
+      });
+      panel.getElementById<UIKit.Text>('btn-cam-b')?.setProperties({
+        text: second ? 'Cam B' : 'Add cam B',
+        backgroundColor: live === CAMERAS[1] ? OPTIC_YELLOW : BLOCK,
+        color: live === CAMERAS[1] ? CLOTH : CHALK,
+      });
+      panel.getElementById('strike-row')?.setProperties({ display: second ? 'flex' : 'none' });
+    };
+    this.cleanupFuncs.push(g.cameraOn.subscribe(showCameras), g.trayOn.subscribe(showCameras));
+
     // The asset library: one shelf shows; a slot adds its item, or takes it off the set.
     let shelf: Shelf = 'Cast';
+    let page = 0;
     const onShelf = (): typeof ASSETS => ASSETS.filter((asset) => asset.shelf === shelf);
     const showShelf = (): void => {
-      const items = onShelf();
+      const all = onShelf();
+      const pages = Math.max(1, Math.ceil(all.length / SHELF_SLOTS));
+      if (page >= pages) page = 0;
       const on = g.trayOn.peek();
       for (const name of SHELVES) {
-        panel.getElementById(`shelf-${name}`)?.setProperties({ borderColor: name === shelf ? OPTIC_YELLOW : SLATE });
+        panel.getElementById(`shelf-${name}`)?.setProperties({
+          backgroundColor: name === shelf ? OPTIC_YELLOW : BLOCK,
+          color: name === shelf ? CLOTH : CHALK,
+        });
       }
       for (let i = 0; i < SHELF_SLOTS; i++) {
-        const item = items[i];
+        const item = all[page * SHELF_SLOTS + i];
         panel.getElementById<UIKit.Text>(`asset-${i}`)?.setProperties({
           display: item ? 'flex' : 'none',
           text: item ? assetTitle(item.label) : '',
           borderColor: item && on.includes(item.label) ? OPTIC_YELLOW : CHALK_HAZE,
         });
       }
-      panel.getElementById<UIKit.Text>('assets-count')?.setProperties({ text: `${on.length} on the set` });
+      panel.getElementById('shelf-pager')?.setProperties({ display: pages > 1 ? 'flex' : 'none' });
+      panel.getElementById<UIKit.Text>('shelf-page')?.setProperties({ text: `${shelf}, ${page + 1} of ${pages}` });
+      panel.getElementById('fx-note')?.setProperties({ display: shelf === 'Effects' ? 'flex' : 'none' });
+      const dressing = on.filter((label) => assetByLabel(label)?.shelf !== 'Kit').length;
+      panel.getElementById<UIKit.Text>('assets-count')?.setProperties({ text: `${dressing} on the set` });
     };
     for (const name of SHELVES) {
       wire(`shelf-${name}`, () => {
         shelf = name;
+        page = 0;
         showShelf();
       });
     }
+    wire('btn-more', () => {
+      page += 1;
+      showShelf();
+    });
     for (let i = 0; i < SHELF_SLOTS; i++) {
       wire(`asset-${i}`, () => {
-        const item = onShelf()[i];
+        const item = onShelf()[page * SHELF_SLOTS + i];
         if (item) g.trayToggle.value = item.label;
       });
     }
+    for (let i = 0; i < PAINTS.length; i++) {
+      wire(`paint-${i}`, () => {
+        g.paintPick.value = i;
+      });
+    }
+    wire('btn-size', () => {
+      g.sizeRequested.value = g.sizeRequested.peek() + 1;
+    });
+    wire('btn-style', () => {
+      g.styleRequested.value = g.styleRequested.peek() + 1;
+    });
     wire('btn-remove', () => {
       g.removeSelected.value = g.removeSelected.peek() + 1;
     });
@@ -352,8 +434,17 @@ export class ControlsSystem extends createSystem({
       g.trayOn.subscribe(showShelf),
       g.castLine.subscribe((line) => {
         const selected = line !== '';
-        cast?.setProperties({ text: selected ? line : 'Pick up a piece to select it' });
-        panel.getElementById('btn-remove')?.setProperties({ display: selected ? 'flex' : 'none' });
+        cast?.setProperties({ text: selected ? line : 'Pick up a piece to change it' });
+        panel.getElementById('held-row')?.setProperties({ display: selected ? 'flex' : 'none' });
+      }),
+      g.selectedPaint.subscribe((paint) => {
+        panel.getElementById('paint-row')?.setProperties({ display: paint >= 0 ? 'flex' : 'none' });
+        for (let i = 0; i < PAINTS.length; i++) {
+          panel.getElementById(`paint-${i}`)?.setProperties({ borderColor: i === paint ? CHALK : CLOTH });
+        }
+      }),
+      g.selectedStyles.subscribe((has) => {
+        panel.getElementById('btn-style')?.setProperties({ display: has ? 'flex' : 'none' });
       }),
       g.selectedIsActor.subscribe((actor) => {
         panel.getElementById('btn-pose')?.setProperties({ display: actor ? 'flex' : 'none' });
@@ -397,6 +488,7 @@ export class ControlsSystem extends createSystem({
       record?.setProperties({
         text: recording ? 'Stop' : has ? 'Record over' : 'Record',
         borderColor: recording ? TALLY_RED : CHALK_HAZE,
+        backgroundColor: recording ? TALLY_RED : BLOCK,
       });
       play?.setProperties({
         display: has && !recording ? 'flex' : 'none',
@@ -424,8 +516,10 @@ export class ControlsSystem extends createSystem({
     const boardCount = panel.getElementById<UIKit.Text>('board-count');
     this.cleanupFuncs.push(
       g.eyelineText.subscribe((lines) => {
-        eyeA?.setProperties({ text: lines[0] ?? 'A: place the creature and an actor' });
-        eyeB?.setProperties({ text: lines[1] ?? '' });
+        // Each actor's line is written in the colour of their own tape.
+        const tape = (line: string | undefined): string => assetByLabel(line?.split(':')[0] ?? '')?.tape ?? CHALK;
+        eyeA?.setProperties({ text: lines[0] ?? 'Put the ball and an actor on the set', color: lines[0] ? tape(lines[0]) : CHALK });
+        eyeB?.setProperties({ text: lines[1] ?? '', color: tape(lines[1]) });
       }),
       // The card under the monitor is the shot list; the panel only keeps count.
       g.shotList.subscribe((lines) => {

@@ -37,7 +37,7 @@ type Aim = {
 };
 
 const OPTIC_YELLOW = 0xd6e13c;
-const SLATE = '#3f4044';
+const SLATE = '#1b1411';
 const CHALK = '#f6f7ef';
 const STENCIL = '"Big Shoulders Stencil"';
 const SIGN_W = 1024;

@@ -75,5 +75,27 @@
   },
   "signature_device": "the clapper stripe: a bar of alternating slate and chalk diagonals at 45 degrees, worn at the ends; once per screen, across the top of the slate frame on the page (hanging past its left edge) and along the front edge of the stage in the headset",
   "texture": "chalk haze: feTurbulence at low opacity on slate surfaces; a small tiled chalk-dust image on the stage plate",
-  "notes": "Passthrough means the headset has no canvas; everything must read against a real room, so the slate plate and the monitor bezel carry the slate colour and the panel is slate with chalk text. The lay figures are the only warm objects. Dark is default because the material is slate; paper is the light theme on the 2D page only. Round 4 critique moved body copy and panel values to Schibsted Grotesk: the condensed family at reading size read as a poster. Round 6 critique turned the viewport's frame into the slate (stripe on top, fields on the face), moved the controls out of the viewport onto the page, and lit the set with a key light and shadows."
+  "notes": "Passthrough means the headset has no canvas; everything must read against a real room, so the slate plate and the monitor bezel carry the slate colour and the panel is slate with chalk text. The lay figures are the only warm objects. Dark is default because the material is slate; paper is the light theme on the 2D page only. Round 4 critique moved body copy and panel values to Schibsted Grotesk: the condensed family at reading size read as a poster. Round 6 critique turned the viewport's frame into the slate (stripe on top, fields on the face), moved the controls out of the viewport onto the page, and lit the set with a key light and shadows.",
+  "second_pass": {
+    "date": "2026-11-05",
+    "family": "luminous-emissive",
+    "metaphor": "the marks are down: a stage with the work lights off, each performer's mark in their own colour of fluorescent spike tape, the live camera's frame lines on the floor, controls on a blacked-out flag",
+    "expressive_axis": "colour as light, each colour owned by one performer",
+    "canvas_hex": "#1b1411",
+    "accent_hex": "#d6e13c (selected) with four owned tape colours #e49a4f #5ca0cb #e8719f #6cc47c",
+    "signature_motion": "a mark dims and waits while its actor is carried, then follows to the new spot",
+    "tokens": {
+      "cloth": "#1b1411",
+      "block": "#2a211c",
+      "seam": "#5a4b3d",
+      "chalk": "#f6f7ef",
+      "chalk_dust": "#c7c7b7",
+      "tape_a": "#e49a4f",
+      "tape_b": "#5ca0cb",
+      "tape_c": "#e8719f",
+      "tape_d": "#6cc47c",
+      "selected": "#d6e13c",
+      "recording": "#e0352b"
+    }
+  }
 }

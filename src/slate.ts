@@ -10,10 +10,10 @@ import { SetPiece, SetRole } from './set-components.js';
 
 const W = 1400;
 const H = 200;
-const SLATE = '#3f4044';
+const SLATE = '#1b1411';
 const CHALK = '#f6f7ef';
 const CHALK_DUST = '#c7c7b7';
-const CHALK_HAZE = '#6f6c6b';
+const CHALK_HAZE = '#5a4b3d';
 const STENCIL = '"Big Shoulders Stencil"';
 const TEXT = '"Big Shoulders"';
 

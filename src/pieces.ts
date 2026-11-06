@@ -22,7 +22,6 @@ import {
   GrabSystem,
   Hovered,
   InputComponent,
-  Matrix4,
   Mesh,
   MeshBasicMaterial,
   Object3D,
@@ -32,6 +31,7 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { localBounds } from './bounds.js';
 import { assetByLabel } from './catalog.js';
 import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
@@ -79,13 +79,18 @@ const OPTIC_YELLOW = 0xd6e13c;
 /** How close a hand has to be to a piece to take it, and how far it has to go to stop being near. */
 const REACH = 0.035;
 const REACH_RELEASE = 0.06;
+const THIN_REACH = 0.045;
 /** Hand tracking drops out for a moment when fingers close: a held piece waits this long for it. */
 const LOST_HAND_SECONDS = 0.5;
 const HAND_SMOOTHING = 45;
 /** A piece let go above the slate falls to it. */
 const FALL = 5;
 const FALL_FROM = 0.015;
+/** Let go this far below the top of something, a piece goes beside or inside it, not onto it. */
+const STACK_SLACK = 0.03;
 const NO_RAYCAST = (): void => {};
+/** The camera whose tilt is kept between visits. */
+const FIRST_CAMERA = 'camera:Camera';
 
 /** Position then quaternion, in the stage's own space. */
 type Pose = number[];
@@ -93,7 +98,7 @@ type SavedPieces = Record<string, Pose>;
 type Side = 'left' | 'right';
 const SIDES: Side[] = ['left', 'right'];
 type Carry = { piece: Entity; by: 'pinch' | 'fist' | 'pad'; offset: Vector3; at: Vector3; lost: number };
-type Drop = { piece: Entity; speed: number };
+type Drop = { piece: Entity; speed: number; floor: number };
 type Globals = {
   newBoardRequested: Signal<number>;
   coachTarget: Signal<string>;
@@ -137,6 +142,8 @@ export class PiecesSystem extends createSystem({
   private rigTurn = new Quaternion();
   /** The space each piece fills, in its own frame, by index with `dressed`. */
   private bounds: Box3[] = [];
+  /** The shape of each piece that others can be set down on, by index; null for the rest. */
+  private solids: (Box3 | null)[] = [];
   private readings: Record<Side, HandReading> = { left: new HandReading(), right: new HandReading() };
   private carrying: Record<Side, Carry | null> = { left: null, right: null };
   /** The piece each hand is on, by index, or -1. */
@@ -168,7 +175,10 @@ export class PiecesSystem extends createSystem({
         if (this.ignored.delete(piece)) return;
         if (this.sideCarrying(piece) == null && piece.hasComponent(Held)) piece.removeComponent(Held);
       }),
-      this.queries.held.subscribe('qualify', (piece) => this.knock(Cue.Pick, piece)),
+      this.queries.held.subscribe('qualify', (piece) => {
+        this.knock(Cue.Pick, piece);
+        this.dropRiders(piece);
+      }),
       // The grab writes the piece's pose once more as it lets go, so settle on the next update.
       this.queries.held.subscribe('disqualify', (piece) => this.released.push(piece)),
       g.newBoardRequested.subscribe((n) => {
@@ -351,8 +361,8 @@ export class PiecesSystem extends createSystem({
       }
       drop.speed += FALL * delta;
       object.position.y -= drop.speed * delta;
-      if (object.position.y > 0) continue;
-      object.position.y = 0;
+      if (object.position.y > drop.floor) continue;
+      object.position.y = drop.floor;
       this.knock(Cue.Place, drop.piece);
       this.drops.splice(i, 1);
       if (this.drops.length === 0) this.save();
@@ -415,11 +425,23 @@ export class PiecesSystem extends createSystem({
       assetByLabel(String(piece.getValue(SetPiece, 'label')))?.grab ?? GRAB_VOLUME[piece.getValue(SetPiece, 'role') as string];
     if (size == null) return;
     const [radius, height] = size;
-    this.bounds.push(this.boundsOf(object, radius, height));
+    const shape = localBounds(object);
+    this.solids.push(assetByLabel(String(piece.getValue(SetPiece, 'label')))?.solid === true ? shape.clone() : null);
+    // A thin piece gets room around it for the hand; a big one is its own shape, so a hand
+    // passing near a car does not count as a hand on the car.
+    const room = shape.isEmpty() ? radius : Math.min(radius, THIN_REACH);
+    shape.expandByPoint(this.local.set(room, height, room));
+    shape.expandByPoint(this.local.set(-room, 0, -room));
+    this.bounds.push(shape);
     const volume = new Mesh(new CylinderGeometry(radius, radius, height, 14, 1), this.volumeMaterial);
     volume.name = 'GrabVolume';
     volume.position.y = height / 2;
-    const ring = new Mesh(new RingGeometry(radius * 0.9, radius * 1.1, 40), this.ringMaterial);
+    // An actor's ring is in their own tape colour; everything else is marked in yellow.
+    const tape = assetByLabel(String(piece.getValue(SetPiece, 'label')))?.tape;
+    const ring = new Mesh(
+      new RingGeometry(radius * 0.9, radius * 1.1, 40),
+      tape ? new MeshBasicMaterial({ color: tape, toneMapped: false }) : this.ringMaterial,
+    );
     ring.name = 'HoverRing';
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.0045;
@@ -432,23 +454,40 @@ export class PiecesSystem extends createSystem({
     this.turns.push(new HandTurn());
   }
 
-  /** The piece's own shape, and the grab zone around it, in the piece's frame. */
-  private boundsOf(object: Object3D, radius: number, height: number): Box3 {
-    const box = new Box3();
-    const part = new Box3();
-    const toPiece = new Matrix4();
-    object.updateWorldMatrix(true, true);
-    const inverse = object.matrixWorld.clone().invert();
-    object.traverse((child) => {
-      if (!(child instanceof Mesh) || child.name === 'EffectParticles') return;
-      const geometry = child.geometry;
-      if (geometry.boundingBox == null) geometry.computeBoundingBox();
-      if (geometry.boundingBox == null) return;
-      box.union(part.copy(geometry.boundingBox).applyMatrix4(toPiece.multiplyMatrices(inverse, child.matrixWorld)));
-    });
-    box.expandByPoint(this.local.set(radius, height, radius));
-    box.expandByPoint(this.local.set(-radius, 0, -radius));
-    return box;
+  /**
+   * What this piece would come to rest on if it were let go here: the top of
+   * a car, a crate, a wall under it, or the slate. Things rest on things.
+   */
+  private supportUnder(index: number): number {
+    const object = this.dressed[index]?.object3D;
+    if (object == null) return 0;
+    let top = 0;
+    object.getWorldPosition(this.point);
+    for (let j = 0; j < this.dressed.length; j++) {
+      const box = this.solids[j];
+      if (box == null || j === index) continue;
+      const other = this.dressed[j].object3D;
+      if (other == null || !other.visible || other.parent !== object.parent || this.dressed[j].hasComponent(Held)) continue;
+      other.worldToLocal(this.local.copy(this.point));
+      if (this.local.x < box.min.x || this.local.x > box.max.x || this.local.z < box.min.z || this.local.z > box.max.z) continue;
+      const height = other.position.y + box.max.y * other.scale.y;
+      if (object.position.y < height - STACK_SLACK) continue;
+      if (height > top) top = height;
+    }
+    return top;
+  }
+
+  /** Something was lifted: whatever was standing on it comes down. */
+  private dropRiders(lifted: Entity): void {
+    if (this.solids[this.dressed.indexOf(lifted)] == null) return;
+    for (let i = 0; i < this.dressed.length; i++) {
+      const piece = this.dressed[i];
+      const object = piece.object3D;
+      if (object == null || piece === lifted || piece.hasComponent(Held) || piece.hasComponent(ShotCamera)) continue;
+      if (object.position.y <= FALL_FROM) continue;
+      const floor = this.supportUnder(i);
+      if (object.position.y > floor + FALL_FROM) this.drops.push({ piece, speed: 0, floor });
+    }
   }
 
   private key(piece: Entity): string {
@@ -475,7 +514,7 @@ export class PiecesSystem extends createSystem({
       this.authored.set(key, [...object.position.toArray(), ...(object.quaternion.toArray() as number[])]);
       const pose = saved?.[key];
       if (isPose(pose)) this.apply(piece, pose);
-      if (piece.hasComponent(ShotCamera)) {
+      if (this.key(piece) === FIRST_CAMERA) {
         const camera = loadJson<{ tilt: number; aimed: boolean }>(StoreKey.Camera);
         if (camera?.aimed === true && Number.isFinite(camera.tilt)) {
           piece.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, camera.tilt)));
@@ -506,17 +545,20 @@ export class PiecesSystem extends createSystem({
     object.quaternion.copy(this.upright.setFromAxisAngle(UP, Math.atan2(this.forward.x, this.forward.z)));
     if (piece.getValue(SetPiece, 'role') === SetRole.Camera) {
       const y = object.position.y;
-      if ((this.globals as Globals).cameraRig.peek() === 'drone') {
+      if ((this.globals as Globals).cameraRig.peek() === 'drone' && this.key(piece) === FIRST_CAMERA) {
         object.position.y = Math.max(DRONE_MIN_HEIGHT, Math.min(y, DRONE_MAX_HEIGHT));
       } else {
         object.position.y = y < CAMERA_FLOOR_SNAP ? 0 : Math.min(y, CAMERA_MAX_HEIGHT);
       }
       this.knock(Cue.Place, piece);
-    } else if (object.position.y > FALL_FROM) {
-      this.drops.push({ piece, speed: 0 });
     } else {
-      object.position.y = 0;
-      this.knock(Cue.Place, piece);
+      const floor = this.supportUnder(this.dressed.indexOf(piece));
+      if (object.position.y > floor + FALL_FROM) {
+        this.drops.push({ piece, speed: 0, floor });
+      } else {
+        object.position.y = floor;
+        this.knock(Cue.Place, piece);
+      }
     }
   }
 
@@ -538,7 +580,7 @@ export class PiecesSystem extends createSystem({
       const object = piece.object3D;
       if (object == null || this.isStage(piece)) continue;
       poses[this.key(piece)] = [...object.position.toArray(), ...(object.quaternion.toArray() as number[])];
-      if (piece.hasComponent(ShotCamera)) {
+      if (this.key(piece) === FIRST_CAMERA) {
         saveJson(StoreKey.Camera, {
           tilt: piece.getValue(ShotCamera, 'tilt') ?? 0,
           aimed: piece.getValue(ShotCamera, 'aimed') === true,

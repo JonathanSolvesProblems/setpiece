@@ -23,8 +23,8 @@ export const STAGE_DEPTH = 0.4;
 export const STAGE_THICKNESS = 0.012;
 export const STRIP_DEPTH = 0.08;
 
-const slate = new MeshStandardMaterial({ color: 0x3f4044, roughness: 0.95 });
-const slateShadow = new MeshStandardMaterial({ color: 0x1e232b, roughness: 0.92 });
+const slate = new MeshStandardMaterial({ color: 0x2a211c, roughness: 0.95 });
+const slateShadow = new MeshStandardMaterial({ color: 0x14100d, roughness: 0.92 });
 const chalk = new MeshStandardMaterial({ color: 0xf6f7ef, roughness: 0.9 });
 const chrome = new MeshStandardMaterial({ color: 0xc5c5c5, roughness: 0.35, metalness: 0.8 });
 const tallyRed = new MeshStandardMaterial({ color: 0xe0352b, emissive: 0xe0352b, emissiveIntensity: 1.2 });

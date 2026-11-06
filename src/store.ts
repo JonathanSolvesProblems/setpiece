@@ -13,6 +13,7 @@ export const StoreKey = {
   Take: 'setpiece.take.v1',
   Camera: 'setpiece.camera.v1',
   Tray: 'setpiece.tray.v2',
+  Settings: 'setpiece.settings.v1',
   Briefs: 'setpiece.briefs.v1',
 } as const;
 

@@ -11,4 +11,6 @@ export const SENSORS = [
 ] as const;
 
 export const Rig = { Tripod: 'tripod', Drone: 'drone' } as const;
+/** The cameras by their labels on the set: the first is always there, the second is added from the panel. */
+export const CAMERAS = ['Camera', 'Camera B'] as const;
 export const LENSES = [18, 24, 35, 50, 85, 135] as const;

@@ -39,6 +39,8 @@ uniform float uRadius;
 uniform float uHeight;
 uniform vec2 uSize;
 uniform float uBurst;
+uniform float uGrow;
+uniform float uWet;
 attribute vec4 aSeed;
 varying float vLife;
 varying vec2 vUv;
@@ -55,9 +57,9 @@ void main() {
   } else {
     float sway = sin(uTime * 3.0 + aSeed.x * 7.0) * 0.012 * life;
     float spread = uRadius * aSeed.y * (0.4 + life);
-    centre = vec3(cos(aSeed.x) * spread + sway, uHeight * life, sin(aSeed.x) * spread);
+    centre = vec3(cos(aSeed.x) * spread + sway, uHeight * life * mix(1.0, 0.55, uWet), sin(aSeed.x) * spread);
   }
-  float size = mix(uSize.x, uSize.y, life);
+  float size = mix(uSize.x, uSize.y, life) * uGrow * mix(1.0, 0.7, uWet);
   vec4 view = modelViewMatrix * vec4(centre, 1.0);
   view.xy += position.xy * size;
   gl_Position = projectionMatrix * view;
@@ -70,6 +72,7 @@ uniform vec3 uLow;
 uniform vec3 uMid;
 uniform vec3 uHigh;
 uniform float uAlpha;
+uniform float uWet;
 varying float vLife;
 varying vec2 vUv;
 void main() {
@@ -77,7 +80,9 @@ void main() {
   float soft = smoothstep(1.0, 0.1, d);
   vec3 colour = vLife < 0.5 ? mix(uLow, uMid, vLife * 2.0) : mix(uMid, uHigh, vLife * 2.0 - 1.0);
   float fade = smoothstep(0.0, 0.12, vLife) * (1.0 - smoothstep(0.55, 1.0, vLife));
-  gl_FragColor = vec4(colour, soft * fade * uAlpha);
+  // Put out, a fire is a wisp of steam.
+  colour = mix(colour, vec3(0.5, 0.52, 0.54), uWet);
+  gl_FragColor = vec4(colour, soft * fade * uAlpha * mix(1.0, 0.3, uWet));
 }`;
 
 function effect(spec: Spec): Mesh {
@@ -116,6 +121,8 @@ function effect(spec: Spec): Mesh {
       uMid: { value: new Color(spec.mid) },
       uHigh: { value: new Color(spec.high) },
       uAlpha: { value: spec.alpha },
+      uGrow: { value: 1 },
+      uWet: { value: 0 },
     },
   });
   const mesh = new Mesh(geometry, material);
@@ -209,4 +216,69 @@ export const sparksEffect = named('Sparks', {
   alpha: 0.95,
   additive: true,
   motion: 'burst',
+});
+export const snowEffect = named('Snow', {
+  count: 120,
+  radius: 0.3,
+  height: 0.5,
+  rate: [0.16, 0.28],
+  size: [0.009, 0.009],
+  low: 0xffffff,
+  mid: 0xf4f7fa,
+  high: 0xe6edf2,
+  alpha: 0.9,
+  additive: false,
+  motion: 'fall',
+});
+export const fogEffect = named('Fog', {
+  count: 26,
+  radius: 0.22,
+  height: 0.06,
+  rate: [0.07, 0.13],
+  size: [0.14, 0.2],
+  low: 0xb9bcc0,
+  mid: 0xc9ccd0,
+  high: 0xd8dadd,
+  alpha: 0.26,
+  additive: false,
+  motion: 'rise',
+});
+export const dustEffect = named('Dust', {
+  count: 36,
+  radius: 0.16,
+  height: 0.07,
+  rate: [0.3, 0.5],
+  size: [0.05, 0.1],
+  low: 0xa48f73,
+  mid: 0xb7a58c,
+  high: 0xc9bca8,
+  alpha: 0.34,
+  additive: false,
+  motion: 'burst',
+});
+export const magicEffect = named('Magic', {
+  count: 70,
+  radius: 0.07,
+  height: 0.3,
+  rate: [0.4, 0.8],
+  size: [0.013, 0.004],
+  low: 0xf2e9ff,
+  mid: 0xb58cff,
+  high: 0x54d6e8,
+  alpha: 0.9,
+  additive: true,
+  motion: 'rise',
+});
+export const embersEffect = named('Embers', {
+  count: 60,
+  radius: 0.12,
+  height: 0.4,
+  rate: [0.15, 0.3],
+  size: [0.007, 0.003],
+  low: 0xffd27a,
+  mid: 0xff7a1a,
+  high: 0xb3260c,
+  alpha: 0.95,
+  additive: true,
+  motion: 'rise',
 });

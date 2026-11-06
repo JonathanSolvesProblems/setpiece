@@ -15,7 +15,8 @@ const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'e
 const lenses = /LENSES = \[([^\]]+)\]/.exec(read('src/camera-formats.ts'))[1].split(',').map((n) => n.trim());
 const formats = count(read('src/camera-formats.ts'), /\{ name: '/g);
 const briefs = count(read('src/briefs.ts'), /^\s+title: '/gm);
-const assets = count(read('src/catalog.ts'), /\{ label: '/g);
+// The second camera is kit, not something on a shelf.
+const assets = count(read('src/catalog.ts'), /\{ label: '/g) - count(read('src/catalog.ts'), /shelf: 'Kit'/g);
 const takeSeconds = Number(/TAKE_MAX_SECONDS = (\d+)/.exec(read('src/take.ts'))[1]);
 const sounds = readdirSync(new URL('../public/audio/', import.meta.url)).filter((name) => name.endsWith('.wav')).length;
 const failures = [];

@@ -1,5 +1,17 @@
 # Setpiece charter
 
+Second pass, 2026-11-05 (see ../direction-2.md). Laws 1, 7, 9, 11 and 16 below are replaced by these; the rest stand.
+
+- **1b. Chalk is the text colour on cloth, with one exception: an actor's own line and tag are written in that actor's tape colour.** Tape colours are never used for anything that does not belong to that actor.
+- **7b. Yellow marks what is selected or good to go, and nothing else:** the live tab, lens, shelf and camera, an asset that is on the set, a stage that has landed, the eyeline ball. Accent budget on the panel: one tab, one lens, one shelf, one camera, plus one edge per asset on the set.
+- **9b. A thing that presses is a block with an edge; a thing that informs is plain chalk.** No control is a word with a rule under it.
+- **11b. One filled chalk button per screen** (Snap frame, or Back to the table at full size, or Enter XR on the page). Selected blocks fill yellow; the record block fills red only while recording.
+- **16b. Never pure white and never pure black.** The whitest thing is chalk #f6f7ef; the darkest is the cloth #1b1411, measured from a stage floor under spike tape.
+- **19. The ground is black cloth, never grey and never glass.** No translucent panel, no blur.
+- **20. Light means live.** Marks dim to 45% while their actor is in the air; nothing glows for decoration.
+- **21. A tape mark is a T, torn square, one per performer, flat on the floor, and out of the lens's picture.**
+
+
 Laws every surface obeys: the headset scene, the panel, the 2D page, the submission images. Each has its reason. The machine-checkable part is `charter.json`.
 
 1. **Chalk is the only text colour on slate; pencil and slate ink are the only text colours on paper.** Optic yellow and tally red are never text. On a slate, chalk is what writes; yellow is the ball and red is the tally (NOTES 1, 12, 13).

@@ -1,13 +1,14 @@
 /**
  * The asset library at work on the set: what is on the slate, what was last
- * picked up, an actor's pose and look, the camera's format and rig. All of it
- * is kept between visits. Effects and rotors are the only things here that run
- * on their own, so this is also where their clock lives.
+ * picked up, an actor's pose and look, a prop's paint, size and fittings, the
+ * camera's format and rig. All of it is kept between visits. Effects, rotors
+ * and the parts of a creature that move on their own are the only things here
+ * that run by themselves, so this is also where their clock lives.
  */
 import { createSystem, Entity, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { Rig, SENSORS } from './camera-formats.js';
-import { assetByLabel, assetTitle, STARTING_ASSETS } from './catalog.js';
+import { CAMERAS, Rig, SENSORS } from './camera-formats.js';
+import { assetByLabel, assetTitle, PAINTS, SIZES, STARTING_ASSETS } from './catalog.js';
 import { Held, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -22,24 +23,41 @@ export const LOOKS = [
 export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running'] as const;
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
 const WOOD_LEGS = /^Leg/;
+const PAINTED = /^Body/;
 const TRIPOD = /^(Base|Post|Leg\d|TripodHead)$/;
 /** Where a drone hovers when it is first switched on, and the most a tripod stands. */
 const DRONE_START = 0.45;
 const TRIPOD_MAX = 0.45;
 const ROTOR_SPEED = 60;
+/** Where a piece new to the set is put down: the first of these that is clear, front and centre first. */
+const SPOTS: [number, number][] = [];
+for (const z of [0.08, -0.04, 0.16, -0.12]) for (const x of [0, 0.12, -0.12, 0.22, -0.22]) SPOTS.push([x, z]);
+const DEFAULT_REACH = 0.05;
 
-type Saved = { on: string[]; cast: Record<string, [number, number]>; sensor: number; rig: string };
+/** Paint, size and fitting, each an index. */
+type Finish = [number, number, number];
+type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
+type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: number };
+export type Dress = { cast: Record<string, [number, number]>; finish: Record<string, Finish> };
+type Saved = { on: string[]; sensor: number; rig: string } & Partial<Dress>;
 type Globals = {
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
   trayRestore: Signal<string[] | null>;
+  trayDress: Signal<Dress>;
+  trayDressRestore: Signal<Dress | null>;
   lifeSize: Signal<boolean>;
   effectsOn: Signal<number>;
   removeSelected: Signal<number>;
   clearSet: Signal<number>;
   selectedIsActor: Signal<boolean>;
+  selectedPaint: Signal<number>;
+  selectedStyles: Signal<boolean>;
   poseRequested: Signal<number>;
   lookRequested: Signal<number>;
+  paintPick: Signal<number>;
+  sizeRequested: Signal<number>;
+  styleRequested: Signal<number>;
   castLine: Signal<string>;
   sensorIndex: Signal<number>;
   cameraRig: Signal<string>;
@@ -53,13 +71,14 @@ export class TraySystem extends createSystem({
 }) {
   private managed: Entity[] = [];
   private effects: ShaderMaterial[] = [];
-  /** Materials of the effects that are on the set, the ones whose clock runs. */
   private on = new Set<string>();
   private rotors: Object3D[] = [];
+  private moving: Moving[] = [];
   private cast = new Map<string, [number, number]>();
+  private finish = new Map<string, Finish>();
   private selected: Entity | null = null;
   private ready = false;
-  private seen = { pose: 0, look: 0, board: 0, remove: 0, clear: 0 };
+  private seen = { pose: 0, look: 0, board: 0, remove: 0, clear: 0, size: 0, style: 0 };
 
   init(): void {
     const g = this.globals as Globals;
@@ -80,8 +99,20 @@ export class TraySystem extends createSystem({
         g.trayRestore.value = null;
         if (this.ready) this.setOn(new Set(list));
       }),
+      g.trayDressRestore.subscribe((dress) => {
+        if (dress == null) return;
+        g.trayDressRestore.value = null;
+        if (this.ready) this.wear(dress);
+      }),
+      g.paintPick.subscribe((index) => {
+        if (index < 0) return;
+        g.paintPick.value = -1;
+        if (this.ready) this.refinish(0, index);
+      }),
       counter(g.poseRequested, 'pose', () => this.step(0, POSES.length)),
       counter(g.lookRequested, 'look', () => this.step(1, LOOKS.length)),
+      counter(g.sizeRequested, 'size', () => this.refinish(1, -1)),
+      counter(g.styleRequested, 'style', () => this.refinish(2, -1)),
       counter(g.removeSelected, 'remove', () => {
         if (this.selected != null) this.toggle(this.key(this.selected));
       }),
@@ -93,7 +124,6 @@ export class TraySystem extends createSystem({
         this.save();
       }),
       this.queries.held.subscribe('qualify', (piece) => {
-        if (piece.getValue(SetPiece, 'role') === SetRole.Stage) return;
         this.selected = piece;
         this.publishSelected();
       }),
@@ -107,6 +137,13 @@ export class TraySystem extends createSystem({
     }
     for (let i = 0; i < this.effects.length; i++) this.effects[i].uniforms.uTime.value = time;
     for (let i = 0; i < this.rotors.length; i++) this.rotors[i].rotation.y += ROTOR_SPEED * delta;
+    for (let i = 0; i < this.moving.length; i++) {
+      const moving = this.moving[i];
+      if (moving.piece.object3D?.visible !== true) continue;
+      const { idle, part } = moving;
+      if (idle.kind === 'spin') part.rotation[idle.axis] += idle.rate * delta;
+      else part.rotation[idle.axis] = moving.rest + Math.sin(time * idle.rate + moving.phase) * idle.amount;
+    }
   }
 
   private key(piece: Entity): string {
@@ -118,11 +155,13 @@ export class TraySystem extends createSystem({
     const saved = loadJson<Saved>(StoreKey.Tray);
     for (const label of saved?.on ?? STARTING_ASSETS) this.on.add(label);
     for (const [key, value] of Object.entries(saved?.cast ?? {})) this.cast.set(key, value);
+    for (const [key, value] of Object.entries(saved?.finish ?? {})) this.finish.set(key, value);
     for (const piece of this.queries.pieces.entities) {
       if (assetByLabel(this.key(piece)) == null) continue;
       this.managed.push(piece);
       this.show(piece, this.on.has(this.key(piece)));
-      this.freeze(piece.object3D!);
+      // A camera's head tilts every frame, so a camera is left to work its own matrices out.
+      if (!piece.hasComponent(ShotCamera)) this.freeze(piece);
       piece.object3D!.traverse((object) => {
         if (object.name !== 'EffectParticles') return;
         this.effects.push((object as Mesh).material as ShaderMaterial);
@@ -130,6 +169,8 @@ export class TraySystem extends createSystem({
       });
       const value = this.cast.get(this.key(piece));
       if (value && piece.getValue(SetPiece, 'role') === SetRole.Actor) this.dress(piece, value);
+      const finish = this.finishOf(this.key(piece));
+      if (finish[0] !== 0 || finish[1] !== 0 || finish[2] !== 0) this.coat(piece, finish);
     }
     const g = this.globals as Globals;
     if (saved != null && Number.isInteger(saved.sensor) && SENSORS[saved.sensor]) g.sensorIndex.value = saved.sensor;
@@ -139,10 +180,20 @@ export class TraySystem extends createSystem({
     return true;
   }
 
-  /** A piece moves as one body, so its parts need their local matrix worked out only once. */
-  private freeze(root: Object3D): void {
+  /**
+   * A piece moves as one body, so its parts need their local matrix worked out
+   * only once. A part that moves on its own keeps working its matrix out.
+   */
+  private freeze(piece: Entity): void {
+    const root = piece.object3D!;
     root.traverse((part) => {
       if (part === root) return;
+      const idle = part.userData.idle as Idle | undefined;
+      if (idle != null) {
+        // A pair of wings carries opposite amounts, so one clock beats both together.
+        this.moving.push({ piece, part, idle, rest: part.rotation[idle.axis], phase: 0 });
+        return;
+      }
       part.updateMatrix();
       part.matrixAutoUpdate = false;
     });
@@ -159,7 +210,32 @@ export class TraySystem extends createSystem({
     const next = new Set(this.on);
     if (next.has(label)) next.delete(label);
     else next.add(label);
+    const added = next.has(label);
     this.setOn(next);
+    if (added) this.clearSpot(label);
+  }
+
+  /** A piece put on the set from the shelf goes where nothing else is standing. */
+  private clearSpot(label: string): void {
+    const piece = this.managed.find((entity) => this.key(entity) === label);
+    const object = piece?.object3D;
+    if (piece == null || object == null) return;
+    const reach = (assetByLabel(label)?.grab?.[0] ?? DEFAULT_REACH) * object.scale.x;
+    const clear = (x: number, z: number): boolean => {
+      for (const other of this.queries.pieces.entities) {
+        const there = other.object3D;
+        if (other === piece || there == null || !there.visible || there.parent !== object.parent) continue;
+        const room = reach + (assetByLabel(this.key(other))?.grab?.[0] ?? DEFAULT_REACH) * there.scale.x * 0.7;
+        if (Math.hypot(there.position.x - x, there.position.z - z) < room) return false;
+      }
+      return true;
+    };
+    if (clear(object.position.x, object.position.z)) return;
+    for (const [x, z] of SPOTS) {
+      if (!clear(x, z)) continue;
+      object.position.set(x, 0, z);
+      return;
+    }
   }
 
   /** The set as it should stand: everything listed on it, everything else back on the shelf. */
@@ -184,6 +260,13 @@ export class TraySystem extends createSystem({
     this.publishSelected();
   }
 
+  private publishDress(): void {
+    (this.globals as Globals).trayDress.value = {
+      cast: Object.fromEntries(this.cast),
+      finish: Object.fromEntries(this.finish),
+    };
+  }
+
   private step(field: 0 | 1, size: number): void {
     const actor = this.selected;
     if (actor == null || actor.getValue(SetPiece, 'role') !== SetRole.Actor) return;
@@ -192,6 +275,36 @@ export class TraySystem extends createSystem({
     value[field] = (value[field] + 1) % size;
     this.cast.set(key, value);
     this.dress(actor, value);
+    this.publishSelected();
+    this.save();
+  }
+
+  /** How a piece is finished: what the wearer chose, or the paint it comes in. */
+  private finishOf(key: string): Finish {
+    return this.finish.get(key) ?? [assetByLabel(key)?.coat ?? 0, 0, 0];
+  }
+
+  /** Paint is chosen; size and fitting step to the next. */
+  private refinish(field: 0 | 1 | 2, pick: number): void {
+    const piece = this.selected;
+    if (piece == null) return;
+    const key = this.key(piece);
+    const asset = assetByLabel(key);
+    if (asset == null) return;
+    const value: Finish = [...this.finishOf(key)];
+    if (asset.shelf === 'Kit') return;
+    if (field === 0) {
+      if (asset.paint !== true) return;
+      value[0] = pick;
+    } else if (field === 1) {
+      value[1] = (value[1] + 1) % SIZES.length;
+    } else {
+      const count = asset.styles?.length ?? 0;
+      if (count < 2) return;
+      value[2] = (value[2] + 1) % count;
+    }
+    this.finish.set(key, value);
+    this.coat(piece, value);
     this.publishSelected();
     this.save();
   }
@@ -208,51 +321,109 @@ export class TraySystem extends createSystem({
         if (!(object instanceof Mesh)) return;
         const colour = WOOD_TOP.test(object.name) ? style.top : WOOD_LEGS.test(object.name) ? style.legs : -1;
         if (colour < 0) return;
-        const material = object.material as MeshStandardMaterial;
-        const key = 'woodColour';
-        if (object.userData[key] == null) {
-          object.material = material.clone();
-          object.userData[key] = material.color.getHex();
-        }
-        (object.material as MeshStandardMaterial).color.setHex(colour === 0 ? object.userData[key] : colour);
+        this.tint(object, colour);
       });
     }
     this.world.getSystem(ViewfinderSystem)?.refresh();
   }
 
+  /** This one piece's own copy of a material, in this colour; zero is the colour it came in. */
+  private tint(mesh: Mesh, colour: number): void {
+    const material = mesh.material as MeshStandardMaterial;
+    const key = 'ownColour';
+    if (mesh.userData[key] == null) {
+      mesh.material = material.clone();
+      mesh.userData[key] = material.color.getHex();
+    }
+    (mesh.material as MeshStandardMaterial).color.setHex(colour === 0 ? mesh.userData[key] : colour);
+  }
+
+  /** Paint on the body, the size of the whole piece, and which fitting shows. */
+  private coat(piece: Entity, [paint, size, style]: Finish): void {
+    const object = piece.object3D!;
+    const asset = assetByLabel(this.key(piece));
+    const scale = SIZES[size]?.scale ?? 1;
+    object.scale.setScalar(scale);
+    object.traverse((part) => {
+      const fitting = /^Style(\d)$/.exec(part.name);
+      if (fitting != null) {
+        part.visible = Number(fitting[1]) === style;
+        return;
+      }
+      if (part.name === 'Horn') {
+        part.visible = style === 1;
+        return;
+      }
+      if (part.name === 'EffectParticles') {
+        ((part as Mesh).material as ShaderMaterial).uniforms.uGrow.value = scale;
+        return;
+      }
+      if (asset?.paint === true && part instanceof Mesh && PAINTED.test(part.name)) this.tint(part, PAINTS[paint]?.hex ?? 0);
+    });
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+  }
+
+  /** A frame's own dressing, put back on: every actor and prop as it was when the frame was taken. */
+  private wear(dress: Dress): void {
+    this.cast = new Map(Object.entries(dress.cast ?? {}));
+    this.finish = new Map(Object.entries(dress.finish ?? {}));
+    for (const piece of this.managed) {
+      const key = this.key(piece);
+      if (piece.getValue(SetPiece, 'role') === SetRole.Actor) this.dress(piece, this.cast.get(key) ?? [0, 0]);
+      this.coat(piece, this.finishOf(key));
+    }
+    this.publishSelected();
+    this.save();
+  }
+
   private publishSelected(): void {
     const g = this.globals as Globals;
     const piece = this.selected;
-    const actor = piece != null && piece.getValue(SetPiece, 'role') === SetRole.Actor;
-    if (piece == null || assetByLabel(this.key(piece)) == null) {
+    const asset = piece == null ? undefined : assetByLabel(this.key(piece));
+    this.publishDress();
+    if (piece == null || asset == null) {
       g.castLine.value = '';
       g.selectedIsActor.value = false;
+      g.selectedPaint.value = -1;
+      g.selectedStyles.value = false;
       return;
     }
-    const [pose, look] = this.cast.get(this.key(piece)) ?? [0, 0];
-    g.castLine.value = actor
-      ? `${assetTitle(this.key(piece))}: ${POSES[pose]}, ${LOOKS[look].name}`
-      : assetTitle(this.key(piece));
+    const actor = piece.getValue(SetPiece, 'role') === SetRole.Actor;
+    const key = this.key(piece);
+    const [pose, look] = this.cast.get(key) ?? [0, 0];
+    const [paint, size, style] = this.finishOf(key);
+    const words: string[] = [];
+    if (actor) words.push(POSES[pose], LOOKS[look].name);
+    if (asset.paint === true && paint > 0) words.push(PAINTS[paint].name);
+    if (size > 0) words.push(SIZES[size].name);
+    if (style > 0 && asset.styles) words.push(asset.styles[style]);
+    g.castLine.value = words.length > 0 ? `${assetTitle(key)}: ${words.join(', ')}` : assetTitle(key);
     g.selectedIsActor.value = actor;
+    g.selectedPaint.value = asset.paint === true ? paint : -1;
+    g.selectedStyles.value = (asset.styles?.length ?? 0) > 1;
   }
 
   /** The same camera on legs or in the air. A flown camera goes up on its own; a landed one comes down. */
   private applyRig(rig: string): void {
-    const cam = this.queries.cams.entities.values().next().value as Entity | undefined;
-    const object = cam?.object3D;
-    if (object == null) return;
-    const drone = rig === Rig.Drone;
     this.rotors.length = 0;
-    for (const child of object.children) {
-      if (TRIPOD.test(child.name)) child.visible = !drone;
-      if (child.name !== 'DroneFrame') continue;
-      child.visible = drone;
-      if (drone) {
-        for (const part of child.children) if (part.name.startsWith('DroneRotor')) this.rotors.push(part);
+    for (const cam of this.queries.cams.entities) {
+      const object = cam.object3D;
+      if (object == null) continue;
+      // Only the first camera flies; the second is always on legs.
+      const first = this.key(cam) === CAMERAS[0];
+      const drone = first && rig === Rig.Drone;
+      for (const child of object.children) {
+        if (TRIPOD.test(child.name)) child.visible = !drone;
+        if (child.name !== 'DroneFrame') continue;
+        child.visible = drone;
+        if (drone) {
+          for (const part of child.children) if (part.name.startsWith('DroneRotor')) this.rotors.push(part);
+        }
       }
+      if (!first) continue;
+      if (drone) object.position.y = Math.max(object.position.y, DRONE_START);
+      else object.position.y = Math.min(object.position.y, TRIPOD_MAX);
     }
-    if (drone) object.position.y = Math.max(object.position.y, DRONE_START);
-    else object.position.y = Math.min(object.position.y, TRIPOD_MAX);
   }
 
   private save(): void {
@@ -261,17 +432,15 @@ export class TraySystem extends createSystem({
     saveJson(StoreKey.Tray, {
       on: [...this.on],
       cast: Object.fromEntries(this.cast),
+      finish: Object.fromEntries(this.finish),
       sensor: g.sensorIndex.peek(),
       rig: g.cameraRig.peek(),
     } satisfies Saved);
   }
 
-  /** A new board starts from the opening cast, in wood. The camera kit stays as it is. */
+  /** A new board starts from the opening cast, in wood and primer. The camera kit stays as it is. */
   private clear(): void {
-    for (const piece of this.managed) {
-      if (piece.getValue(SetPiece, 'role') === SetRole.Actor) this.dress(piece, [0, 0]);
-    }
-    this.cast.clear();
+    this.wear({ cast: {}, finish: {} });
     clearKey(StoreKey.Tray);
     this.setOn(new Set(STARTING_ASSETS));
   }
