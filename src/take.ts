@@ -14,7 +14,7 @@
  * Nothing here is drawn or generated: a take is the poses the wearer's own
  * hands gave the pieces, and it can only replay those.
  */
-import { AudioSource, AudioUtils, createSystem, Entity, Quaternion } from '@iwsdk/core';
+import { AudioSource, AudioUtils, createSystem, Entity, VisibilityState, Quaternion } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { CAMERAS } from './camera-formats.js';
 import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
@@ -101,7 +101,17 @@ export class TakeSystem extends createSystem({
   init(): void {
     const g = this.globals as Globals;
     const isPiece = (piece: Entity): boolean => piece.getValue(SetPiece, 'role') !== SetRole.Stage;
+    // The system menu, or the headset coming off, ends a pass cleanly: what was
+    // carried so far is the take, and nothing runs on while nobody is watching.
+    let visibility = this.world.visibilityState.peek();
     this.cleanupFuncs.push(
+      this.world.visibilityState.subscribe((state) => {
+        const left = visibility === VisibilityState.Visible && state !== VisibilityState.Visible;
+        visibility = state;
+        if (!left) return;
+        if (this.state === TakeState.Recording) this.stopRecording();
+        if (this.state === TakeState.Playing) this.stopPlaying();
+      }),
       this.queries.held.subscribe('qualify', (piece) => {
         if (isPiece(piece)) this.heldPieces++;
       }),

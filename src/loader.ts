@@ -8,9 +8,9 @@
  * Imported first in index.ts so it is running before the engine starts.
  */
 
-/** The panel's type, fetched one file at a time, is the longest part the page can count. */
+/** The panel's type, fetched a file at a time, is the part of this wait the page can count. */
 const PANEL_FONTS = 5;
-const PANEL_FONT = /\/ui\/fonts\/[A-Za-z]+-[A-Za-z]+\.ttf/;
+const PANEL_FONT = /\/ui\/fonts\/baked\/[A-Za-z-]+\.json/;
 const SLOW_MS = 20_000;
 const STUCK_MS = 60_000;
 

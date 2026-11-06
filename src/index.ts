@@ -1,4 +1,5 @@
 import { placingPieces, setFailed, setReady } from './loader.js';
+import './fonts.js';
 import { VisibilityState, World } from '@iwsdk/core';
 import { signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';

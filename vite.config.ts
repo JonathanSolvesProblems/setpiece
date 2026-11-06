@@ -6,9 +6,10 @@
  */
 
 import { iwsdkDev } from '@iwsdk/vite-plugin-dev';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [iwsdkDev()],
   server: { host: '0.0.0.0', port: 8081, open: false },
   build: {
@@ -29,6 +30,11 @@ export default defineConfig({
   // (three@0.185 vs app super-three@0.181). Duplicate Component classes break
   // instanceof checks → "Only pmndrs/uikit components can be added as children".
   resolve: {
+    // The panel draws no icons; see src/no-icons.ts.
+    alias:
+      command === 'build'
+        ? [{ find: /^@pmndrs\/uikit-lucide$/, replacement: fileURLToPath(new URL('./src/no-icons.ts', import.meta.url)) }]
+        : [],
     dedupe: [
       'three',
       '@pmndrs/uikit',
@@ -49,4 +55,4 @@ export default defineConfig({
   },
   publicDir: 'public',
   base: './',
-});
+}));
