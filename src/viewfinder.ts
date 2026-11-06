@@ -870,8 +870,8 @@ export class ViewfinderSystem extends createSystem({
     g.beginPath();
     g.roundRect((256 - width) / 2, 8, width, 112, 10);
     g.fill();
-    // The tag is written in the performer's own tape colour.
-    g.fillStyle = assetByLabel(String(piece.getValue(SetPiece, 'label')))?.tape ?? '#f6f7ef';
+    // An actor's tag is written in their own tape colour; everything else is chalk.
+    g.fillStyle = (role === SetRole.Actor ? assetByLabel(String(piece.getValue(SetPiece, 'label')))?.tape : undefined) ?? '#f6f7ef';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(text, 128, 66);

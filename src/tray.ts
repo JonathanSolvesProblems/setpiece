@@ -61,6 +61,7 @@ type Globals = {
   coachNote: Signal<string>;
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
+  setReady: Signal<boolean>;
   trayRestore: Signal<string[] | null>;
   trayDress: Signal<Dress>;
   trayDressRestore: Signal<Dress | null>;
@@ -181,6 +182,7 @@ export class TraySystem extends createSystem({
   update(delta: number, time: number): void {
     if (!this.ready) {
       this.ready = this.prepare();
+      if (this.ready) (this.globals as Globals).setReady.value = true;
       return;
     }
     for (let i = 0; i < this.effects.length; i++) this.effects[i].uniforms.uTime.value = time;

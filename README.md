@@ -2,7 +2,7 @@
 
 Block a VFX shot on your kitchen table with your hands. A 1:10 film set on a slate lands on your real table; you move wooden stand-ins, a tennis ball where the creature's eyes will be, and a 35 mm camera; you look through the lens, snap, and leave with the storyboard, the shot list and the eyeline for each actor.
 
-Live: https://setpiece-xr.vercel.app
+Live: https://setpiece.jonathansolvesproblems.com
 
 Built for the Meta VR Start Developer Competition 2026, Productivity track, New Experience. Hands only, seated, no controller needed.
 
@@ -10,7 +10,7 @@ Built for the Meta VR Start Developer Competition 2026, Productivity track, New 
 
 On a Meta Quest 3 or 3S, nothing to install:
 
-1. Open https://setpiece-xr.vercel.app in the Meta Quest Browser, sitting at a table.
+1. Open https://setpiece.jonathansolvesproblems.com in the Meta Quest Browser, sitting at a table.
 2. Pinch **Enter XR**. The first time, the headset asks whether the browser may use spatial data. Allow it and the set finds your table by itself. If you would rather not, or the room was never scanned, the set floats in front of you: touch your table with a fingertip and pinch, and it lands there.
 3. Follow the line above the monitor. It asks for one thing at a time and moves on when you have done it.
 

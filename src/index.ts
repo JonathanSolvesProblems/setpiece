@@ -1,3 +1,4 @@
+import { placingPieces, setFailed, setReady } from './loader.js';
 import { VisibilityState, World } from '@iwsdk/core';
 import { signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';
@@ -49,6 +50,7 @@ World.create(
   // The tray, the cast and the camera kit.
   globals.trayToggle = signal('');
   globals.trayOn = signal<string[]>([]);
+  globals.setReady = signal(false);
   globals.effectsOn = signal(0);
   globals.poseRequested = signal(0);
   globals.squirmOn = signal(loadJson<{ squirm: boolean }>(StoreKey.Settings)?.squirm !== false);
@@ -90,6 +92,7 @@ World.create(
   globals.recordRequested = signal(0);
   globals.playRequested = signal(0);
 
+  placingPieces();
   world
     .registerSystem(PlacementSystem, { priority: 10 })
     .registerSystem(PiecesSystem, { priority: 12 })
@@ -134,6 +137,7 @@ World.create(
     if (supported || enter == null) return;
     enter.textContent = 'Copy the link for your Quest';
     enter.dataset.mode = 'copy';
+    enter.disabled = false;
     if (hint) hint.textContent = 'This browser cannot run the headset session. Paste the link into the Meta Quest Browser, sit at a table, and the set lands on it.';
   });
   // Starting a session can stop on a question only the person in the headset can
@@ -240,7 +244,7 @@ World.create(
   saveTake?.addEventListener('click', () => {
     if (viewfinder == null || takeState.peek() === TakeState.Recording) return;
     saveTake.disabled = true;
-    saveTake.textContent = 'Filming the take';
+    saveTake.textContent = `Filming the take, 0 of ${Math.round(takeLength.peek())} s`;
     void downloadAnimatic(
       viewfinder,
       takeLength.peek(),
@@ -257,6 +261,9 @@ World.create(
   });
   takeLength.subscribe((seconds) => {
     if (saveTake) saveTake.hidden = seconds <= 0 || !canRecordVideo();
+  });
+  (globals.takeSeconds as Signal<number>).subscribe((seconds) => {
+    if (saveTake?.disabled) saveTake.textContent = `Filming the take, ${Math.floor(seconds)} of ${Math.round(takeLength.peek())} s`;
   });
   (globals.shotFrames as Signal<Shot[]>).subscribe((shots) => {
     if (saveBoard) saveBoard.hidden = shots.length === 0;
@@ -322,6 +329,12 @@ World.create(
     if (fieldEyeline) fieldEyeline.textContent = parts.length > 0 ? parts.join(' · ') : 'place an actor';
   });
 
+  // The loading card comes off once the set has drawn, not when the code has finished.
+  const setIsReady = globals.setReady as Signal<boolean>;
+  setIsReady.subscribe((ready) => {
+    if (ready) requestAnimationFrame(setReady);
+  });
+
   // Debug and test hook: lets scripts drive the app from the page.
   (globalThis as Record<string, unknown>).setpiece = {
     world,
@@ -331,4 +344,4 @@ World.create(
       (globals.sceneRequest as Signal<Spoken | null>).value = understand(String(text));
     },
   };
-});
+}).catch(setFailed);

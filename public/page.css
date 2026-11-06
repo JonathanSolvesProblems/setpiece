@@ -239,19 +239,76 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
   background: var(--block);
   overflow: hidden;
 }
-/* Until the stage is on the page, say so where it will be. */
-.stage::before {
-  content: "Setting the stage.";
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--chalk-dust);
-  font-size: 0.9rem;
-}
-.stage:has(canvas)::before { content: none; }
 #scene-container { width: 100%; aspect-ratio: 16 / 9; position: relative; }
 #scene-container canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* While the set is built: the chalk drawing of it, and the call for what is happening.
+   The stripe is this screen's one clapper stripe, until the slate's own takes over.
+   The thread is busy for seconds at a time here, so only transform moves: the browser
+   carries that by itself. Nothing animates on the way out. */
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(calc(var(--unit) * 2), 5cqi, calc(var(--unit) * 12));
+  padding: clamp(calc(var(--unit) * 2), 3cqi, calc(var(--unit) * 7)) clamp(calc(var(--unit) * 3), 7cqi, calc(var(--unit) * 18));
+  background: var(--cloth);
+  color: var(--chalk);
+}
+.loader[hidden] { display: none; }
+.loader-art { height: 100%; aspect-ratio: 83 / 88; overflow: hidden; }
+.loader-art img { display: block; width: 100%; height: 100%; object-fit: contain; transform: scale(1.09); }
+.loader-call { min-width: 0; max-width: 30rem; }
+.loader .field { min-height: 0; flex-wrap: wrap; gap: 0 calc(var(--unit) * 3); }
+.loader .value { color: var(--chalk); white-space: normal; }
+.loader-track {
+  height: 14px;
+  margin-top: calc(var(--unit) * 2);
+  background: var(--block);
+  overflow: hidden;
+}
+.loader-fill {
+  height: 100%;
+  overflow: hidden;
+  transform: translateX(-92%);
+  transition: transform 6s cubic-bezier(0.16, 0.7, 0.2, 1);
+  will-change: transform;
+}
+.loader-stripe {
+  width: calc(100% + 40px);
+  height: 100%;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='14'%3E%3Crect width='40' height='14' fill='%231b1411'/%3E%3Cpath d='M0 14 8 0H28L20 14Z' fill='%23f6f7ef'/%3E%3C/svg%3E") left center / 40px 14px repeat-x;
+  animation: loader-run 1.4s linear infinite;
+  will-change: transform;
+}
+@keyframes loader-run { to { transform: translateX(-40px); } }
+.loader-note {
+  margin: calc(var(--unit) * 2) 0 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  color: var(--chalk-dust);
+}
+.loader-note[hidden] { display: none; }
+.loader .block { margin-top: calc(var(--unit) * 3); align-items: center; justify-content: center; text-decoration: none; color: var(--chalk); }
+.when-failed, .when-stopped { display: none; }
+:root[data-load="failed"] .when-failed { display: block; }
+:root[data-load="failed"] .when-stopped, :root[data-load="stuck"] .when-stopped { display: inline-flex; }
+:root[data-load="failed"] .when-loading, :root[data-load="failed"] #loader-note, :root[data-load="failed"] #enter-xr { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .loader-fill { transition: none; }
+  .loader-stripe { animation: none; }
+}
+@container (max-width: 520px) {
+  .loader { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .loader-art { height: auto; width: 100%; max-height: 100%; }
+  .loader-note { font-size: 0.8rem; }
+  .loader-track { margin-top: var(--unit); }
+}
+.strip[inert] { opacity: 0.45; }
 
 /* The floor in front of the set: who has a mark, and where each of them is looking. */
 .floor {
@@ -372,7 +429,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
 }
 .primary:hover { background: var(--ink-muted); border-color: var(--ink-muted); color: var(--ground); }
 .primary:active { transform: translateY(1px); }
-.primary[aria-busy="true"] { background: var(--ink-muted); border-color: var(--ink-muted); cursor: progress; }
+.primary[aria-busy="true"], .primary:disabled { background: var(--ink-muted); border-color: var(--ink-muted); cursor: progress; }
 /* Three lines held, because this line changes while the headset is asked. */
 .hint { margin: 0; min-height: 4.2em; color: var(--ink-muted); font-size: 0.9rem; line-height: 1.4; text-wrap: pretty; }
 .try { margin: 0 0 calc(var(--unit) * 4); color: var(--ink-muted); font-size: 0.9rem; line-height: 1.4; text-wrap: pretty; }
@@ -404,7 +461,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
   font-family: var(--label);
   font-weight: 700;
   font-size: 0.8rem;
-  color: var(--ink-muted);
+  color: var(--pencil);
 }
 .board .filled .n { color: var(--chalk); text-shadow: 0 0 3px var(--cloth); }
 .board .cap {

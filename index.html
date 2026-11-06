@@ -2,6 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      // If the app's own script never arrives, nothing else can say so.
+      addEventListener('error', function (event) {
+        if (event.target && event.target.tagName === 'SCRIPT') document.documentElement.dataset.load = 'failed';
+      }, true);
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Setpiece</title>
     <meta name="description" content="Block a VFX shot on your kitchen table with your hands. A 1:10 set on a slate, a 35 mm camera, lenses, eyelines, and a storyboard at the end." />
@@ -13,7 +19,7 @@
     <link rel="apple-touch-icon" href="/icon-180.png" />
     <meta property="og:title" content="Setpiece" />
     <meta property="og:description" content="Block the shot on your kitchen table. Wooden stand-ins, a tennis ball where the creature will be, a 35 mm camera you move with your hands." />
-    <meta property="og:image" content="https://setpiece-xr.vercel.app/og.png" />
+    <meta property="og:image" content="https://setpiece.jonathansolvesproblems.com/og.png" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" href="/ui/fonts/BigShoulders.ttf" as="font" type="font/ttf" crossorigin />
@@ -51,8 +57,25 @@
             <h1 id="hero-heading">Block the shot on your kitchen table</h1>
           </div>
 
-          <div class="stage">
+          <div class="stage" aria-busy="true">
             <div id="scene-container"></div>
+            <div class="loader" id="loader" role="status">
+              <div class="loader-art"><img src="/art/figure.webp" alt="" width="830" height="880" /></div>
+              <div class="loader-call">
+                <div class="field">
+                  <span class="label">Call</span>
+                  <span class="value when-loading" id="loader-step">Opening the kit</span>
+                  <span class="value when-failed">The set did not load</span>
+                </div>
+                <div class="loader-track when-loading" aria-hidden="true">
+                  <div class="loader-fill" id="loader-fill"><div class="loader-stripe"></div></div>
+                </div>
+                <p class="loader-note" id="loader-note" hidden></p>
+                <p class="loader-note when-failed">Check the connection, then reload. Your board is kept on this device.</p>
+                <noscript><p class="loader-note">The set needs JavaScript to run.</p></noscript>
+                <a class="block when-stopped" href="/">Reload the page</a>
+              </div>
+            </div>
           </div>
 
           <div class="floor">
@@ -73,7 +96,7 @@
             <p class="marks-note">One tape colour per actor, so nobody walks to the wrong mark.</p>
           </div>
 
-          <div class="strip" role="group" aria-label="Lens and take">
+          <div class="strip" role="group" aria-label="Lens and take" inert>
             <div class="field">
               <span class="label" id="lens-label">Lens</span>
               <div class="lenses" role="group" aria-labelledby="lens-label">
@@ -105,7 +128,7 @@
               storyboard.
             </p>
             <div class="actions">
-              <button id="enter-xr" class="primary" type="button">Enter XR</button>
+              <button id="enter-xr" class="primary" type="button" disabled>Setting the stage</button>
               <button id="page-mic" class="block" type="button" hidden>Allow the microphone, to say a scene</button>
               <p class="hint" id="xr-hint">Open this page in the Meta Quest Browser, point at any table and pinch: the set lands on it.</p>
             </div>

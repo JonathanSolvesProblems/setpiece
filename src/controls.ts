@@ -383,11 +383,12 @@ export class ControlsSystem extends createSystem({
               backgroundColor: state === 'listening' ? OPTIC_YELLOW : undefined,
               color: state === 'listening' ? CLOTH : CHALK,
             });
-            if (state === 'loading') tell('');
+            if (state === 'loading') tell('Waking the listener.');
             if (state === 'listening') tell('Say what should be on the set, then stop talking.');
             if (state === 'error') tell(detail ?? 'The microphone did not start.');
           },
-          onProgress: (fraction) => tell(`Fetching the listener, ${Math.round(fraction * 100)}%. This happens once.`),
+          onProgress: (fraction) =>
+            tell(fraction < 1 ? `Fetching the listener, ${Math.round(fraction * 100)}%. This happens once.` : 'Waking the listener.'),
           onText: (text, final) => {
             if (text !== '') tell(`Heard: ${text}`);
             if (!final) return;

@@ -81,7 +81,7 @@ export const SCENES: Scene[] = [
     lens: 24,
     camera: [-0.26, 0.16, -55],
     pieces: [
-      { label: 'Robot', x: 0.095, z: -0.06, yaw: -110 },
+      { label: 'Robot', x: 0.095, z: -0.045, yaw: -110 },
       { label: 'Tank', x: -0.06, z: 0.07, yaw: 90, size: 1 },
       { label: 'Explosion', x: 0.02, z: -0.08 },
       { label: 'Smoke', x: 0.08, z: -0.14 },

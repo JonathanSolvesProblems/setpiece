@@ -18,7 +18,8 @@ const KNOCK_SPEED = 0.1;
 const JUMP = 0.12;
 const ACTOR_REACH = 0.03;
 /** How far around itself each kind of water wets, in metres on the slate. */
-const WETS: Record<string, number> = { Rain: 0.3, Water: 0.14, Snow: 0.3 };
+// Snow is left out: a campfire keeps burning through a snowfall, and Winter camp depends on it.
+const WETS: Record<string, number> = { Rain: 0.3, Water: 0.14 };
 const BURNS = ['Fire', 'Embers'];
 const WET_RATE = 1.6;
 
