@@ -74,6 +74,8 @@ export class TraySystem extends createSystem({
   private on = new Set<string>();
   private rotors: Object3D[] = [];
   private moving: Moving[] = [];
+  /** Pieces with a part that moves by itself: the lens has to keep looking at them, as it does at an effect. */
+  private restless = new Set<string>();
   private cast = new Map<string, [number, number]>();
   private finish = new Map<string, Finish>();
   private selected: Entity | null = null;
@@ -192,6 +194,7 @@ export class TraySystem extends createSystem({
       if (idle != null) {
         // A pair of wings carries opposite amounts, so one clock beats both together.
         this.moving.push({ piece, part, idle, rest: part.rotation[idle.axis], phase: 0 });
+        this.restless.add(this.key(piece));
         return;
       }
       part.updateMatrix();
@@ -255,7 +258,7 @@ export class TraySystem extends createSystem({
     const g = this.globals as Globals;
     g.trayOn.value = [...this.on];
     let live = 0;
-    for (const label of this.on) if (assetByLabel(label)?.shelf === 'Effects') live++;
+    for (const label of this.on) if (assetByLabel(label)?.shelf === 'Effects' || this.restless.has(label)) live++;
     g.effectsOn.value = live;
     this.publishSelected();
   }

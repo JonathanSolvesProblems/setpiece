@@ -10,6 +10,7 @@
 import { createSystem, Entity, Euler, Matrix4, Object3D, Quaternion, Vector3 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { Held, SetPiece, SetRole } from './set-components.js';
+import { ViewfinderSystem } from './viewfinder.js';
 
 const SWING_STIFFNESS = 60;
 const SWING_DAMPING = 3.5;
@@ -107,6 +108,7 @@ export class SquirmSystem extends createSystem({
   private push = new Vector3();
   private one = new Vector3(1, 1, 1);
   private zero = new Vector3();
+  private lens: ViewfinderSystem | undefined;
 
   init(): void {
     this.cleanupFuncs.push(
@@ -180,7 +182,10 @@ export class SquirmSystem extends createSystem({
   }
 
   update(delta: number): void {
-    if (delta <= 0) return;
+    if (delta <= 0 || this.moving.length === 0) return;
+    // A figure moving its limbs does not move as a piece, so the monitor is told to look again.
+    this.lens ??= this.world.getSystem(ViewfinderSystem);
+    this.lens?.refresh();
     for (let i = this.moving.length - 1; i >= 0; i--) {
       const state = this.moving[i];
       if (this.animate(state, delta)) continue;

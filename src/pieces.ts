@@ -105,6 +105,7 @@ type Globals = {
   setupRecalled: Signal<number>;
   cameraRig: Signal<string>;
   takeState: Signal<string>;
+  trayOn: Signal<string[]>;
 };
 /** A flown camera stays where it is let go, between these heights. */
 const DRONE_MIN_HEIGHT = 0.2;
@@ -144,6 +145,8 @@ export class PiecesSystem extends createSystem({
   private bounds: Box3[] = [];
   /** The shape of each piece that others can be set down on, by index; null for the rest. */
   private solids: (Box3 | null)[] = [];
+  /** How far each piece reaches from its own origin, by index: a quick way to rule a hand out. */
+  private spans: number[] = [];
   private readings: Record<Side, HandReading> = { left: new HandReading(), right: new HandReading() };
   private carrying: Record<Side, Carry | null> = { left: null, right: null };
   /** The piece each hand is on, by index, or -1. */
@@ -163,7 +166,8 @@ export class PiecesSystem extends createSystem({
       }),
       this.queries.grabbed.subscribe('qualify', (piece) => {
         if (this.isStage(piece)) return;
-        if (this.guard > 0) {
+        // A hand already has it: the other hand's ray does not get to pull on it as well.
+        if (this.guard > 0 || this.sideCarrying(piece) != null) {
           this.ignored.add(piece);
           this.grab?.forceRelease(piece);
           return;
@@ -181,6 +185,9 @@ export class PiecesSystem extends createSystem({
       }),
       // The grab writes the piece's pose once more as it lets go, so settle on the next update.
       this.queries.held.subscribe('disqualify', (piece) => this.released.push(piece)),
+      g.trayOn.subscribe(() => {
+        if (this.ready) this.setChanged();
+      }),
       g.newBoardRequested.subscribe((n) => {
         if (n > this.boardSeen) {
           this.boardSeen = n;
@@ -213,11 +220,48 @@ export class PiecesSystem extends createSystem({
     if (this.drops.length > 0) this.fall(delta);
     if (this.released.length === 0) return;
     for (const piece of this.released) {
-      if (piece.object3D == null) continue;
+      // A piece taken off the set while it was held has nowhere to stand.
+      if (piece.object3D == null || !piece.object3D.visible) continue;
       this.settle(piece);
     }
     this.released.length = 0;
-    this.save();
+    // A piece still falling is saved when it lands.
+    if (this.drops.length === 0) this.save();
+  }
+
+  private drop(piece: Entity, floor: number): void {
+    for (let i = 0; i < this.drops.length; i++) {
+      if (this.drops[i].piece !== piece) continue;
+      this.drops[i].floor = floor;
+      return;
+    }
+    this.drops.push({ piece, speed: 0, floor });
+  }
+
+  /** The set changed: nothing is carried that is no longer on it, and nothing stands on what has gone. */
+  private setChanged(): void {
+    for (const side of SIDES) {
+      const carry = this.carrying[side];
+      if (carry == null || carry.piece.object3D?.visible === true) continue;
+      this.carrying[side] = null;
+      this.setRayAside(side, false);
+    }
+    for (let i = 0; i < this.dressed.length; i++) {
+      const piece = this.dressed[i];
+      const object = piece.object3D;
+      if (object == null) continue;
+      if (!object.visible) {
+        if (piece.hasComponent(Grabbed)) {
+          this.ignored.add(piece);
+          this.grab?.forceRelease(piece);
+        }
+        if (piece.hasComponent(Held)) piece.removeComponent(Held);
+        continue;
+      }
+      if (piece.hasComponent(Held) || piece.hasComponent(ShotCamera) || object.position.y <= FALL_FROM) continue;
+      const floor = this.supportUnder(i);
+      if (object.position.y > floor + FALL_FROM) this.drop(piece, floor);
+    }
   }
 
   private sideCarrying(piece: Entity): Side | null {
@@ -228,7 +272,9 @@ export class PiecesSystem extends createSystem({
 
   /** The ray is already holding something for this hand: it is not reaching for anything else. */
   private rayBusy(side: Side): boolean {
-    for (const entity of this.queries.grabbed.entities) if (this.grab?.getHolderHand(entity) === side) return true;
+    for (let i = 0; i < this.dressed.length; i++) {
+      if (this.dressed[i].hasComponent(Grabbed) && this.grab?.getHolderHand(this.dressed[i]) === side) return true;
+    }
     return false;
   }
 
@@ -252,6 +298,13 @@ export class PiecesSystem extends createSystem({
       if (object == null || !object.visible || object.parent?.visible !== true) continue;
       if ((object as { pointerEvents?: string }).pointerEvents === 'none') continue;
       if (piece.hasComponent(Held)) continue;
+      // Too far to be on it at all: no need to work out where the hand is in the piece's own frame.
+      const at = object.matrixWorld.elements;
+      const far = this.spans[i] * object.scale.x + reach;
+      const dx = point.x - at[12];
+      const dy = point.y - at[13];
+      const dz = point.z - at[14];
+      if (dx * dx + dy * dy + dz * dz > far * far) continue;
       object.worldToLocal(this.local.copy(point));
       const box = this.bounds[i];
       const gap = box.distanceToPoint(this.local);
@@ -325,6 +378,11 @@ export class PiecesSystem extends createSystem({
     object.getWorldPosition(this.point);
     this.carrying[side] = { piece, by, offset: this.point.clone().sub(point), at: point.clone(), lost: 0 };
     this.near[side] = -1;
+    // This pinch belongs to the hand now: whatever the ray began with it is let go.
+    if (!this.rayAside[side]) {
+      this.rayAside[side] = true;
+      this.input.xr.multiPointers[side].toggleSubPointer('ray', false);
+    }
     piece.addComponent(Held);
   }
 
@@ -335,7 +393,7 @@ export class PiecesSystem extends createSystem({
     else if (carry.by === 'fist') letGo = live && !this.readings[side].shut;
     else letGo = pad != null && !pad.getSelecting();
     carry.lost = live ? 0 : carry.lost + delta;
-    if (letGo || carry.lost > LOST_HAND_SECONDS || carry.piece.object3D == null) {
+    if (letGo || carry.lost > LOST_HAND_SECONDS || carry.piece.object3D?.visible !== true) {
       this.carrying[side] = null;
       this.setRayAside(side, false);
       // The other hand may still have it, by its own reach or by the ray.
@@ -359,6 +417,12 @@ export class PiecesSystem extends createSystem({
       const drop = this.drops[i];
       const object = drop.piece.object3D;
       if (object == null || drop.piece.hasComponent(Held)) {
+        this.drops.splice(i, 1);
+        continue;
+      }
+      if (!object.visible) {
+        // Taken off the set in the air: it is on the floor when it comes back.
+        object.position.y = drop.floor;
         this.drops.splice(i, 1);
         continue;
       }
@@ -436,6 +500,7 @@ export class PiecesSystem extends createSystem({
     shape.expandByPoint(this.local.set(room, height, room));
     shape.expandByPoint(this.local.set(-room, 0, -room));
     this.bounds.push(shape);
+    this.spans.push(Math.max(shape.min.length(), shape.max.length()));
     const volume = new Mesh(new CylinderGeometry(radius, radius, height, 14, 1), this.volumeMaterial);
     volume.name = 'GrabVolume';
     volume.position.y = height / 2;
@@ -489,7 +554,7 @@ export class PiecesSystem extends createSystem({
       if (object == null || piece === lifted || piece.hasComponent(Held) || piece.hasComponent(ShotCamera)) continue;
       if (object.position.y <= FALL_FROM) continue;
       const floor = this.supportUnder(i);
-      if (object.position.y > floor + FALL_FROM) this.drops.push({ piece, speed: 0, floor });
+      if (object.position.y > floor + FALL_FROM) this.drop(piece, floor);
     }
   }
 
@@ -557,7 +622,7 @@ export class PiecesSystem extends createSystem({
     } else {
       const floor = this.supportUnder(this.dressed.indexOf(piece));
       if (object.position.y > floor + FALL_FROM) {
-        this.drops.push({ piece, speed: 0, floor });
+        this.drop(piece, floor);
       } else {
         object.position.y = floor;
         this.knock(Cue.Place, piece);
