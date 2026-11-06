@@ -20,7 +20,7 @@ import { understand, wordsToHear } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
 import { SetPiece, StageAnchor } from './set-components.js';
 import { SCENES } from './scenes.js';
-import { saveJson, StoreKey } from './store.js';
+import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
 
@@ -51,9 +51,8 @@ const UP = new Vector3(0, 1, 0);
 const BOARD_SLOTS = 6;
 // Yellow is what is selected or good to go; nothing is yellow for decoration.
 const OPTIC_YELLOW = '#d6e13c';
-/** The flag's black cloth, a block that can be pressed, and the edge of one. */
+/** The flag's black cloth, and the edge of a block that can be pressed. */
 const CLOTH = '#1b1411';
-const BLOCK = '#2a211c';
 const CHALK_HAZE = '#5a4b3d';
 const PLACED_STATUSES = new Set<string>([
   StageStatus.Table,
@@ -227,7 +226,7 @@ export class ControlsSystem extends createSystem({
       g.lensMm.subscribe((mm) => {
         for (const l of LENSES) {
           panel.getElementById(`lens-${l}`)?.setProperties({
-            backgroundColor: l === mm ? OPTIC_YELLOW : BLOCK,
+            backgroundColor: l === mm ? OPTIC_YELLOW : undefined,
             color: l === mm ? CLOTH : CHALK,
           });
         }
@@ -280,7 +279,7 @@ export class ControlsSystem extends createSystem({
       for (const name of TABS) {
         panel.getElementById(`page-${name}`)?.setProperties({ display: name === tab ? 'flex' : 'none' });
         panel.getElementById(`tab-${name}`)?.setProperties({
-          backgroundColor: name === tab ? OPTIC_YELLOW : BLOCK,
+          backgroundColor: name === tab ? OPTIC_YELLOW : undefined,
           color: name === tab ? CLOTH : CHALK,
         });
       }
@@ -329,7 +328,8 @@ export class ControlsSystem extends createSystem({
     this.cleanupFuncs.push(
       g.squirmOn.subscribe((on) => {
         squirm?.setProperties({ text: on ? 'Squirm when held: on' : 'Squirm when held: off', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
-        saveJson(StoreKey.Settings, { squirm: on });
+        const settings = loadJson<{ voice?: boolean }>(StoreKey.Settings);
+        saveJson(StoreKey.Settings, { ...settings, squirm: on });
       }),
     );
 
@@ -365,16 +365,25 @@ export class ControlsSystem extends createSystem({
         thinking: 'One moment',
         error: 'Say a scene',
       };
+      // The first press says what it will cost; the listener is 40 MB, kept after that.
+      let warned = loadJson<{ voice?: boolean }>(StoreKey.Settings)?.voice === true;
       wire('btn-voice', () => {
+        if (!warned) {
+          warned = true;
+          tell('A 40 MB download, once. It stays on the headset, and what you say stays too. Press again to go ahead.');
+          return;
+        }
+        saveJson(StoreKey.Settings, { squirm: g.squirmOn.peek(), voice: true });
         voice ??= new Voice({
           words: wordsToHear(),
           onState: (state, detail) => {
             busy = state === 'loading' || state === 'listening' || state === 'thinking';
             voiceButton.setProperties({
               text: WORDS[state],
-              backgroundColor: state === 'listening' ? OPTIC_YELLOW : BLOCK,
+              backgroundColor: state === 'listening' ? OPTIC_YELLOW : undefined,
               color: state === 'listening' ? CLOTH : CHALK,
             });
+            if (state === 'loading') tell('');
             if (state === 'listening') tell('Say what should be on the set, then stop talking.');
             if (state === 'error') tell(detail ?? 'The microphone did not start.');
           },
@@ -389,7 +398,13 @@ export class ControlsSystem extends createSystem({
         if (busy) voice.stop();
         else void voice.start();
       });
-      this.cleanupFuncs.push(() => voice?.dispose());
+      this.cleanupFuncs.push(
+        () => voice?.dispose(),
+        // Out of the session or behind a system menu, the microphone closes.
+        this.world.visibilityState.subscribe((state) => {
+          if (state !== VisibilityState.Visible) voice?.stop();
+        }),
+      );
     }
 
     // Two cameras, one live. Pressing the other is a cut, and a take that is recording keeps it.
@@ -407,12 +422,12 @@ export class ControlsSystem extends createSystem({
       const second = g.trayOn.peek().includes(CAMERAS[1]);
       const live = g.cameraOn.peek();
       panel.getElementById('btn-cam-a')?.setProperties({
-        backgroundColor: live === CAMERAS[0] ? OPTIC_YELLOW : BLOCK,
+        backgroundColor: live === CAMERAS[0] ? OPTIC_YELLOW : undefined,
         color: live === CAMERAS[0] ? CLOTH : CHALK,
       });
       panel.getElementById<UIKit.Text>('btn-cam-b')?.setProperties({
         text: second ? 'Cam B' : 'Add cam B',
-        backgroundColor: live === CAMERAS[1] ? OPTIC_YELLOW : BLOCK,
+        backgroundColor: live === CAMERAS[1] ? OPTIC_YELLOW : undefined,
         color: live === CAMERAS[1] ? CLOTH : CHALK,
       });
       panel.getElementById('strike-row')?.setProperties({ display: second ? 'flex' : 'none' });
@@ -439,12 +454,13 @@ export class ControlsSystem extends createSystem({
       if (page >= pages) page = 0;
       const on = g.trayOn.peek();
       for (const name of SHELF_TABS) {
-        // Filled yellow is the top level; a shelf is the level below it, so it only takes an edge.
-        panel.getElementById(`shelf-${name}`)?.setProperties({ borderColor: name === shelf ? OPTIC_YELLOW : BLOCK });
+        panel.getElementById(`shelf-${name}`)?.setProperties({
+          backgroundColor: name === shelf ? OPTIC_YELLOW : undefined,
+          color: name === shelf ? CLOTH : CHALK,
+        });
       }
       const searching = shelf === 'Search';
       panel.getElementById('search-box')?.setProperties({ display: searching ? 'flex' : 'none' });
-      panel.getElementById('held-block')?.setProperties({ display: searching ? 'none' : 'flex' });
       if (searching) {
         const found = query === '' ? 'Spell a name' : all.length === 0 ? `${query.toUpperCase()}: nothing in the kit` : query.toUpperCase();
         panel.getElementById<UIKit.Text>('search-query')?.setProperties({ text: found });
@@ -453,13 +469,13 @@ export class ControlsSystem extends createSystem({
         const at = page * slots() + i;
         const scene = scenes ? SCENES[at] : undefined;
         const item = !scenes && i < slots() ? all[at] : undefined;
-        // An edge says it is on the set; filled says it is the one the row below will change.
+        // Yellow means chosen, here as everywhere; a chalk edge says it is on the set.
         const selected = item != null && item.label === g.selectedLabel.peek();
         panel.getElementById<UIKit.Text>(`asset-${i}`)?.setProperties({
           display: item || scene ? 'flex' : 'none',
           text: scene ? scene.title : item ? assetTitle(item.label) : '',
-          borderColor: item && on.includes(item.label) ? OPTIC_YELLOW : CHALK_HAZE,
-          backgroundColor: selected ? OPTIC_YELLOW : BLOCK,
+          borderColor: item && on.includes(item.label) ? CHALK : CHALK_HAZE,
+          backgroundColor: selected ? OPTIC_YELLOW : undefined,
           color: selected ? CLOTH : CHALK,
         });
       }
@@ -594,7 +610,7 @@ export class ControlsSystem extends createSystem({
       record?.setProperties({
         text: recording ? 'Stop' : has ? 'Record over' : 'Record',
         borderColor: recording ? TALLY_RED : CHALK_HAZE,
-        backgroundColor: recording ? TALLY_RED : BLOCK,
+        backgroundColor: recording ? TALLY_RED : undefined,
       });
       play?.setProperties({
         display: has && !recording ? 'flex' : 'none',

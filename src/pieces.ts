@@ -113,6 +113,7 @@ type Globals = {
   cameraRig: Signal<string>;
   takeState: Signal<string>;
   trayOn: Signal<string[]>;
+  layoutChanged: Signal<number>;
 };
 /** A flown camera stays where it is let go, between these heights. */
 const DRONE_MIN_HEIGHT = 0.2;
@@ -197,6 +198,10 @@ export class PiecesSystem extends createSystem({
       this.queries.held.subscribe('disqualify', (piece) => this.released.push(piece)),
       g.trayOn.subscribe(() => {
         if (this.ready) this.setChanged();
+      }),
+      // The tray put something down where there was room: that is where it stands now.
+      g.layoutChanged.subscribe((n) => {
+        if (n > 0 && this.ready) this.save();
       }),
       g.newBoardRequested.subscribe((n) => {
         if (n > this.boardSeen) {

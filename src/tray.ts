@@ -14,6 +14,7 @@ import { SCENES } from './scenes.js';
 import type { Spoken } from './scene-request.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
+import { withGrain } from './wood-grain.js';
 
 export const LOOKS = [
   { name: 'Wood', top: 0, legs: 0, hair: false },
@@ -50,6 +51,11 @@ type Saved = { on: string[]; sensor: number; rig: string } & Partial<Dress>;
 type Globals = {
   sceneRequest: Signal<Spoken | null>;
   sceneStart: Signal<number>;
+  takeState: Signal<string>;
+  takeLength: Signal<number>;
+  takeClear: Signal<number>;
+  layoutChanged: Signal<number>;
+  cameraOn: Signal<string>;
   lensMm: Signal<number>;
   setupRecalled: Signal<number>;
   coachNote: Signal<string>;
@@ -205,6 +211,7 @@ export class TraySystem extends createSystem({
       // A camera's head tilts every frame, so a camera is left to work its own matrices out.
       if (!piece.hasComponent(ShotCamera)) this.freeze(piece);
       piece.object3D!.traverse((object) => {
+        if (object instanceof Mesh && PAINTED.test(object.name)) withGrain(object.material as MeshStandardMaterial);
         if (object.name !== 'EffectParticles') return;
         this.effects.push((object as Mesh).material as ShaderMaterial);
         object.raycast = () => {};
@@ -257,9 +264,29 @@ export class TraySystem extends createSystem({
     this.setOn(next);
     if (!added) return;
     this.clearSpot(label);
+    this.layoutDone();
     // What was just added is what the panel offers to change.
     this.selected = this.managed.find((entity) => this.key(entity) === label) ?? this.selected;
     this.publishSelected();
+  }
+
+  private layoutDone(): void {
+    const g = this.globals as Globals;
+    g.layoutChanged.value = g.layoutChanged.peek() + 1;
+  }
+
+  /** A whole set cannot change under a hand or under a take. Says why not, and returns false. */
+  private readyToRebuild(): boolean {
+    const g = this.globals as Globals;
+    if (g.takeState.peek() !== 'idle') {
+      g.coachNote.value = 'STOP THE TAKE FIRST | A take is running. Stop it, then change the set.';
+      return false;
+    }
+    if (this.queries.held.entities.size > 0) {
+      g.coachNote.value = 'LET GO FIRST | Put down what you are holding, then change the set.';
+      return false;
+    }
+    return true;
   }
 
   /** Spares of this piece that are off the set, next first. */
@@ -326,10 +353,14 @@ export class TraySystem extends createSystem({
    */
   private build({ request, text }: Spoken): void {
     const g = this.globals as Globals;
+    if (!this.readyToRebuild()) return;
     const next = request.clear ? new Set<string>() : new Set(this.on);
     // Starting over clears the dressing, not the camera department.
     if (request.clear) for (const label of this.on) if (assetByLabel(label)?.shelf === 'Kit') next.add(label);
-    for (const label of request.remove) next.delete(label);
+    for (const label of request.remove) {
+      next.delete(label);
+      for (const spare of sparesOf(label)) next.delete(spare);
+    }
     const placed: string[] = [];
     const refinished: string[] = [];
     let onlyOne = false;
@@ -360,6 +391,7 @@ export class TraySystem extends createSystem({
     for (const piece of this.managed) if (refinished.includes(this.key(piece))) this.coat(piece, this.finishOf(this.key(piece)));
     this.setOn(next);
     for (const label of placed) this.clearSpot(label);
+    this.layoutDone();
     // "A burning car": the fire goes on the thing that was named before it.
     const fire = request.items.findIndex((item) => item.label === 'Fire');
     if (fire > 0 && BURNING.test(text)) {
@@ -393,6 +425,11 @@ export class TraySystem extends createSystem({
     const scene = SCENES[index];
     if (scene == null) return;
     const g = this.globals as Globals;
+    if (!this.readyToRebuild()) return;
+    // A take belongs to the set it was shot on; left alone it would drag these pieces back.
+    const hadTake = g.takeLength.peek() > 0;
+    if (hadTake) g.takeClear.value = g.takeClear.peek() + 1;
+    if (g.cameraOn.peek() !== CAMERAS[0]) g.cameraOn.value = CAMERAS[0];
     const keep = [...this.on].filter((label) => assetByLabel(label)?.shelf === 'Kit');
     this.cast.clear();
     this.finish.clear();
@@ -418,7 +455,7 @@ export class TraySystem extends createSystem({
     g.lensMm.value = scene.lens;
     this.world.getSystem(ViewfinderSystem)?.refresh();
     g.setupRecalled.value = g.setupRecalled.peek() + 1;
-    g.coachNote.value = `${scene.title.toUpperCase()} | Everything here can be moved. Pick up a piece, or look through the lens.`;
+    g.coachNote.value = `${scene.title.toUpperCase()} | ${hadTake ? 'The last take is cleared. ' : ''}Everything here can be moved. Pick up a piece, or look through the lens.`;
   }
 
   /** The set as it should stand: everything listed on it, everything else back on the shelf. */
@@ -515,7 +552,9 @@ export class TraySystem extends createSystem({
     const material = mesh.material as MeshStandardMaterial;
     const key = 'ownColour';
     if (mesh.userData[key] == null) {
-      mesh.material = material.clone();
+      const own = material.clone();
+      if (PAINTED.test(mesh.name)) withGrain(own);
+      mesh.material = own;
       mesh.userData[key] = material.color.getHex();
     }
     (mesh.material as MeshStandardMaterial).color.setHex(colour === 0 ? mesh.userData[key] : colour);

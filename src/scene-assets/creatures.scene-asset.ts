@@ -43,7 +43,7 @@ import {
 } from './lib/kit.js';
 
 /** Carved, like the lay figures: a creature is a wooden maquette until someone paints it. */
-const primer = new MeshStandardMaterial({ color: 0xa98567, roughness: 0.72 });
+const primer = new MeshStandardMaterial({ color: 0xa37a60, roughness: 0.72 });
 const horn = new MeshStandardMaterial({ color: 0x3a332d, roughness: 0.55 });
 const bone = new MeshStandardMaterial({ color: 0xe4dac2, roughness: 0.5 });
 const eyeGlow = new MeshStandardMaterial({ color: 0xffb347, emissive: 0xff9a1f, emissiveIntensity: 0.8, roughness: 0.3 });

@@ -17,7 +17,7 @@ import {
 const LENGTH = 0.45;
 const WIDTH = 0.18;
 /** Bare basswood, as a model maker's maquette comes before anyone paints it. */
-const primer = new MeshStandardMaterial({ color: 0xc9ae8f, roughness: 0.72 });
+const primer = new MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.72 });
 const glass = new MeshStandardMaterial({ color: 0x20262e, roughness: 0.25, metalness: 0.3 });
 const rubber = new MeshStandardMaterial({ color: 0x17191c, roughness: 0.9 });
 const barRed = new MeshStandardMaterial({ color: 0xc8202c, emissive: 0xa0101a, emissiveIntensity: 0.8 });

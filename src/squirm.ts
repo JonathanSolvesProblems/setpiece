@@ -138,6 +138,8 @@ export class SquirmSystem extends createSystem({
   private zero = new Vector3();
   private lens: ViewfinderSystem | undefined;
   private actors: Entity[] = [];
+  private lastTake = 'idle';
+  private lastSeconds = 0;
 
   init(): void {
     this.cleanupFuncs.push(
@@ -234,8 +236,14 @@ export class SquirmSystem extends createSystem({
 
   /** While a take plays, whoever is moving is walking. */
   private watchWalkers(delta: number): void {
-    const g = this.globals as { takeState: Signal<string> };
-    const playing = g.takeState.peek() === 'playing';
+    const g = this.globals as { takeState: Signal<string>; takeSeconds: Signal<number> };
+    const state0 = g.takeState.peek();
+    const playing = state0 !== 'idle';
+    // A take starting, or looping round, is a jump: nothing has walked anywhere.
+    const seconds = g.takeSeconds.peek();
+    const jumped = state0 !== this.lastTake || seconds < this.lastSeconds;
+    this.lastTake = state0;
+    this.lastSeconds = seconds;
     if (!playing && this.moving.length === 0) return;
     if (this.actors.length === 0) {
       for (const piece of this.queries.pieces.entities) {
@@ -247,10 +255,11 @@ export class SquirmSystem extends createSystem({
       const object = piece.object3D!;
       const state = this.states.get(piece) ?? (playing ? this.stateFor(piece) : undefined);
       if (state == null) continue;
-      const dx = object.position.x - state.wasX;
-      const dz = object.position.z - state.wasZ;
+      const dx = jumped ? 0 : object.position.x - state.wasX;
+      const dz = jumped ? 0 : object.position.z - state.wasZ;
       state.wasX = object.position.x;
       state.wasZ = object.position.z;
+      if (jumped) state.speed = 0;
       // A take looping back to its start is a jump, not a step.
       const run = Math.hypot(dx, dz);
       const speed = run > 0.05 ? 0 : run / delta;

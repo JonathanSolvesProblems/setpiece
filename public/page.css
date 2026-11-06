@@ -297,8 +297,6 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
 .mark-b .tee { rotate: 2deg; }
 .mark-c .tee { rotate: -1.5deg; }
 .mark-d .tee { rotate: 2.5deg; }
-/* A mark whose actor is not on the floor waits at this strength. */
-.mark-c .tee, .mark-d .tee { opacity: 0.45; }
 @keyframes lay {
   from { opacity: 0; transform: translateY(-6px); }
 }

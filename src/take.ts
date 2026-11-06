@@ -40,10 +40,13 @@ type Track = {
   touched: boolean;
   /** Where the piece stood when the pass began. */
   start: Float32Array;
+  /** The last sample of this pass with a hand on the piece. */
+  lastHeld: number;
 };
 type SavedTake = { rate: number; length: number; tracks: Record<string, number[]>; rig?: string; cuts?: number[] };
 type Globals = {
   cameraOn: Signal<string>;
+  takeClear: Signal<number>;
   trayOn: Signal<string[]>;
   takeState: Signal<string>;
   takeSeconds: Signal<number>;
@@ -122,6 +125,9 @@ export class TakeSystem extends createSystem({
       }),
       // A camera button pressed while a take records is a cut. From that moment the pass follows the
       // wearer's cuts; the cuts the take already had before it stand.
+      g.takeClear.subscribe((n) => {
+        if (n > 0) this.clear();
+      }),
       g.cameraOn.subscribe((label) => {
         const index = Math.max(0, CAMERAS.indexOf(label as (typeof CAMERAS)[number]));
         const before = this.liveIndex;
@@ -164,6 +170,7 @@ export class TakeSystem extends createSystem({
           recorded: false,
           touched: false,
           start: new Float32Array(STRIDE),
+          lastHeld: -1,
         });
       }
       this.trackedCount = count;
@@ -269,6 +276,7 @@ export class TakeSystem extends createSystem({
     for (let i = 0; i < this.tracks.length; i++) {
       const track = this.tracks[i];
       track.touched = false;
+      track.lastHeld = -1;
       if (track.piece.object3D != null) this.readPose(track, track.start, 0);
     }
     this.setState(TakeState.Recording);
@@ -310,7 +318,10 @@ export class TakeSystem extends createSystem({
       if (track.touched) {
         this.readPose(track, track.data, index * STRIDE);
         // An actor is carried through the air to block a walk; the take keeps the walk, on the floor.
-        if (track.piece.getValue(SetPiece, 'role') === SetRole.Actor) track.data[index * STRIDE + 1] = track.start[1];
+        if (track.piece.getValue(SetPiece, 'role') === SetRole.Actor) {
+          track.data[index * STRIDE + 1] = track.start[1];
+          if (track.piece.hasComponent(Held)) track.lastHeld = index;
+        }
         if (track.piece.hasComponent(ShotCamera)) this.rig = (this.globals as Globals).cameraRig.peek();
       }
     }
@@ -320,6 +331,14 @@ export class TakeSystem extends createSystem({
     const written = this.written + 1;
     let any = false;
     for (let i = 0; i < this.tracks.length; i++) any = any || this.tracks[i].touched;
+    // An actor set down on something during the pass stays up there from then on.
+    for (let i = 0; i < this.tracks.length; i++) {
+      const track = this.tracks[i];
+      const object = track.piece.object3D;
+      if (!track.touched || object == null || track.lastHeld < 0 || track.piece.hasComponent(Held)) continue;
+      if (track.piece.getValue(SetPiece, 'role') !== SetRole.Actor) continue;
+      for (let s = track.lastHeld + 1; s < written; s++) track.data[s * STRIDE + 1] = object.position.y;
+    }
     // A pass in which the camera was cut is a pass worth keeping, and its cuts replace the old ones.
     any = any || this.passManual;
     if (this.passManual) this.cuts = this.passCuts;

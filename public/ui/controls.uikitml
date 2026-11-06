@@ -38,7 +38,7 @@
   .label {
     font-family: "Shoulders";
     font-weight: 700;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 15px;
     color: #c7c7b7;
     width: 64px;
@@ -64,7 +64,6 @@
     font-size: 13px;
     line-height: 18px;
     color: #f6f7ef;
-    background-color: #2a211c;
     flex-grow: 1;
     height: 36px;
     justify-content: center;
@@ -72,6 +71,7 @@
     border-radius: 2px;
     cursor: pointer;
   }
+  .tab:hover { background-color: #5a4b3d; }
   .shelf {
     text-align: center;
     font-family: "Grotesk";
@@ -79,18 +79,16 @@
     font-size: 13px;
     line-height: 16px;
     color: #f6f7ef;
-    background-color: #2a211c;
     flex-grow: 1;
     padding-left: 4px;
     padding-right: 4px;
     height: 30px;
-    border-width: 2px;
-    border-color: #2a211c;
     justify-content: center;
     align-items: center;
     border-radius: 2px;
     cursor: pointer;
   }
+  .shelf:hover { background-color: #5a4b3d; }
   .takebutton {
     font-family: "Grotesk";
     font-weight: 600;
@@ -110,6 +108,7 @@
     border-radius: 2px;
     cursor: pointer;
   }
+  .takebutton:hover { background-color: #5a4b3d; }
   .assetrow { flex-direction: row; gap: 6px; width: 100%; }
   .asset {
     text-align: center;
@@ -128,6 +127,7 @@
     border-radius: 2px;
     cursor: pointer;
   }
+  .asset:hover { background-color: #5a4b3d; }
   .keys { flex-direction: row; gap: 3px; width: 100%; }
   .key {
     font-family: "Grotesk";
@@ -135,7 +135,6 @@
     font-size: 14px;
     line-height: 18px;
     color: #f6f7ef;
-    background-color: #2a211c;
     text-align: center;
     width: 32px;
     height: 29px;
@@ -144,6 +143,7 @@
     border-radius: 2px;
     cursor: pointer;
   }
+  .key:hover { background-color: #5a4b3d; }
   .chips { flex-direction: row; gap: 4px; width: 100%; justify-content: space-between; }
   .chip {
     width: 27px;
@@ -163,7 +163,6 @@
     font-size: 17px;
     line-height: 20px;
     color: #f6f7ef;
-    background-color: #2a211c;
     width: 32px;
     height: 34px;
     justify-content: center;
@@ -172,6 +171,7 @@
     border-radius: 2px;
     cursor: pointer;
   }
+  .lens:hover { background-color: #5a4b3d; }
   .word {
     text-align: center;
     font-family: "Grotesk";
@@ -190,6 +190,7 @@
     border-radius: 2px;
     cursor: pointer;
   }
+  .word:hover { background-color: #5a4b3d; }
   .primary {
     font-family: "Grotesk";
     font-weight: 600;
@@ -334,7 +335,7 @@
       <div id="cast-line" class="line">Pick up a piece to change it</div>
     </div>
     <div id="paint-row" class="chips" style="display: none">
-      <div id="paint-0" class="chip" style="background-color: #c9ae8f"></div>
+      <div id="paint-0" class="chip" style="background-color: #c4a07a"></div>
       <div id="paint-1" class="chip" style="background-color: #9c3a2e"></div>
       <div id="paint-2" class="chip" style="background-color: #b86f33"></div>
       <div id="paint-3" class="chip" style="background-color: #c4a23f"></div>

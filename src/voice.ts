@@ -49,6 +49,8 @@ const NO_SPEECH_MS = 8000;
 const MAX_LISTEN_MS = 30000;
 /** How long to wait for the last words after stop(). */
 const FLUSH_MS = 4000;
+/** How long the audio is given to start before saying so. */
+const RESUME_MS = 1500;
 /** Sound kept while the model loads, in tenths of a second. Older sound is let go. */
 const KEPT_CHUNKS = 150;
 
@@ -108,7 +110,7 @@ const fileUrl = (path: string): string => new URL(`${import.meta.env.BASE_URL}${
 function microphoneSentence(error: unknown): string {
   const name = error instanceof DOMException ? error.name : '';
   if (name === 'NotAllowedError' || name === 'SecurityError') {
-    return 'The microphone is blocked for this site. Allow it in the browser, then try again.';
+    return 'No microphone yet. Exit, press Allow the microphone on the page, then come back.';
   }
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No microphone was found.';
   if (name === 'NotReadableError') return 'The microphone is in use by something else.';
@@ -197,11 +199,19 @@ export class Voice {
     try {
       // Made inside the press that called start(), while the browser still allows sound to begin.
       context = this.context ?? this.openContext();
-      context.resume().catch(() => undefined);
+      const resumed = context.resume().catch(() => undefined);
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: false,
       });
+      await Promise.race([resumed, new Promise((done) => window.setTimeout(done, RESUME_MS))]);
+      if (context.state !== 'running') {
+        for (const track of stream.getTracks()) track.stop();
+        if (run === this.run) this.fail('The headset did not start the sound. Press it again.');
+        return;
+      }
+      // The microphone going away (a system menu, the headset coming off) ends the listening.
+      for (const track of stream.getTracks()) track.addEventListener('ended', () => this.stop(), { once: true });
       if (run !== this.run) {
         for (const track of stream.getTracks()) track.stop();
         return;
@@ -213,8 +223,13 @@ export class Voice {
     }
 
     try {
-      const model = this.loadModel();
       await this.addCapture(context);
+    } catch {
+      if (run === this.run) this.fail('The headset would not open the sound. Press it again.');
+      return;
+    }
+    try {
+      const model = this.loadModel();
       if (run !== this.run) return;
       this.openMicrophone(context, stream);
       await model;
@@ -231,6 +246,8 @@ export class Voice {
     if (this.state === 'loading') {
       this.run++;
       this.closeMicrophone();
+      // A download that was called off should stop costing data.
+      if (this.settleLoad != null) this.dropWorker();
       this.setState('idle');
       return;
     }

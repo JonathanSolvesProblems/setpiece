@@ -53,6 +53,8 @@ World.create(
   globals.poseRequested = signal(0);
   globals.squirmOn = signal(loadJson<{ squirm: boolean }>(StoreKey.Settings)?.squirm !== false);
   globals.selectedPaint = signal(-1);
+  globals.takeClear = signal(0);
+  globals.layoutChanged = signal(0);
   globals.selectedLabel = signal('');
   globals.selectedCopies = signal(false);
   globals.copyRequested = signal(0);
@@ -107,11 +109,28 @@ World.create(
   // same signals the headset panel uses; the slate's fields along the frame
   // and the storyboard under it, kept current from those signals.
   const enter = document.getElementById('enter-xr') as HTMLButtonElement | null;
+  // A headset may not be able to ask for the microphone mid-session, so the page can ask first.
+  const mic = document.getElementById('page-mic') as HTMLButtonElement | null;
+  if (mic != null) {
+    mic.addEventListener('click', () => {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          for (const track of stream.getTracks()) track.stop();
+          mic.textContent = 'Microphone allowed';
+          mic.disabled = true;
+        })
+        .catch(() => {
+          mic.textContent = 'Microphone not allowed';
+        });
+    });
+  }
   const hint = document.getElementById('xr-hint');
   // A browser without passthrough cannot enter the session; the honest action
   // there is to carry the link to a headset that can.
   const xr = (navigator as Navigator & { xr?: { isSessionSupported(mode: string): Promise<boolean> } }).xr;
   Promise.resolve(xr ? xr.isSessionSupported('immersive-ar').catch(() => false) : false).then((supported) => {
+    if (supported && mic != null && navigator.mediaDevices != null) mic.hidden = false;
     if (supported || enter == null) return;
     enter.textContent = 'Copy the link for your Quest';
     enter.dataset.mode = 'copy';
