@@ -7,6 +7,8 @@
  * Every painted part is named Body*, so a coat of paint takes the whole shell.
  */
 import {
+  BufferAttribute,
+  BufferGeometry,
   CylinderGeometry,
   Group,
   Mesh,
@@ -100,6 +102,33 @@ function bar(a: Vector3, b: Vector3, width: number, material: Material, name: st
   return mesh;
 }
 
+/**
+ * One mesh for each material, so a car is a handful of draw calls and not sixty.
+ * Nothing on it moves against the rest, and a coat of paint still takes the whole
+ * body, because the body is one mesh named Body.
+ */
+function mergeByMaterial(g: Group, names: Map<Material, string>): void {
+  const parts = g.children.filter((child): child is Mesh => child instanceof Mesh);
+  for (const [material, name] of names) {
+    const positions: number[] = [];
+    const normals: number[] = [];
+    for (const part of parts) {
+      if (part.material !== material) continue;
+      part.updateMatrix();
+      const flat = part.geometry.index != null ? part.geometry.toNonIndexed() : part.geometry.clone();
+      flat.applyMatrix4(part.matrix);
+      positions.push(...(flat.getAttribute('position').array as Float32Array));
+      normals.push(...(flat.getAttribute('normal').array as Float32Array));
+      g.remove(part);
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
+    geometry.setAttribute('normal', new BufferAttribute(new Float32Array(normals), 3));
+    geometry.computeBoundingSphere();
+    g.add(named(new Mesh(geometry, material), name));
+  }
+}
+
 export function sedanShell(g: Group, paint: MeshStandardMaterial, glass: MeshStandardMaterial, rubber: MeshStandardMaterial): void {
   const body = LoftSurface.tube(BODY);
   g.add(named(new Mesh(body.build(sampleRange(-0.225, 0.224, 22), 24, true), paint), 'Body'));
@@ -171,4 +200,15 @@ export function sedanShell(g: Group, paint: MeshStandardMaterial, glass: MeshSta
   const back = named(new Mesh(bevelBox(0.118, 0.012, 0.012, 0.004), rubber), 'BumperRear');
   back.position.set(0, 0.044, -0.2245);
   g.add(grille, front, back);
+  mergeByMaterial(
+    g,
+    new Map<Material, string>([
+      [paint, 'Body'],
+      [glass, 'Glasshouse'],
+      [rubber, 'Trim'],
+      [lens, 'Headlamps'],
+      [tail, 'TailLamps'],
+      [hub, 'Hubs'],
+    ]),
+  );
 }

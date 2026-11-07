@@ -38,9 +38,9 @@ type Beat = {
   pieces: Placed[];
 };
 
-const A = { label: 'A', x: -0.12, z: 0.125 };
-const B = { label: 'B', x: 0.12, z: 0.125 };
-const C = { label: 'C', x: 0, z: 0.015 };
+const A = { label: 'A', x: -0.1, z: 0.085 };
+const B = { label: 'B', x: 0.1, z: 0.085 };
+const C = { label: 'C', x: 0, z: 0.005 };
 const LEFT = { label: 'A', x: -0.14, z: 0.03 };
 const RIGHT = { label: 'B', x: 0.14, z: 0.03 };
 
@@ -49,8 +49,8 @@ const BEATS: Beat[] = [
   {
     title: 'Standoff',
     heard: ['mexican standoff', 'mexican stand off', 'standoff', 'stand off', 'showdown', 'show down', 'face off', 'faceoff'],
-    lens: 24,
-    camera: [-0.23, 0.17, -62],
+    lens: 18,
+    camera: [0.05, 0.195, 14],
     says: 'Three actors, each aiming at the next.',
     pieces: roundTheRing([A, C, B], AIM),
   },
@@ -103,7 +103,7 @@ const AFTERMATHS: { heard: string[]; says: string; pieces: Placed[] }[] = [
     heard: ['car chase', 'police chase', 'high speed chase', 'car crash', 'crash', 'crashed', 'pile up', 'pileup', 'wreck', 'wrecked'],
     says: 'Two cars crashed behind them.',
     pieces: [
-      { label: 'Car', x: -0.135, z: -0.105, yaw: 78, paint: RED, size: SMALL },
+      { label: 'Car', x: -0.127, z: -0.105, yaw: 78, paint: RED, size: SMALL },
       { label: 'Car 2', x: 0.13, z: -0.1, yaw: -104, size: SMALL },
       { label: 'Smoke', x: 0.01, z: -0.12 },
     ],
