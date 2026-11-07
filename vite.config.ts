@@ -11,11 +11,13 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 // Which commit a page was built from, so a page left open can tell it is out of date.
+// The host builds without the git folder, so the build's own time is part of it: every build differs.
 const BUILD = (() => {
+  const made = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '');
   try {
-    return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain src public index.html').toString().trim() === '' ? '' : '+');
+    return `${execSync('git rev-parse --short HEAD').toString().trim()}-${made}`;
   } catch {
-    return 'unknown';
+    return `${process.env.VERCEL_URL?.split('-')[1] ?? 'host'}-${made}`;
   }
 })();
 
