@@ -34,6 +34,21 @@ export class HandReading {
   shut = false;
   /** Metres between thumb and index tips, as last tracked. */
   pinchGap = 0;
+  /** Two points along the hand's pointing ray, from aimFrom. */
+  readonly rayFrom = new Vector3();
+  readonly rayTo = new Vector3();
+
+  /** Where the hand is pointing. It asks the headset each time, so it is for the rare frame that needs it. */
+  aimFrom(frame: XRFrame, base: XRReferenceSpace, source: XRInputSource | undefined, origin: Object3D): boolean {
+    const pose = source == null ? null : frame.getPose(source.targetRaySpace, base);
+    if (pose == null) return false;
+    const m = pose.transform.matrix;
+    this.rayFrom.set(m[12], m[13], m[14]);
+    this.rayTo.set(m[12] - m[8], m[13] - m[9], m[14] - m[10]);
+    origin.localToWorld(this.rayFrom);
+    origin.localToWorld(this.rayTo);
+    return true;
+  }
   /** True for the one frame the hand went from open to shut. */
   fistStart = false;
 

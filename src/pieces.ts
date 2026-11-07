@@ -28,10 +28,12 @@ import {
   MeshBasicMaterial,
   Object3D,
   Quaternion,
+  Raycaster,
   RingGeometry,
   Vector3,
   VisibilityState,
 } from '@iwsdk/core';
+import type { Intersection, UIKitMLAsset } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
 import { assetByLabel } from './catalog.js';
@@ -84,6 +86,8 @@ const REACH_RELEASE = 0.06;
 const THIN_REACH = 0.045;
 /** Hand tracking drops out for a moment when fingers close: a held piece waits this long for it. */
 const LOST_HAND_SECONDS = 0.5;
+/** Scaled past this, a piece is too large for being near it to mean reaching for it. */
+const OVERSIZE = 1.2;
 /**
  * A turning wrist hides the fingertips from the headset, and the browser reports
  * the pinch gone for a moment while the fingers are still together. So a hold ends
@@ -166,6 +170,8 @@ export class PiecesSystem extends createSystem({
   private spans: number[] = [];
   private readings: Record<Side, HandReading> = { left: new HandReading(), right: new HandReading() };
   private carrying: Record<Side, Carry | null> = { left: null, right: null };
+  private panelRay = new Raycaster();
+  private panelHits: Intersection[] = [];
   /** The piece each hand is on, by index, or -1. */
   private near: Record<Side, number> = { left: -1, right: -1 };
   private rayAside: Record<Side, boolean> = { left: false, right: false };
@@ -385,6 +391,8 @@ export class PiecesSystem extends createSystem({
       index = this.nearestTo(fistAt, reach);
       fromFist = index >= 0;
     }
+    // A big or giant piece reaches a long way, and the button that shrinks it must stay in reach.
+    if (index >= 0 && byHand && this.dressed[index].object3D!.scale.x > OVERSIZE && this.pointsAtPanel(side)) index = -1;
     this.near[side] = index;
     this.setRayAside(side, index >= 0);
     if (index < 0 || this.guard > 0) return;
@@ -395,6 +403,23 @@ export class PiecesSystem extends createSystem({
     const by: Carry['by'] = !byHand ? 'pad' : fisted && !pinched ? 'fist' : 'pinch';
     const point = by === 'fist' || fromFist ? fistAt : pinchAt;
     this.take(side, this.dressed[index], by, by === 'pinch' && fromFist ? pinchAt : point);
+  }
+
+  /** Whether this hand's ray lands on the control panel. */
+  private pointsAtPanel(side: Side): boolean {
+    const xr = this.input.xr;
+    const renderer = this.world.renderer;
+    const frame = renderer.xr.getFrame?.();
+    const base = renderer.xr.getReferenceSpace();
+    const reading = this.readings[side];
+    if (frame == null || base == null || !reading.aimFrom(frame, base, xr.getPrimaryInputSource(side), this.player)) return false;
+    const panel = this.world.getSceneObject<UIKitMLAsset>('controls-panel')?.getElementById('panel-root') as unknown as Object3D | undefined;
+    if (panel == null) return false;
+    this.panelRay.ray.origin.copy(reading.rayFrom);
+    this.panelRay.ray.direction.copy(reading.rayTo).sub(reading.rayFrom).normalize();
+    this.panelHits.length = 0;
+    panel.raycast(this.panelRay, this.panelHits);
+    return this.panelHits.length > 0;
   }
 
   private take(side: Side, piece: Entity, by: Carry['by'], point: Vector3): void {
