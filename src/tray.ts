@@ -11,6 +11,8 @@ import { CAMERAS, Rig, SENSORS } from './camera-formats.js';
 import { assetByLabel, assetTitle, PAINTS, sparesOf, SIZES, STARTING_ASSETS } from './catalog.js';
 import { Held, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { SCENES } from './scenes.js';
+import type { Scene } from './scenes.js';
+import { AIM } from './scene-stagings.js';
 import type { Spoken } from './scene-request.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -23,7 +25,7 @@ export const LOOKS = [
   { name: 'White shirt', top: 0xe6e4da, legs: 0x2a2c31, hair: true },
   { name: 'Hi-vis', top: 0xd6e13c, legs: 0x2f3a45, hair: true },
 ] as const;
-export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running'] as const;
+export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim'] as const;
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
 const WOOD_LEGS = /^Leg/;
 const PAINTED = /^Body/;
@@ -367,9 +369,25 @@ export class TraySystem extends createSystem({
    * painted and sized as asked. Only what is in the library can be named, and
    * what was named that is not there is said back.
    */
-  private build({ request, text }: Spoken): void {
+  private build(spoken: Spoken): void {
+    const { request, text, staging, aim } = spoken;
     const g = this.globals as Globals;
     if (!this.readyToRebuild()) return;
+    if (staging != null) {
+      this.stage(staging);
+      // Anything else that was named goes on around the blocking.
+      const taken = new Set(staging.pieces.map((placed) => placed.label.replace(/ \d$/, '')));
+      const extras = request.items.filter((item) => !taken.has(item.label));
+      if (extras.length > 0) this.build({ ...spoken, staging: null, aim: false, request: { clear: false, items: extras, remove: [], unknown: [] } });
+      const also = extras.length > 0 ? ` Also on: ${extras.map((item) => assetTitle(item.label)).join(', ')}.` : '';
+      const lacking = request.unknown.length > 0 ? ` Not in the kit: ${request.unknown.join(', ')}.` : '';
+      g.coachNote.value = `${staging.title.toUpperCase()} | ${staging.says}${also}${lacking} Everything can be moved.`;
+      return;
+    }
+    if (aim) {
+      this.takeAim();
+      return;
+    }
     const next = request.clear ? new Set<string>() : new Set(this.on);
     // Starting over clears the dressing, not the camera department.
     if (request.clear) for (const label of this.on) if (assetByLabel(label)?.shelf === 'Kit') next.add(label);
@@ -436,12 +454,43 @@ export class TraySystem extends createSystem({
     g.coachNote.value = `${nothingDone ? 'NOT IN THE KIT' : 'SET FROM YOUR WORDS'} | ${parts.join(' ')}`;
   }
 
-  /** A whole set to start from: every piece to its mark, dressed, and the camera where it should be. */
+  /** A set from the library. */
   private startScene(index: number): void {
     const scene = SCENES[index];
-    if (scene == null) return;
+    if (scene == null || !this.readyToRebuild()) return;
+    this.stage(scene);
+  }
+
+  /** Every actor on the set takes aim at the next one. With nobody on the set, two come on to do it. */
+  private takeAim(): void {
     const g = this.globals as Globals;
-    if (!this.readyToRebuild()) return;
+    const isActor = (label: string): boolean =>
+      this.managed.some((piece) => this.key(piece) === label && piece.getValue(SetPiece, 'role') === SetRole.Actor);
+    if (![...this.on].some(isActor)) {
+      this.setOn(new Set([...this.on, 'A', 'B']));
+      this.clearSpot('A');
+      this.clearSpot('B');
+    }
+    const actors = this.managed.filter((piece) => this.on.has(this.key(piece)) && isActor(this.key(piece)));
+    actors.forEach((piece, i) => {
+      const key = this.key(piece);
+      const value: [number, number] = [AIM, this.cast.get(key)?.[1] ?? 0];
+      this.cast.set(key, value);
+      this.dress(piece, value);
+      const from = piece.object3D;
+      const to = actors[(i + 1) % actors.length].object3D;
+      if (from != null && to != null && actors.length > 1) {
+        from.rotation.set(0, Math.atan2(to.position.x - from.position.x, to.position.z - from.position.z), 0);
+      }
+    });
+    this.layoutDone();
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    g.coachNote.value = `AIM | ${actors.length === 1 ? 'Your actor takes aim.' : 'Each actor aiming at the next.'} Everything can be moved.`;
+  }
+
+  /** A whole set: every piece to its mark, dressed, and the camera where it should be. */
+  private stage(scene: Scene): void {
+    const g = this.globals as Globals;
     // A take belongs to the set it was shot on; left alone it would drag these pieces back.
     const hadTake = g.takeLength.peek() > 0;
     if (hadTake) g.takeClear.value = g.takeClear.peek() + 1;

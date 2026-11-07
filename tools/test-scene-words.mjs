@@ -246,7 +246,32 @@ for (const [name, ok] of listChecks) {
   if (!ok) failed++;
 }
 
-const total = CASES.length + noise.length + listChecks.length;
+// Directing words: a blocking, not a list of pieces.
+const { stagingFor, withoutStaging, asksToAim, stagingWords } = await load('src/scene-stagings.ts');
+const SCENE_NAMES = [{ title: 'Dragon attack', lens: 24, camera: [0, 0, 0], pieces: [{ label: 'Dragon', x: 0, z: 0 }] }];
+const stagedLabels = (text) => stagingFor(text, SCENE_NAMES)?.pieces.map((piece) => piece.label).join(',') ?? null;
+const STANDOFF = 'i want like a mexican standoff where there was just a car chase and now they are pointing weapons at each other';
+const stagings = [
+  ['the sentence from the headset', stagedLabels(STANDOFF) === 'A,C,B,Car,Car 2,Smoke'],
+  ['every figure in a standoff aims', stagingFor(STANDOFF, []).pieces.slice(0, 3).every((piece) => piece.pose === 4)],
+  ['heard as two words', stagedLabels('a mexican stand off') === 'A,C,B'],
+  ['a shootout in an alley', stagedLabels('a shootout in an alley') === 'A,B,Lamp post,Dumpster'],
+  ['aiming at each other is a shootout', stagedLabels('they are aiming at each other') === 'A,B'],
+  ['a library scene by name', stagedLabels('dragon attack') === 'Dragon'],
+  ['a list of pieces is not a beat', stagedLabels('a dragon and two actors') === null],
+  ['nothing said, nothing staged', stagedLabels('') === null],
+  ['a chase on its own is not a standoff', stagedLabels('a car chase') === null],
+  ['what else was named survives', parseRequest(withoutStaging('a hold up with a van'), NOW).items.some((item) => item.label === 'Van')],
+  ['the words themselves are not missing pieces', parseRequest(withoutStaging(STANDOFF), NOW).unknown.length === 0],
+  ['weapons alone ask for aim', asksToAim('give them guns') && !asksToAim('give them a dragon')],
+  ['the list is plain lower-case words', stagingWords().every((entry) => /^[a-z]+( [a-z]+)*$/.test(entry))],
+];
+for (const [name, ok] of stagings) {
+  console.log(`${ok ? 'ok  ' : 'FAIL'} staging: ${name}`);
+  if (!ok) failed++;
+}
+
+const total = CASES.length + noise.length + listChecks.length + stagings.length;
 if (failed > 0) {
   console.error(`\n${failed} of ${total} checks failed.`);
   process.exit(1);

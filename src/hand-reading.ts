@@ -32,6 +32,8 @@ export class HandReading {
   /** Inside the closed hand, in world space. */
   readonly fistAt = new Vector3();
   shut = false;
+  /** Metres between thumb and index tips, as last tracked. */
+  pinchGap = 0;
   /** True for the one frame the hand went from open to shut. */
   fistStart = false;
 
@@ -68,6 +70,7 @@ export class HandReading {
     const wz = p[14];
     this.fistAt.set(wx + (p[STRIDE + 12] - wx) * PALM_REACH, wy + (p[STRIDE + 13] - wy) * PALM_REACH, wz + (p[STRIDE + 14] - wz) * PALM_REACH);
     origin.localToWorld(this.fistAt);
+    this.pinchGap = dist(p, 2, 3);
     const palm = dist(p, 0, 1);
     if (palm < 0.01) return;
     const curl = (dist(p, 4, 0) + dist(p, 5, 0) + dist(p, 6, 0)) / 3 / palm;

@@ -7,6 +7,7 @@
  * Torso, Chest, Neck, Head, LegL/LegR, ArmL/ArmR; EyelineBall, Stand.
  */
 import {
+  BoxGeometry,
   CapsuleGeometry,
   CylinderGeometry,
   Group,
@@ -59,7 +60,25 @@ export type Stance = {
   armsUp?: boolean;
   /** Mid-stride with the arms driving. */
   running?: boolean;
+  /** One arm straight out at the shoulder, with a wooden prop pistol in the hand. */
+  aiming?: 'L' | 'R';
 };
+
+/**
+ * The prop, in the same dark wood as the joints: a block for the slide and a
+ * block for the grip, cut a little over scale so it reads from across a table.
+ * The name keeps it on the arm when the figure moves.
+ */
+function propPistol(hand: Vector3, tag: 'L' | 'R'): Mesh {
+  const slide = new Mesh(new BoxGeometry(0.0034, 0.0044, 0.024), woodDark);
+  slide.name = `Pistol${tag}`;
+  slide.position.set(hand.x, hand.y + 0.0045, hand.z + 0.0085);
+  const grip = new Mesh(new BoxGeometry(0.0032, 0.0098, 0.0048), woodDark);
+  grip.position.set(0, -0.0058, -0.0075);
+  grip.rotation.x = -0.25;
+  slide.add(grip);
+  return slide;
+}
 
 export function layFigure(name: string, realHeightM: number, stance: Stance = {}): Group {
   const h = realHeightM * SCALE;
@@ -109,7 +128,10 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
     const shoulder = new Vector3(side * 0.16 * h, 0.8 * h, 0);
     let elbow = new Vector3(side * 0.19 * h, 0.62 * h, -0.01 * h);
     let wrist = new Vector3(side * 0.16 * h, 0.45 * h, -0.05 * h);
-    if (stance.pointing === tag) {
+    if (stance.aiming === tag) {
+      elbow = new Vector3(side * 0.12 * h, 0.8 * h, 0.17 * h);
+      wrist = new Vector3(side * 0.05 * h, 0.81 * h, 0.33 * h);
+    } else if (stance.pointing === tag) {
       // Arm raised toward the mark in front of the figure.
       elbow = new Vector3(side * 0.19 * h, 0.74 * h, 0.13 * h);
       wrist = new Vector3(side * 0.15 * h, 0.82 * h, 0.3 * h);
@@ -131,6 +153,7 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       limb(elbow, wrist, 0.035 * h, wood, `Arm${tag}Lower`),
       ball(wrist, 0.04 * h, woodLight, `Hand${tag}`),
     );
+    if (stance.aiming === tag) g.add(propPistol(wrist, tag));
   }
   return g;
 }
@@ -176,9 +199,10 @@ function castFigure(name: string, realHeightM: number, stances: Stance[]): Group
 const neutral: Stance = {};
 const armsUp: Stance = { armsUp: true };
 const running: Stance = { running: true };
+const aiming: Stance = { aiming: 'R', step: 'L' };
 
-export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running]);
-export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running]);
-export const actorC = castFigure('ActorC', 1.78, [neutral, { step: 'L' }, armsUp, running]);
-export const actorD = castFigure('ActorD', 1.6, [neutral, { pointing: 'L' }, armsUp, running]);
+export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running, aiming]);
+export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running, aiming]);
+export const actorC = castFigure('ActorC', 1.78, [neutral, { step: 'L' }, armsUp, running, aiming]);
+export const actorD = castFigure('ActorD', 1.6, [neutral, { pointing: 'L' }, armsUp, running, aiming]);
 export const creature = eyelineStand(0.33);

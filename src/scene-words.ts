@@ -10,7 +10,8 @@
  *
  * What it cannot do: add a piece that was not said. Every item it returns
  * comes from a word in the transcript that names a piece in the vocabulary.
- * An empty or meaningless transcript returns an empty request.
+ * An empty or meaningless transcript returns an empty request. Words that name
+ * a blocking rather than pieces are read in scene-stagings.ts.
  */
 
 export type Vocab = { label: string; title: string; shelf: string; aliases?: string[] }[];

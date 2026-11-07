@@ -10,6 +10,7 @@
 import { ASSETS } from './catalog.js';
 import { parseRequest, speechWords } from './scene-words.js';
 import type { Request as SceneRequest, Vocab } from './scene-words.js';
+import { wordsToHear } from './scene-request.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
 
@@ -59,7 +60,8 @@ let progressCalls = 0;
 let progress = 0;
 
 const voice = new Voice({
-  words: open ? undefined : speechWords(vocab),
+  // The list the app listens with, unless this page was asked to try something else.
+  words: open ? undefined : params.has('coming') ? speechWords(vocab) : wordsToHear(),
   onState(state, detail) {
     states.push(state);
     stateText.textContent = detail ? `${state}: ${detail}` : state;

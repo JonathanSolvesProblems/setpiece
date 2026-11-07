@@ -84,6 +84,15 @@ const REACH_RELEASE = 0.06;
 const THIN_REACH = 0.045;
 /** Hand tracking drops out for a moment when fingers close: a held piece waits this long for it. */
 const LOST_HAND_SECONDS = 0.5;
+/**
+ * A turning wrist hides the fingertips from the headset, and the browser reports
+ * the pinch gone for a moment while the fingers are still together. So a hold ends
+ * when the fingers are seen apart, or when the pinch stays gone for a while.
+ */
+const FINGERS_APART = 0.04;
+const OPENING_SECONDS = 0.06;
+const PINCH_GONE_SECONDS = 0.3;
+const FIST_OPEN_SECONDS = 0.12;
 const HAND_SMOOTHING = 45;
 /** A piece let go above the slate falls to it. */
 const FALL = 5;
@@ -104,7 +113,7 @@ type Pose = number[];
 type SavedPieces = Record<string, Pose>;
 type Side = 'left' | 'right';
 const SIDES: Side[] = ['left', 'right'];
-type Carry = { piece: Entity; by: 'pinch' | 'fist' | 'pad'; offset: Vector3; at: Vector3; lost: number };
+type Carry = { piece: Entity; by: 'pinch' | 'fist' | 'pad'; offset: Vector3; at: Vector3; lost: number; opening: number };
 type Drop = { piece: Entity; speed: number; floor: number };
 type Globals = {
   newBoardRequested: Signal<number>;
@@ -391,7 +400,7 @@ export class PiecesSystem extends createSystem({
   private take(side: Side, piece: Entity, by: Carry['by'], point: Vector3): void {
     const object = piece.object3D!;
     object.getWorldPosition(this.point);
-    this.carrying[side] = { piece, by, offset: this.point.clone().sub(point), at: point.clone(), lost: 0 };
+    this.carrying[side] = { piece, by, offset: this.point.clone().sub(point), at: point.clone(), lost: 0, opening: 0 };
     this.near[side] = -1;
     // This pinch belongs to the hand now: whatever the ray began with it is let go.
     if (!this.rayAside[side]) {
@@ -405,8 +414,13 @@ export class PiecesSystem extends createSystem({
     const pad = this.input.xr.gamepads[side];
     let letGo: boolean;
     if (!byHand) letGo = !live || (pad?.getSelecting() !== true && pad?.getButtonPressed(InputComponent.Squeeze) !== true);
-    else if (carry.by === 'fist') letGo = live && !this.readings[side].shut;
-    else letGo = pad != null && !pad.getSelecting();
+    else {
+      const reading = this.readings[side];
+      const opening = carry.by === 'fist' ? live && !reading.shut : pad != null && !pad.getSelecting();
+      carry.opening = opening ? carry.opening + delta : 0;
+      if (carry.by === 'fist') letGo = carry.opening >= FIST_OPEN_SECONDS;
+      else letGo = carry.opening >= PINCH_GONE_SECONDS || (carry.opening >= OPENING_SECONDS && live && reading.pinchGap > FINGERS_APART);
+    }
     carry.lost = live ? 0 : carry.lost + delta;
     if (letGo || carry.lost > LOST_HAND_SECONDS || carry.piece.object3D?.visible !== true) {
       this.carrying[side] = null;
