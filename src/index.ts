@@ -1,5 +1,6 @@
 import { placingPieces, setFailed, setReady } from './loader.js';
 import './fonts.js';
+import { BUILD, watchForNewBuild } from './build-check.js';
 import { DepthSensingSystem, VisibilityState, World } from '@iwsdk/core';
 import { signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';
@@ -102,6 +103,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.takeState = signal<string>(TakeState.Idle);
   globals.takeSeconds = signal(0);
   globals.takeEmpty = signal(0);
+  globals.lastSpoken = signal('');
   globals.takeLength = signal(0);
   globals.recordRequested = signal(0);
   globals.playRequested = signal(0);
@@ -357,8 +359,22 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     if (ready) requestAnimationFrame(setReady);
   });
 
+  // Outside a session, a newer build replaces this one. Inside, it waits until the session ends.
+  let stale = false;
+  const reloadWhenFree = (): void => {
+    if (stale && world.session == null && !world.sessionRequestPending && takeState.peek() === TakeState.Idle) location.reload();
+  };
+  watchForNewBuild(() => {
+    stale = true;
+    reloadWhenFree();
+  });
+  world.visibilityState.subscribe((state) => {
+    if (state === VisibilityState.NonImmersive) reloadWhenFree();
+  });
+
   // Debug and test hook: lets scripts drive the app from the page.
   (globalThis as Record<string, unknown>).setpiece = {
+    build: BUILD,
     world,
     viewfinder: world.getSystem(ViewfinderSystem),
     // The same thing the voice button does, from typed words.

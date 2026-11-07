@@ -65,6 +65,7 @@ type Globals = {
   trayOn: Signal<string[]>;
   setReady: Signal<boolean>;
   occlusion: Signal<string | null>;
+  lastSpoken: Signal<string>;
   trayRestore: Signal<string[] | null>;
   trayDress: Signal<Dress>;
   trayDressRestore: Signal<Dress | null>;
@@ -372,16 +373,18 @@ export class TraySystem extends createSystem({
   private build(spoken: Spoken): void {
     const { request, text, staging, aim } = spoken;
     const g = this.globals as Globals;
+    g.lastSpoken.value = text;
     if (!this.readyToRebuild()) return;
     if (staging != null) {
       this.stage(staging);
       // Anything else that was named goes on around the blocking.
       const taken = new Set(staging.pieces.map((placed) => placed.label.replace(/ \d$/, '')));
-      const extras = request.items.filter((item) => !taken.has(item.label));
+      // The beat decides who is in it, so "everyone" or "two actors" does not add more people.
+      const extras = request.items.filter((item) => !taken.has(item.label) && assetByLabel(item.label)?.tape == null);
       if (extras.length > 0) this.build({ ...spoken, staging: null, aim: false, request: { clear: false, items: extras, remove: [], unknown: [] } });
       const also = extras.length > 0 ? ` Also on: ${extras.map((item) => assetTitle(item.label)).join(', ')}.` : '';
-      const lacking = request.unknown.length > 0 ? ` Not in the kit: ${request.unknown.join(', ')}.` : '';
-      g.coachNote.value = `${staging.title.toUpperCase()} | ${staging.says}${also}${lacking} Everything can be moved.`;
+      // Around a beat that was understood, a stray unknown word is far more often a mishearing than a request.
+      g.coachNote.value = `${staging.title.toUpperCase()} | ${staging.says}${also} Everything can be moved.`;
       return;
     }
     if (aim) {

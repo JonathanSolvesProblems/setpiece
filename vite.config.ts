@@ -6,11 +6,31 @@
  */
 
 import { iwsdkDev } from '@iwsdk/vite-plugin-dev';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
+// Which commit a page was built from, so a page left open can tell it is out of date.
+const BUILD = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain src public index.html').toString().trim() === '' ? '' : '+');
+  } catch {
+    return 'unknown';
+  }
+})();
+
 export default defineConfig(({ command }) => ({
-  plugins: [iwsdkDev()],
+  plugins: [
+    iwsdkDev(),
+    {
+      name: 'setpiece-version',
+      apply: 'build',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build: BUILD }) });
+      },
+    },
+  ],
+  define: { __BUILD__: JSON.stringify(command === 'build' ? BUILD : 'dev') },
   server: { host: '0.0.0.0', port: 8081, open: false },
   build: {
     outDir: 'dist',

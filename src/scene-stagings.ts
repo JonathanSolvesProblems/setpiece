@@ -164,5 +164,5 @@ export const stagingWords = (): string[] => [
   ...WEAPONS,
   // The small words a director strings these together with. Left out, a recogniser
   // working from a list puts a piece's name where they were said.
-  ...'where was were just now they are their them after before who when that this there at each other of the is been have has had like want would pointing'.split(' '),
+  ...'where was were just now they are their them after before who when that this there at each other of the is been have has had like want would pointing so its everyone everybody okay then'.split(' '),
 ];
