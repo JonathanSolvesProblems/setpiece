@@ -9,7 +9,7 @@
  */
 
 /** The panel's type, fetched a file at a time, is the part of this wait the page can count. */
-const PANEL_FONTS = 5;
+const PANEL_FONTS = 6;
 const PANEL_FONT = /\/ui\/fonts\/baked\/[A-Za-z-]+\.json/;
 const SLOW_MS = 20_000;
 const STUCK_MS = 60_000;

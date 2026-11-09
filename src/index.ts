@@ -361,9 +361,15 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
 
   // Outside a session, a newer build replaces this one. Inside, it waits until the session ends.
   let stale = false;
+  const free = (): boolean => stale && world.session == null && !world.sessionRequestPending && takeState.peek() === TakeState.Idle;
   const reloadWhenFree = (): void => {
-    if (stale && world.session == null && !world.sessionRequestPending && takeState.peek() === TakeState.Idle) location.reload();
+    if (!free()) return;
+    // A piece still in a hand when a session ends is saved on release, about half a second later.
+    window.setTimeout(() => {
+      if (free()) location.reload();
+    }, 1500);
   };
+  takeState.subscribe(() => reloadWhenFree());
   watchForNewBuild(() => {
     stale = true;
     reloadWhenFree();

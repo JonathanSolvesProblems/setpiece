@@ -388,6 +388,8 @@ export class TraySystem extends createSystem({
       return;
     }
     if (aim) {
+      // "Two actors with guns and a car": the pieces go on first, then everyone takes aim.
+      if (request.items.length > 0 || request.remove.length > 0 || request.clear) this.build({ ...spoken, aim: false });
       this.takeAim();
       return;
     }
@@ -487,6 +489,8 @@ export class TraySystem extends createSystem({
       }
     });
     this.layoutDone();
+    this.publishSelected();
+    this.save();
     this.world.getSystem(ViewfinderSystem)?.refresh();
     g.coachNote.value = `AIM | ${actors.length === 1 ? 'Your actor takes aim.' : 'Each actor aiming at the next.'} Everything can be moved.`;
   }
@@ -621,6 +625,9 @@ export class TraySystem extends createSystem({
     const key = 'ownColour';
     if (mesh.userData[key] == null) {
       const own = material.clone();
+      // clone() leaves these behind, and the occlusion trial lives in them.
+      own.onBeforeCompile = material.onBeforeCompile;
+      own.customProgramCacheKey = material.customProgramCacheKey;
       if (PAINTED.test(mesh.name)) withGrain(own);
       mesh.material = own;
       mesh.userData[key] = material.color.getHex();

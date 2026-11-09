@@ -248,7 +248,10 @@ for (const [name, ok] of listChecks) {
 
 // Directing words: a blocking, not a list of pieces.
 const { stagingFor, withoutStaging, asksToAim, stagingWords } = await load('src/scene-stagings.ts');
-const SCENE_NAMES = [{ title: 'Dragon attack', lens: 24, camera: [0, 0, 0], pieces: [{ label: 'Dragon', x: 0, z: 0 }] }];
+const SCENE_NAMES = [
+  { title: 'Dragon attack', lens: 24, camera: [0, 0, 0], pieces: [{ label: 'Dragon', x: 0, z: 0 }] },
+  { title: 'Wizard duel', lens: 35, camera: [0, 0, 0], pieces: [{ label: 'Magic', x: 0, z: 0 }] },
+];
 const stagedLabels = (text) => stagingFor(text, SCENE_NAMES)?.pieces.map((piece) => piece.label).join(',') ?? null;
 const STANDOFF = 'i want like a mexican standoff where there was just a car chase and now they are pointing weapons at each other';
 const stagings = [
@@ -258,6 +261,10 @@ const stagings = [
   ['a shootout in an alley', stagedLabels('a shootout in an alley') === 'A,B,Lamp post,Dumpster'],
   ['aiming at each other is a shootout', stagedLabels('they are aiming at each other') === 'A,B'],
   ['a library scene by name', stagedLabels('dragon attack') === 'Dragon'],
+  ['a library scene whose title holds a beat word is still the scene', stagedLabels('wizard duel') === 'Magic'],
+  ['a beat with a library title inside it is still the beat', stagingFor('a standoff after a car chase', [{ title: 'Car chase', lens: 24, camera: [0, 0, 0], pieces: [] }]).title === 'Standoff'],
+  ['a second setting moves to the corners', stagingFor('a standoff in the street after a car chase', []).pieces.find((p) => p.label === 'Lamp post').z > 0],
+  ['the first setting keeps its marks', stagingFor('a standoff in the street', []).pieces.find((p) => p.label === 'Lamp post').z < 0],
   ['a list of pieces is not a beat', stagedLabels('a dragon and two actors') === null],
   ['nothing said, nothing staged', stagedLabels('') === null],
   ['a chase on its own is not a standoff', stagedLabels('a car chase') === null],

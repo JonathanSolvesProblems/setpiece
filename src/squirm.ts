@@ -81,6 +81,7 @@ const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
 
 function rigFor(pose: Object3D): Rig {
   const byName = (pattern: RegExp): Object3D[] => pose.children.filter((part) => pattern.test(part.name));
+  const aiming = (parts: Object3D[]): boolean => parts.some((part) => part.name.startsWith('Pistol'));
   const limb = (parts: Object3D[], pivot: Vector3, wave: number, phase: number, splay: number, axis: Vector3 = X, stride = 0, step = 0): Limb => ({
     parts,
     bases: parts.map((part) => part.matrix.clone()),
@@ -104,8 +105,8 @@ function rigFor(pose: Object3D): Rig {
     const knee = legs.find((part) => part.name.startsWith('Knee'))!;
     limbs.push(
       limb(legs, new Vector3(knee.position.x, pelvis.position.y, 0), LEG_KICK, i * Math.PI, 0, X, LEG_STRIDE, i * Math.PI),
-      // An arm swings with the opposite leg.
-      limb(arms, shoulder.position.clone(), ARM_WAVE, i * Math.PI + Math.PI / 2, side * ARM_SPLAY, X, ARM_STRIDE, i * Math.PI + Math.PI),
+      // An arm swings with the opposite leg. An arm holding the prop pistol stays on its aim.
+      limb(arms, shoulder.position.clone(), ARM_WAVE, i * Math.PI + Math.PI / 2, aiming(arms) ? 0 : side * ARM_SPLAY, X, aiming(arms) ? 0 : ARM_STRIDE, i * Math.PI + Math.PI),
     );
   });
   limbs.push(limb(byName(/^(Neck|Head|Hair)$/), neck.position.clone(), HEAD_ROLL, 0.8, 0, new Vector3(0, 0, 1)));

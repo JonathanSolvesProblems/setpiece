@@ -1,0 +1,48 @@
+{
+ "what": "Cold load and bundle size, measured on the builds named. Quest numbers are from the headset over the DevTools protocol (tmp/q-move.py, tmp/q-first-tab.py); desktop numbers are headless Chromium with software rendering (tmp/load-phases.py), which is slower than any real machine and is used only to compare builds with each other.",
+ "quest_3s": [
+  {
+   "date": "2026-11-06",
+   "build": "89b0c43",
+   "case": "first visit to the new address, nothing cached",
+   "seconds_to_set_ready": 11.2
+  },
+  {
+   "date": "2026-11-06",
+   "build": "34b580d",
+   "case": "reload with files cached",
+   "seconds_to_set_ready": 3.4
+  }
+ ],
+ "desktop_software_rendering": [
+  {
+   "date": "2026-11-06",
+   "build": "f140935",
+   "case": "before the font and bundle work",
+   "seconds_to_set_ready": [
+    5.5,
+    12.4
+   ]
+  },
+  {
+   "date": "2026-11-07",
+   "build": "34b580d",
+   "case": "baked fonts, no icon library",
+   "seconds_to_set_ready": [
+    4.9,
+    6.0
+   ]
+  }
+ ],
+ "main_script_mb": [
+  {
+   "build": "f140935",
+   "mb": 6.78
+  },
+  {
+   "build": "34b580d",
+   "mb": 2.54
+  }
+ ],
+ "note": "The main script shrank by removing an icon library the panel never drew; the panel type is generated ahead of time (tools/bake-fonts.mjs) instead of on every load."
+}

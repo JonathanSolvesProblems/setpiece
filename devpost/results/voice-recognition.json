@@ -1,0 +1,127 @@
+{
+ "what": "What the on-device recogniser (Vosk, vosk-model-small-en-us-0.15, run inside the page) wrote down when a Windows synthetic voice spoke each sentence into it through a fake microphone in desktop Chromium, with the word list the app listens with. Scripts: tmp/voice-sim.py and tmp/voice-sim3.py against the production build on Nov 6 and 7, 2026. Not a real voice and not the headset microphone.",
+ "runs": [
+  {
+   "said": "i want like a mexican standoff where there was just a car chase and now they are pointing weapons at each other",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "i want like mexican stand off where there was just car chase and now [unk] weapons at each other"
+  },
+  {
+   "said": "i want like a mexican standoff where there was just a car chase and now they are pointing weapons at each other",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "i want like a mexican standoff where there was just car chase and now there point weapons at each other"
+  },
+  {
+   "said": "make me a mexican standoff",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "make me a mexican standoff"
+  },
+  {
+   "said": "make me a mexican standoff",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "make me a mexican standoff"
+  },
+  {
+   "said": "a shootout in an alley",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "a shootout in an alley"
+  },
+  {
+   "said": "a shootout in an alley",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "a shootout in an alley"
+  },
+  {
+   "said": "a hold up with a van",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "a hold up with van"
+  },
+  {
+   "said": "a hold up with a van",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "a holdup with van"
+  },
+  {
+   "said": "dragon attack",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "dragon attack"
+  },
+  {
+   "said": "dragon attack",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "dragon attack"
+  },
+  {
+   "said": "make me a scene with a dragon two actors and a burning car",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "make me a scene with dragon two actors and burning car"
+  },
+  {
+   "said": "make me a scene with a dragon two actors and a burning car",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "make me a scene with dragon two actors and a burning car"
+  },
+  {
+   "said": "give them guns",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "give them guns"
+  },
+  {
+   "said": "give them guns",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "give them guns"
+  },
+  {
+   "said": "it was just a car chase now mexican standoff",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "it was just car chase now mexican standoff"
+  },
+  {
+   "said": "it was just a car chase now mexican standoff",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "it was just car chase now mexican standoff"
+  },
+  {
+   "said": "there was just a car chase and now its a mexican standoff",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "there was just car chase and now mexican standoff"
+  },
+  {
+   "said": "there was just a car chase and now its a mexican standoff",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "there was just car chase and now mexican standoff"
+  },
+  {
+   "said": "was just a car chase now a mexican standoff with guns",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "was just car chase now mexican standoff with guns"
+  },
+  {
+   "said": "was just a car chase now a mexican standoff with guns",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "was just car chase now mexican standoff with guns"
+  },
+  {
+   "said": "okay so there was a car chase and now everyone is in a mexican standoff",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "okay soldier wizard car chase and now everyone is mexican standoff"
+  },
+  {
+   "said": "okay so there was a car chase and now everyone is in a mexican standoff",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "okay soldier was car chase and now everyone is mexican standoff"
+  },
+  {
+   "said": "mexican standoff",
+   "voice": "Microsoft David Desktop (Windows SAPI)",
+   "heard": "mexican standoff"
+  },
+  {
+   "said": "mexican standoff",
+   "voice": "Microsoft Zira Desktop (Windows SAPI)",
+   "heard": "mexican standoff"
+  }
+ ],
+ "heard_the_beat": 14,
+ "standoff_runs": 14
+}

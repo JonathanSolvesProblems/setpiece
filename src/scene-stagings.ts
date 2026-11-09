@@ -97,8 +97,8 @@ const BEATS: Beat[] = [
   },
 ];
 
-/** What is left around a beat: where it came from, added behind the marks. */
-const AFTERMATHS: { heard: string[]; says: string; pieces: Placed[] }[] = [
+/** What is left around a beat: where it came from, added behind the marks. `otherwise` is where a setting goes when another came first. */
+const AFTERMATHS: { heard: string[]; says: string; pieces: Placed[]; otherwise?: Placed[] }[] = [
   {
     heard: ['car chase', 'police chase', 'high speed chase', 'car crash', 'crash', 'crashed', 'pile up', 'pileup', 'wreck', 'wrecked'],
     says: 'Two cars crashed behind them.',
@@ -115,6 +115,11 @@ const AFTERMATHS: { heard: string[]; says: string; pieces: Placed[] }[] = [
       { label: 'Lamp post', x: -0.24, z: -0.14, yaw: 90 },
       { label: 'Dumpster', x: 0.2, z: -0.13 },
     ],
+    // With the crash behind the actors, the street comes forward to the corners, beside the camera.
+    otherwise: [
+      { label: 'Lamp post', x: 0.26, z: 0.16, yaw: -90 },
+      { label: 'Dumpster', x: -0.195, z: 0.115 },
+    ],
   },
 ];
 
@@ -127,18 +132,20 @@ const saysAny = (said: string, phrases: string[]): boolean => phrases.some((phra
 /** A beat and whatever is left around it, or a library scene named outright, or null. */
 export function stagingFor(text: string, scenes: Scene[]): Staging | null {
   const said = spaced(text);
+  const scene = scenes.find((candidate) => said.includes(` ${candidate.title.toLowerCase()} `));
   const beat = BEATS.find((candidate) => saysAny(said, candidate.heard));
-  if (beat == null) {
-    const scene = scenes.find((candidate) => said.includes(` ${candidate.title.toLowerCase()} `));
-    return scene == null ? null : { ...scene, says: 'From the library.' };
-  }
+  const beatWord = beat?.heard.find((phrase) => said.includes(` ${phrase} `)) ?? '';
+  // A library scene named outright wins, unless the beat is the stronger claim: "wizard duel" is the
+  // scene, "a standoff after a car chase" is the beat with the chase left behind it.
+  if (scene != null && (beat == null || scene.title.toLowerCase().includes(beatWord))) return { ...scene, says: 'From the library.' };
+  if (beat == null) return null;
   const around = AFTERMATHS.filter((aftermath) => saysAny(said, aftermath.heard));
   return {
     title: beat.title,
     lens: beat.lens,
     camera: beat.camera,
     says: [beat.says, ...around.map((aftermath) => aftermath.says)].join(' '),
-    pieces: [...beat.pieces, ...around.flatMap((aftermath) => aftermath.pieces)],
+    pieces: [...beat.pieces, ...around.flatMap((aftermath, i) => (i > 0 ? (aftermath.otherwise ?? aftermath.pieces) : aftermath.pieces))],
   };
 }
 

@@ -7,7 +7,8 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 
-const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+// A clone on Windows may carry CRLF endings; the checks read one line ending.
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const readme = read('README.md');
 const count = (text, pattern) => (text.match(pattern) ?? []).length;
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
@@ -32,6 +33,25 @@ expect(`README says ${assets} assets in the library`, readme.includes(`${assets}
 expect(`README says a take runs ${WORDS[takeSeconds]} seconds`, readme.includes(`${WORDS[takeSeconds]} seconds`));
 expect(`README says ${WORDS[formats]} formats`, new RegExp(`\\b${WORDS[formats]} formats\\b`, 'i').test(readme) || formats === count(readme, /Full frame|full frame|Super 35|Super 16|65 mm/g));
 expect(`README says ${WORDS[sounds]} sounds, as on disk`, readme.includes(`${WORDS[sounds]} sounds`));
+
+// The submission form and the sources file, against the results they quote.
+const submission = read('devpost/submission.md');
+const sources = read('devpost/sources.md');
+const tagline = /## Tagline\n\n```\n(.*)\n```/.exec(submission)[1];
+expect(`the tagline is ${tagline.length} characters, 140 at most`, tagline.length <= 140);
+expect('the tagline has no open value in it', !tagline.includes('[X'));
+const frames = JSON.parse(read('devpost/results/quest-frame-rate.json'));
+const fps = frames.samples.map((sample) => sample.fps).sort((a, b) => a - b);
+const median = fps[Math.floor(fps.length / 2)];
+expect(`the tagline's frame rate is the measured median, ${median}`, tagline.includes(`${median} frames`));
+expect(`the submission says ${fps.length} one-second samples and a lowest of ${fps[0]}`, submission.includes(`${fps.length} one-second samples`) && submission.includes(`the lowest was ${fps[0]}`));
+expect(`the submission says ${assets} pieces and ${lenses[0]} to ${lenses[lenses.length - 1]} mm`, submission.includes(`${assets} hand-built pieces`) && submission.includes(`${lenses[0]} to ${lenses[lenses.length - 1]} mm`));
+for (const file of readdirSync(new URL('../devpost/results/', import.meta.url))) {
+  expect(`sources.md names devpost/results/${file}`, sources.includes(file));
+}
+expect(`sources.md counts ${assets} pieces`, sources.includes(`${assets} pieces`));
+const retiredAt = sources.indexOf('are retired');
+expect('sources.md retires the two October rate cards and cites neither', retiredAt > 0 && !/Antoniou|StoryboardArt\.org/.test(sources.slice(retiredAt)));
 
 // Things that used to be true and must not come back.
 for (const retired of ['ray-and-pinch distance grab', 'lands where you carry it by the plate', 'gaze', 'sits on a QR', 'AI-generated video']) {

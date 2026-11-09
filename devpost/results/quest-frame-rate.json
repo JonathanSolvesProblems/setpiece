@@ -1,0 +1,381 @@
+{
+ "what": "Frames per second inside the immersive session on a Meta Quest 3S, Quest Browser, hands tracked, on the live site. Each sample is one second of requestAnimationFrame timestamps, taken about once a minute by a read-only logger attached over the Chrome DevTools Protocol (tmp/q-log.py in the working tree). The wearer was using the app normally: picking up pieces, snapping frames, opening tabs.",
+ "target_rate_hz": 90,
+ "competition_minimum_fps": 60,
+ "summary": [
+  {
+   "date": "2026-11-05",
+   "build": "commit 63478c0 or later, Nov 5 evening",
+   "samples": 13,
+   "min": 87.6,
+   "median": 90.0,
+   "max": 90.0,
+   "under60": 0
+  },
+  {
+   "date": "2026-11-06",
+   "build": "commit 59b2ceb",
+   "samples": 46,
+   "min": 65.5,
+   "median": 90.0,
+   "max": 90.0,
+   "under60": 0
+  }
+ ],
+ "samples": [
+  {
+   "date": "2026-11-05",
+   "time": "20:16:41",
+   "fps": 89.1,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:17:45",
+   "fps": 89.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:18:49",
+   "fps": 89.9,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:19:53",
+   "fps": 90.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:20:57",
+   "fps": 87.6,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:22:01",
+   "fps": 89.9,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:23:05",
+   "fps": 90.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:24:08",
+   "fps": 90.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:25:12",
+   "fps": 90.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:26:16",
+   "fps": 90.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:27:20",
+   "fps": 90.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:28:24",
+   "fps": 89.9,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-05",
+   "time": "20:29:28",
+   "fps": 90.0,
+   "build": "commit 63478c0 or later, Nov 5 evening"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:46:23",
+   "fps": 65.5,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:47:27",
+   "fps": 81.7,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:48:31",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:49:35",
+   "fps": 89.7,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:50:39",
+   "fps": 89.9,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:51:43",
+   "fps": 89.4,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:52:48",
+   "fps": 87.3,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:53:53",
+   "fps": 88.3,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:54:58",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:56:03",
+   "fps": 88.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:57:08",
+   "fps": 89.7,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:58:13",
+   "fps": 87.1,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "09:59:18",
+   "fps": 89.7,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "10:00:22",
+   "fps": 89.3,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "10:01:27",
+   "fps": 89.7,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "10:02:31",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "10:03:35",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:18:46",
+   "fps": 82.2,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:19:51",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:20:55",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:21:53",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:22:00",
+   "fps": 89.2,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:22:57",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:23:04",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:24:01",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:24:08",
+   "fps": 89.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:25:05",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:25:12",
+   "fps": 86.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:26:09",
+   "fps": 89.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:26:16",
+   "fps": 89.3,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:27:13",
+   "fps": 89.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:27:20",
+   "fps": 89.7,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:28:17",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:28:24",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:29:21",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:29:28",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:30:25",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:30:32",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:31:29",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:31:36",
+   "fps": 89.3,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:32:34",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:32:41",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:33:38",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:33:45",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:34:42",
+   "fps": 89.7,
+   "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-06",
+   "time": "19:34:49",
+   "fps": 90.0,
+   "build": "commit 59b2ceb"
+  }
+ ]
+}
