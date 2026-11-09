@@ -23,7 +23,7 @@ Put your fingers on a piece and pinch, or close a fist around it. The pointing r
 ## 04 heard
 
 ```
-The recogniser runs inside the page, so nothing you say leaves the headset. 14 of 14 standoff lines from two synthetic voices came through.
+Synthetic voices into the page’s own recogniser, on a desktop. 14 of 14 standoff lines came through. The headset microphone is next.
 ```
 
 ## 05 board
@@ -47,7 +47,7 @@ Carry an actor across while it records and they walk it back, in step, on the fl
 ## 08 fire
 
 ```
-Rain over a fire puts it out. A car driven into an actor knocks them down. A take replays what the blocking does, not what you wish it did.
+Rain moved over the fire and the flames die down. The same rules knock an actor down when a car is driven into them during a take.
 ```
 
 ## 09 library
@@ -65,13 +65,13 @@ Dragon attack: a dragon, a house on fire and two actors, placed as a blocking. S
 ## 11 back
 
 ```
-Put the headset on again and the set is on the same spot of the same table, with the board you left. The panel says so.
+After a reload in the headset the panel lists what came back: the set, the pieces and the board. Same spot after a relaunch: next to prove.
 ```
 
 ## 12 fps
 
 ```
-59 one-second samples over two sessions of normal use on a Quest 3S: median 90.0, lowest 65.5 in the first minute, 0 under 60.
+46 one-second samples over three sittings on a Quest 3S, 5 and 6 Nov builds: median 90.0, lowest 65.5 in the first minute.
 ```
 
 ## 13 load
@@ -83,17 +83,11 @@ While the set builds, the card names each step. The app is 2.54 MB, down from 6.
 ## 14 leave
 
 ```
-Back in the browser: the board as an image, the shot list as a CSV and the take as a short animatic, saved to your own files.
+Saved from the page: the board as an image with each frame’s numbers, and the shot list as a CSV. A take saves as a short video too.
 ```
 
 ## 15 camera
 
 ```
 Four sensor formats, a tripod or a drone up to 11 m on the real set, and a second camera you can cut to while a take records.
-```
-
-## 16 checks
-
-```
-node tools/check-live.mjs asserts 35 things about the live site, no account and no key. Last run: 35 of 35 passed.
 ```

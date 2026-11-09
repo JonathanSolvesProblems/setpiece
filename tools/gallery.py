@@ -55,8 +55,8 @@ SLIDES = [
          caption='Put your fingers on a piece and pinch, or close a fist around it. The pointing ray steps aside when a hand is near a piece.'),
     dict(slug='say', badge=LIVE_BADGE, headline='Say the scene', picture=('live', 'standoff'),
          caption='"A Mexican standoff after a car chase": three actors on marks, each aiming at the next, two crashed cars behind. All of it movable.'),
-    dict(slug='heard', badge='Result · devpost/results/voice-recognition.json', headline='What the headset heard', picture=('result', 'voice'),
-         caption='The recogniser runs inside the page, so nothing you say leaves the headset. {voice_heard} of {voice_runs} standoff lines from two synthetic voices came through.'),
+    dict(slug='heard', badge='Result · devpost/results/voice-recognition.json', headline='What the recogniser wrote down', picture=('result', 'voice'),
+         caption='Synthetic voices into the page\u2019s own recogniser, on a desktop. {voice_heard} of {voice_runs} standoff lines came through. The headset microphone is next.'),
     dict(slug='board', badge=LIVE_BADGE, headline='Snap, and the frame carries its numbers', picture=('live', 'board'),
          caption='Each frame on the board is stamped with its lens, camera height, distance and every actor’s eyeline, measured where the pieces stood.'),
     dict(slug='lenses', badge=LIVE_BADGE, headline='Six lenses, 18 to 135 mm', picture=('live', 'lenses'),
@@ -64,23 +64,21 @@ SLIDES = [
     dict(slug='take', badge=LIVE_BADGE, headline='Record a take', picture=('live', 'take'),
          caption='Carry an actor across while it records and they walk it back, in step, on the floor. Up to twelve seconds, kept with the board.'),
     dict(slug='fire', badge=LIVE_BADGE, headline='Pieces answer each other', picture=('live', 'fire'),
-         caption='Rain over a fire puts it out. A car driven into an actor knocks them down. A take replays what the blocking does, not what you wish it did.'),
+         caption='Rain moved over the fire and the flames die down. The same rules knock an actor down when a car is driven into them during a take.'),
     dict(slug='library', badge='Emulator · the panel at 1 mm per pixel', headline='{assets} pieces on six shelves', picture='../.design/shots/pass2/panel/assets-held.jpg',
          caption='Cast, creatures, vehicles, effects, set and props, every one a bare maquette you can paint, size and fit out. {scenes} scenes to start from.'),
     dict(slug='scene', badge=LIVE_BADGE, headline='Ten scenes to start from', picture=('live', 'dragon'),
          caption='Dragon attack: a dragon, a house on fire and two actors, placed as a blocking. Start here, then move anything.'),
-    dict(slug='back', badge=QUEST, headline='Back where you left it', picture='captures/quest-car-bicycle.jpg',
-         caption='Put the headset on again and the set is on the same spot of the same table, with the board you left. The panel says so.'),
-    dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json', headline='{fps_median} frames a second', picture=('result', 'fps'),
-         caption='{fps_samples} one-second samples over two sessions of normal use on a Quest 3S: median {fps_median}, lowest {fps_min} in the first minute, {fps_under60} under 60.'),
-    dict(slug='load', badge=LIVE_BADGE, headline='It says what it is doing', picture=('live', 'loading'),
+    dict(slug='back', badge=QUEST, headline='It keeps your set and your board', picture='captures/quest-car-bicycle.jpg',
+         caption='After a reload in the headset the panel lists what came back: the set, the pieces and the board. Same spot after a relaunch: next to prove.'),
+    dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
+         caption='{fps_samples} one-second samples over three sittings on a Quest 3S, 5 and 6 Nov builds: median {fps_median}, lowest {fps_min} in the first minute.'),
+    dict(slug='load', badge=LIVE_BADGE, headline='The wait is a call sheet', picture=('live', 'loading'),
          caption='While the set builds, the card names each step. The app is {bundle_mb} MB, down from {bundle_before_mb}; a reload on the Quest is ready in {quest_reload_s} s.'),
     dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
-         caption='Back in the browser: the board as an image, the shot list as a CSV and the take as a short animatic, saved to your own files.'),
+         caption='Saved from the page: the board as an image with each frame’s numbers, and the shot list as a CSV. A take saves as a short video too.'),
     dict(slug='camera', badge=QUEST, headline='Format, rig, second camera', picture='captures/quest-camera-tab.jpg',
          caption='Four sensor formats, a tripod or a drone up to 11 m on the real set, and a second camera you can cut to while a take records.'),
-    dict(slug='checks', badge='Result · devpost/checks/last-run.md', headline='Checks you can run yourself', picture=('result', 'checks'),
-         caption='node tools/check-live.mjs asserts {checks_total} things about the live site, no account and no key. Last run: {checks_passed} of {checks_total} passed.'),
 ]
 
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -125,7 +123,7 @@ def result_body(kind: str) -> str:
             seen.add(r['said'])
             rows.append(f"<tr><td>{r['said']}</td><td class='yes'>{r['heard']}</td></tr>")
         return (f'<div class="result"><p class="muted">Said by a Windows voice through a fake microphone into the page’s own recogniser. The right column is what it wrote down.</p>'
-                f'<table><tr><th>Said</th><th>Heard</th></tr>{"".join(rows[:6])}</table></div>')
+                f'<table><tr><th>Said</th><th>Heard</th></tr>{"".join(rows[:5])}</table></div>')
     if kind == 'checks':
         lines = [l for l in checks.splitlines() if l.startswith('| ') and not l.startswith('| Check') and not l.startswith('|---')]
         rows = ''.join(f"<tr><td>{l.split('|')[1].strip()}</td><td class='{'yes' if 'pass' in l.split('|')[2] else ''}'>{l.split('|')[2].strip()}</td></tr>" for l in lines[:14])
@@ -259,29 +257,44 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         await page.wait_for_timeout(2500)
         await stage_png(page, png)
     elif recipe == 'exports':
+        # What a director actually leaves with: the board image and the shot list, saved by the page's own buttons.
+        from PIL import Image, ImageDraw, ImageFont
         await page.evaluate('globalThis.setpiece.world.globals.sceneStart.value = 1')
         await page.wait_for_timeout(1200)
-        await click('#page-snap')
-        await page.wait_for_timeout(1200)
-        # A take only exists when a piece was carried, so the actor is dragged with a real mouse while it records.
-        x, y = await page.evaluate("""(() => { const w = globalThis.setpiece.world; const o = w.scene.getObjectByName('Actor A');
-          const v = o.getWorldPosition(o.position.clone()); v.y += 0.07; v.project(w.camera);
-          const r = document.querySelector('#scene-container canvas').getBoundingClientRect();
-          return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; })()""")
-        await click('#page-record')
-        await page.wait_for_timeout(300)
-        await page.mouse.move(x, y)
-        await page.wait_for_timeout(500)
-        await page.mouse.down()
-        await page.wait_for_timeout(500)
-        for i in range(1, 10):
-            await page.mouse.move(x + i * 9, y + i * 2)
-            await page.wait_for_timeout(160)
-        await page.mouse.up()
-        await page.wait_for_timeout(400)
-        await click('#page-record')
-        await page.wait_for_timeout(1500)
-        await shot(page, png, '.flag', bottom=300)
+        for lens in ['18', '35', '85']:
+            await click(f'.lens[data-lens="{lens}"]')
+            await page.wait_for_timeout(1200)
+            await click('#page-snap')
+            await page.wait_for_timeout(2500)
+        async with page.expect_download(timeout=30000) as waiting:
+            await click('#page-save-board')
+        board_path = out / 'saved-board.png'
+        await (await waiting.value).save_as(str(board_path))
+        async with page.expect_download(timeout=30000) as waiting:
+            await click('#page-save-list')
+        csv_path = out / 'saved-shot-list.csv'
+        await (await waiting.value).save_as(str(csv_path))
+        board = Image.open(board_path).convert('RGB')
+        import csv, io
+        rows = list(csv.reader(io.StringIO(csv_path.read_text(encoding='utf-8'))))[:4]
+        width, height = 2400, 1300
+        sheet = Image.new('RGB', (width, height), (42, 33, 28))
+        bw = 1500
+        bh = int(board.height * bw / board.width)
+        sheet.paste(board.resize((bw, bh)), (0, (height - bh) // 2))
+        draw = ImageDraw.Draw(sheet)
+        font = ImageFont.truetype(str(ROOT / 'public/ui/fonts/SchibstedGrotesk-Medium.ttf'), 30)
+        head = ImageFont.truetype(str(ROOT / 'public/ui/fonts/BigShoulders-Bold.ttf'), 40)
+        draw.text((1560, 60), 'SETPIECE-SHOT-LIST.CSV', font=head, fill=(199, 199, 183))
+        y = 140
+        header, body = rows[0], rows[1:]
+        for record in body:
+            for name, cell in list(zip(header, record))[:5]:
+                draw.text((1560, y), name, font=font, fill=(199, 199, 183))
+                draw.text((1990, y), cell, font=font, fill=(246, 247, 239))
+                y += 40
+            y += 30
+        sheet.save(png)
     else:
         raise ValueError(recipe)
     await ctx.close()

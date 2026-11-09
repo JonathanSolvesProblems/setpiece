@@ -20,7 +20,7 @@ All on a Meta Quest 3S in the Quest Browser, hands tracked, on the live site.
 
 | Number | Source |
 |---|---|
-| 90 frames a second through normal use: 59 one-second samples over two sessions on 5 and 6 November 2026, median 90.0, lowest 65.5 (the first minute after entering), none under 60 | `devpost/results/quest-frame-rate.json`, written by the read-only session logger (tmp/q-log.py) that sampled requestAnimationFrame once a minute while the wearer used the app |
+| A median of 90.0 frames a second through normal use: 46 one-second samples over three sittings on 5 and 6 November 2026, lowest 65.5 (the first minute after entering), none under 60; measured on those days' builds, not the one submitted | `devpost/results/quest-frame-rate.json`, written by the read-only session logger (tmp/q-log.py) that sampled requestAnimationFrame once a minute while the wearer used the app |
 | 90 fps with the set still (median frame 11.1 ms, p95 13.1 ms, none over 20 ms in 720 frames); 78 fps carrying two pieces (median 12.7 ms, 2 of 392 over 20 ms); 109 draw calls, about 11,500 triangles | Spot measurements on 5 November 2026 with tmp/quest-check.py fps, recorded the same day in `PHASE0.md` ("Device session on Nov 5") |
 | 74 fps with the car, fire, smoke and water on the slate, against 76 just before they were added | Same method, same day, recorded in `PHASE0.md` |
 | 11.2 s from opening the address to a set ready on the first visit; 3.4 s on a reload | `devpost/results/load-and-size.json` |
