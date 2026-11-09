@@ -6,23 +6,10 @@
  *
  * Every painted part is named Body*, so a coat of paint takes the whole shell.
  */
-import {
-  BufferAttribute,
-  BufferGeometry,
-  CylinderGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  SphereGeometry,
-  TorusGeometry,
-  Vector3,
-} from '@iwsdk/core';
+import { Group, Mesh, MeshStandardMaterial, SphereGeometry, Vector3 } from '@iwsdk/core';
 import type { Material } from '@iwsdk/core';
-import { alignSpan, bevelBox, LoftSurface, sampleRange } from './hardsurface.js';
-
-const lens = new MeshStandardMaterial({ color: 0xe4dcc6, roughness: 0.3, metalness: 0.2 });
-const tail = new MeshStandardMaterial({ color: 0x7c2c25, roughness: 0.35 });
-const hub = new MeshStandardMaterial({ color: 0x8d8a84, roughness: 0.45, metalness: 0.5 });
+import { bevelBox, LoftSurface, sampleRange } from './hardsurface.js';
+import { archedWheel, bar, lens, hub, mergeByMaterial, named, skinAt, tail } from './vehicle.js';
 
 const SIDES = [-1, 1] as const;
 const BELT = 0.066;
@@ -77,58 +64,6 @@ const ROOF = [
   roofAt(0.05, 0.1375, 0.074),
 ];
 
-function named<T extends Mesh>(mesh: T, name: string): T {
-  mesh.name = name;
-  return mesh;
-}
-
-/** The point on a loft's skin at this station and height, on one side of the car. */
-function skinAt(surface: LoftSurface, z: number, y: number, side: number): Vector3 {
-  let best = new Vector3();
-  let gap = Infinity;
-  for (let theta = 0; theta < Math.PI * 2; theta += 0.02) {
-    const point = surface.point(z, theta);
-    if (point.x * side <= 0 || Math.abs(point.y - y) >= gap) continue;
-    gap = Math.abs(point.y - y);
-    best = point;
-  }
-  return best;
-}
-
-/** A thin bar lying on the skin between two points, for pillars and seams. */
-function bar(a: Vector3, b: Vector3, width: number, material: Material, name: string): Mesh {
-  const mesh = named(new Mesh(new CylinderGeometry(width, width, 1, 5), material), name);
-  mesh.scale.y = alignSpan(mesh, a, b);
-  return mesh;
-}
-
-/**
- * One mesh for each material, so a car is a handful of draw calls and not sixty.
- * Nothing on it moves against the rest, and a coat of paint still takes the whole
- * body, because the body is one mesh named Body.
- */
-function mergeByMaterial(g: Group, names: Map<Material, string>): void {
-  const parts = g.children.filter((child): child is Mesh => child instanceof Mesh);
-  for (const [material, name] of names) {
-    const positions: number[] = [];
-    const normals: number[] = [];
-    for (const part of parts) {
-      if (part.material !== material) continue;
-      part.updateMatrix();
-      const flat = part.geometry.index != null ? part.geometry.toNonIndexed() : part.geometry.clone();
-      flat.applyMatrix4(part.matrix);
-      positions.push(...(flat.getAttribute('position').array as Float32Array));
-      normals.push(...(flat.getAttribute('normal').array as Float32Array));
-      g.remove(part);
-    }
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
-    geometry.setAttribute('normal', new BufferAttribute(new Float32Array(normals), 3));
-    geometry.computeBoundingSphere();
-    g.add(named(new Mesh(geometry, material), name));
-  }
-}
-
 export function sedanShell(g: Group, paint: MeshStandardMaterial, glass: MeshStandardMaterial, rubber: MeshStandardMaterial): void {
   const body = LoftSurface.tube(BODY);
   g.add(named(new Mesh(body.build(sampleRange(-0.225, 0.224, 22), 24, true), paint), 'Body'));
@@ -177,19 +112,7 @@ export function sedanShell(g: Group, paint: MeshStandardMaterial, glass: MeshSta
     g.add(sill);
     for (const z of AXLES) {
       const tag = `${z > 0 ? 'F' : 'R'}${side < 0 ? 'L' : 'R'}`;
-      const well = named(new Mesh(new CylinderGeometry(0.043, 0.043, 0.012, 16), rubber), 'WheelWell');
-      well.rotation.z = Math.PI / 2;
-      well.position.set(side * 0.088, WHEEL_RADIUS, z);
-      const lip = named(new Mesh(new TorusGeometry(0.0435, 0.0022, 5, 14, Math.PI), paint), 'BodyArch');
-      lip.rotation.y = side * (Math.PI / 2);
-      lip.position.set(side * 0.0916, WHEEL_RADIUS, z);
-      const tyre = named(new Mesh(new CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, 0.026, 16), rubber), `Wheel${tag}`);
-      tyre.rotation.z = Math.PI / 2;
-      tyre.position.set(side * WHEEL_X, WHEEL_RADIUS, z);
-      const cap = named(new Mesh(new CylinderGeometry(0.019, 0.021, 0.004, 10), hub), 'Hub');
-      cap.rotation.z = Math.PI / 2;
-      cap.position.set(side * (WHEEL_X + 0.0135), WHEEL_RADIUS, z);
-      g.add(well, lip, tyre, cap);
+      archedWheel(g, { side, z, radius: WHEEL_RADIUS, tyreWidth: 0.026, wheelX: WHEEL_X, wellRadius: 0.043, wellX: 0.088, lipX: 0.0916, tag }, paint, rubber);
     }
   }
   // Grille and bumpers.

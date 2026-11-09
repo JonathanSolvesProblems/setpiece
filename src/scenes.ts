@@ -31,7 +31,7 @@ export const SCENES: Scene[] = [
     camera: [-0.26, 0.17, -60],
     pieces: [
       { label: 'Car', x: 0.07, z: 0.09, yaw: 90, paint: 1 },
-      { label: 'Van', x: -0.06, z: -0.09, yaw: 90, style: 1 },
+      { label: 'Van', x: -0.052, z: -0.09, yaw: 90, style: 1 },
       { label: 'Lamp post', x: 0.22, z: -0.13, yaw: 90 },
       { label: 'Smoke', x: -0.15, z: 0.06 },
       { label: 'A', x: 0.24, z: -0.02, yaw: -90, pose: 3 },

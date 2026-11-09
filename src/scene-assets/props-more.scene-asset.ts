@@ -23,6 +23,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { bevelBox } from './lib/hardsurface.js';
+import { buildRock } from './lib/nature.js';
 import { BEAD, Kit, SIDES, ball, idleGroup, limb, loft, plate, sec, v } from './lib/kit.js';
 
 const primer = new MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.72 });
@@ -512,29 +513,9 @@ function dumpster(): Group {
   return g;
 }
 
-/** Deterministic lumpiness from position, so shared vertices move together and the shell stays closed. */
-function lump(x: number, y: number, z: number): number {
-  return 0.16 * Math.sin(3.1 * x + 1.3) * Math.sin(2.7 * y + 0.4) * Math.sin(3.3 * z + 2.1) + 0.07 * Math.sin(7.3 * x + 2.2 * y + 0.5) * Math.cos(6.1 * z - 1.7 * y);
-}
-
-/** A faceted boulder, flat underneath so it sits. */
+/** A weathered boulder, smooth and irregular, flat underneath so it sits. */
 function rock(): Group {
-  const g = new Group();
-  g.name = 'Rock';
-  const geometry = new IcosahedronGeometry(1, 2);
-  const p = geometry.getAttribute('position');
-  for (let i = 0; i < p.count; i += 1) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const k = 1 + lump(x, y, z);
-    p.setXYZ(i, x * k * 0.1, Math.max(y * k, -0.55) * 0.075, z * k * 0.088);
-  }
-  geometry.computeBoundingBox();
-  geometry.translate(0, -geometry.boundingBox!.min.y, 0);
-  geometry.computeVertexNormals();
-  const kit = new Kit();
-  kit.put('Boulder', stone, new Mesh(geometry));
-  kit.build(g);
-  return g;
+  return buildRock(stone);
 }
 
 /** A timber picket fence between three posts. */

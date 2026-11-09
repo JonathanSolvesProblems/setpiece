@@ -37,7 +37,7 @@ It is for an indie director or a VFX supervisor in prep: one blocking per shot, 
 
 You sit down, point at the table and pinch. A 1:10 set lands on it, in your real room. You pick up wooden stand-ins with your fingers, put the ball where the creature will be, pick a lens from 18 to 135 mm and look through the camera. The monitor shows what that lens sees. Snap, and the frame goes on a storyboard with its lens, camera height, distance and eyelines already written on it.
 
-Record a take and carry an actor across the set: they walk it back to you, in step. Add a second camera and cut between the two while you record. Say "a Mexican standoff after a car chase" and three actors take their marks, each aiming at the next, with two crashed cars behind them. Rain over a fire puts it out, and a car driven into an actor knocks them down.
+Record a take and carry an actor across the set: they walk it back to you, in step. Add a second camera and cut between the two while you record. Say "a Mexican standoff after a car chase" and three actors take their marks, each aiming at the next, with two crashed cars behind them. Push a car and let go and it drives on until it stops, and an actor in its way goes down. Rain over a fire puts it out.
 
 You leave with a board image, a shot list and a short animatic. Every number on the board is measured from where the pieces stood at that moment. Nothing on it is estimated or generated. Voice runs inside the page, from a 40 MB model fetched the first time you press it, so what you say stays on the headset.
 

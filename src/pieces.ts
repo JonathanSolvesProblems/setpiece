@@ -85,7 +85,31 @@ const REACH = 0.035;
 const REACH_RELEASE = 0.06;
 const THIN_REACH = 0.045;
 /** Hand tracking drops out for a moment when fingers close: a held piece waits this long for it. */
+/** Half a vehicle's length along its nose, from its own shape, at its size on the set. */
+function localBoundsDepth(box: Box3 | null | undefined, object: Object3D): number {
+  if (box == null) return 0.1 * object.scale.x;
+  return Math.max(Math.abs(box.max.z), Math.abs(box.min.z)) * object.scale.x;
+}
+
 const LOST_HAND_SECONDS = 0.5;
+/**
+ * A vehicle let go while it is moving rolls on, the way a toy car does when it
+ * is pushed and released: along the way it is facing, slowing as it goes, until
+ * it stops, meets the slate's edge or runs into something solid. Speeds are in
+ * metres a second on the slate, so 0.1 here is 1 m/s on the real set.
+ */
+const ROLLING_VEHICLES = new Set(['Car', 'Van', 'Motorbike', 'Truck', 'Pickup', 'Bus', 'Bicycle', 'Tank']);
+const ROLL_FROM = 0.12;
+const ROLL_TOP = 0.9;
+const ROLL_FRICTION = 0.2;
+const ROLL_STOP = 0.015;
+/** How quickly the measured speed of a held piece follows its last moves, per second. */
+const SPEED_FOLLOW = 30;
+/** Seconds a push is remembered after the hand slows. */
+const PUSH_MEMORY = 0.2;
+/** The slate's half size, in metres on the stage. */
+const SLATE_HALF_X = 0.3;
+const SLATE_HALF_Z = 0.2;
 /** Scaled past this, a piece is too large for being near it to mean reaching for it. */
 const OVERSIZE = 1.2;
 /**
@@ -148,6 +172,16 @@ export class PiecesSystem extends createSystem({
   private released: Entity[] = [];
   /** The pieces that can be held, with each one's hover mark and wrist follower, by index. */
   private dressed: Entity[] = [];
+  /** Each dressed piece's speed while held, in stage metres a second, and where it was the frame before. */
+  private heldSpeed: Vector3[] = [];
+  private heldLast: Vector3[] = [];
+  private heldNow: Vector3[] = [];
+  private heldSeen: boolean[] = [];
+  /** Vehicles rolling on after being let go: index into dressed, and signed speed along their nose. */
+  private rolling: { index: number; speed: number }[] = [];
+  private nose = new Vector3();
+  private probe = new Vector3();
+  private turnBack = new Quaternion();
   private rings: Mesh[] = [];
   private turns: HandTurn[] = [];
   /** Grabs that began inside the guard window and were let go at once. */
@@ -247,12 +281,15 @@ export class PiecesSystem extends createSystem({
     this.reachWith('left', delta);
     this.reachWith('right', delta);
     this.followHands(delta, time);
+    this.measureHeld(delta);
     if (this.drops.length > 0) this.fall(delta);
+    if (this.rolling.length > 0) this.roll(delta);
     if (this.released.length === 0) return;
     for (const piece of this.released) {
       // A piece taken off the set while it was held has nowhere to stand.
       if (piece.object3D == null || !piece.object3D.visible) continue;
       this.settle(piece);
+      this.maybeRoll(piece);
     }
     this.released.length = 0;
     // A piece still falling is saved when it lands.
@@ -463,6 +500,97 @@ export class PiecesSystem extends createSystem({
     this.point.copy(carry.at).add(carry.offset);
     object.parent?.worldToLocal(this.point);
     object.position.copy(this.point);
+  }
+
+  /** How fast each held piece is moving, so a vehicle let go mid-push knows its speed. */
+  private measureHeld(delta: number): void {
+    if (delta <= 0) return;
+    const follow = 1 - Math.exp(-SPEED_FOLLOW * delta);
+    for (let i = 0; i < this.dressed.length; i++) {
+      const piece = this.dressed[i];
+      const object = piece.object3D;
+      if (this.heldSpeed[i] == null) {
+        this.heldSpeed[i] = new Vector3();
+        this.heldNow[i] = new Vector3();
+        this.heldLast[i] = new Vector3();
+        this.heldSeen[i] = false;
+      }
+      if (object == null || !piece.hasComponent(Held)) {
+        this.heldSeen[i] = false;
+        continue;
+      }
+      if (this.heldSeen[i]) {
+        this.probe.copy(object.position).sub(this.heldLast[i]).divideScalar(delta);
+        this.heldNow[i].lerp(this.probe, follow);
+        // A hand slows a little before the fingers open, so the push is the fastest of the last moments.
+        this.heldSpeed[i].multiplyScalar(Math.exp(-delta / PUSH_MEMORY));
+        if (this.heldNow[i].lengthSq() >= this.heldSpeed[i].lengthSq()) this.heldSpeed[i].copy(this.heldNow[i]);
+      } else {
+        this.heldNow[i].set(0, 0, 0);
+        this.heldSpeed[i].set(0, 0, 0);
+        this.heldSeen[i] = true;
+      }
+      this.heldLast[i].copy(object.position);
+    }
+  }
+
+  /** A vehicle let go while moving keeps going along its nose. */
+  private maybeRoll(piece: Entity): void {
+    const index = this.dressed.indexOf(piece);
+    const object = piece.object3D;
+    if (index < 0 || object == null || this.heldSpeed[index] == null) return;
+    const asset = assetByLabel(String(piece.getValue(SetPiece, 'label') ?? ''));
+    if (!ROLLING_VEHICLES.has(asset?.spareOf ?? asset?.label ?? '')) return;
+    // Only a vehicle on its wheels rolls; one dropped from the air lands first.
+    for (let i = 0; i < this.drops.length; i++) if (this.drops[i].piece === piece) return;
+    this.nose.set(0, 0, 1).applyQuaternion(object.quaternion);
+    this.nose.y = 0;
+    this.nose.normalize();
+    const along = this.heldSpeed[index].x * this.nose.x + this.heldSpeed[index].z * this.nose.z;
+    if (Math.abs(along) < ROLL_FROM) return;
+    for (let i = 0; i < this.rolling.length; i++) if (this.rolling[i].index === index) this.rolling.splice(i, 1);
+    this.rolling.push({ index, speed: Math.sign(along) * Math.min(Math.abs(along), ROLL_TOP) });
+  }
+
+  private roll(delta: number): void {
+    for (let r = this.rolling.length - 1; r >= 0; r--) {
+      const run = this.rolling[r];
+      const piece = this.dressed[run.index];
+      const object = piece?.object3D;
+      if (object == null || !object.visible || piece.hasComponent(Held)) {
+        this.rolling.splice(r, 1);
+        continue;
+      }
+      this.nose.set(0, 0, 1).applyQuaternion(object.quaternion);
+      this.nose.y = 0;
+      this.nose.normalize();
+      const step = run.speed * delta;
+      // The leading end of the vehicle, a step ahead, is what meets the edge or a wall.
+      const reach = (localBoundsDepth(this.bounds[run.index], object) + Math.abs(step)) * Math.sign(run.speed);
+      this.probe.copy(object.position).addScaledVector(this.nose, reach);
+      const blocked = Math.abs(this.probe.x) > SLATE_HALF_X || Math.abs(this.probe.z) > SLATE_HALF_Z || this.solidAt(this.probe, run.index);
+      if (!blocked) object.position.addScaledVector(this.nose, step);
+      const slower = Math.max(0, Math.abs(run.speed) - ROLL_FRICTION * delta);
+      run.speed = Math.sign(run.speed) * slower;
+      if (blocked || slower < ROLL_STOP) {
+        this.rolling.splice(r, 1);
+        this.knock(Cue.Place, piece);
+        if (this.rolling.length === 0 && this.drops.length === 0) this.save();
+      }
+    }
+  }
+
+  /** Whether a point on the stage is inside a solid piece other than this one. */
+  private solidAt(point: Vector3, self: number): boolean {
+    for (let j = 0; j < this.dressed.length; j++) {
+      const box = this.solids[j];
+      const other = this.dressed[j].object3D;
+      if (j === self || box == null || other == null || !other.visible) continue;
+      this.point.copy(point).sub(other.position).applyQuaternion(this.turnBack.copy(other.quaternion).invert());
+      this.point.divideScalar(other.scale.x || 1);
+      if (box.containsPoint(this.point)) return true;
+    }
+    return false;
   }
 
   /** A piece let go in the air drops to the slate and knocks when it gets there. */
