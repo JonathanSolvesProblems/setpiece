@@ -112,7 +112,7 @@ export function sedanShell(g: Group, paint: MeshStandardMaterial, glass: MeshSta
     g.add(sill);
     for (const z of AXLES) {
       const tag = `${z > 0 ? 'F' : 'R'}${side < 0 ? 'L' : 'R'}`;
-      archedWheel(g, { side, z, radius: WHEEL_RADIUS, tyreWidth: 0.026, wheelX: WHEEL_X, wellRadius: 0.043, wellX: 0.088, lipX: 0.0916, tag }, paint, rubber);
+      archedWheel(g, { side, z, radius: WHEEL_RADIUS, tyreWidth: 0.026, wheelX: WHEEL_X, wellRadius: 0.043, wellX: 0.088, lipX: 0.0916, tag, halfWell: true }, paint, rubber);
     }
   }
   // Grille and bumpers.
