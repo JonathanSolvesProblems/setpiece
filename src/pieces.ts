@@ -37,6 +37,7 @@ import type { Intersection, UIKitMLAsset } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
 import { assetByLabel } from './catalog.js';
+import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
 import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
 import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
@@ -178,7 +179,7 @@ export class PiecesSystem extends createSystem({
   private heldNow: Vector3[] = [];
   private heldSeen: boolean[] = [];
   /** Vehicles rolling on after being let go: index into dressed, and signed speed along their nose. */
-  private rolling: { index: number; speed: number }[] = [];
+  private rolling: { index: number; speed: number; hit: boolean }[] = [];
   private nose = new Vector3();
   private probe = new Vector3();
   private turnBack = new Quaternion();
@@ -264,6 +265,8 @@ export class PiecesSystem extends createSystem({
       }),
       // The card sent every piece back to a frame's setup: that is the blocking to keep now.
       g.setupRecalled.subscribe((n) => {
+        // Every piece is on a new mark, so nothing carries on rolling from the old one.
+        this.rolling.length = 0;
         if (n > 0 && this.ready) {
           this.knock(Cue.Place, this.dressed[0]);
           this.save();
@@ -549,7 +552,7 @@ export class PiecesSystem extends createSystem({
     const along = this.heldSpeed[index].x * this.nose.x + this.heldSpeed[index].z * this.nose.z;
     if (Math.abs(along) < ROLL_FROM) return;
     for (let i = 0; i < this.rolling.length; i++) if (this.rolling[i].index === index) this.rolling.splice(i, 1);
-    this.rolling.push({ index, speed: Math.sign(along) * Math.min(Math.abs(along), ROLL_TOP) });
+    this.rolling.push({ index, speed: Math.sign(along) * Math.min(Math.abs(along), ROLL_TOP), hit: false });
   }
 
   private roll(delta: number): void {
@@ -568,7 +571,13 @@ export class PiecesSystem extends createSystem({
       // The leading end of the vehicle, a step ahead, is what meets the edge or a wall.
       const reach = (localBoundsDepth(this.bounds[run.index], object) + Math.abs(step)) * Math.sign(run.speed);
       this.probe.copy(object.position).addScaledVector(this.nose, reach);
-      const blocked = Math.abs(this.probe.x) > SLATE_HALF_X || Math.abs(this.probe.z) > SLATE_HALF_Z || this.solidAt(this.probe, run.index);
+      let blocked = Math.abs(this.probe.x) > SLATE_HALF_X || Math.abs(this.probe.z) > SLATE_HALF_Z || this.solidAt(this.probe, run.index);
+      // An actor in the way stops it. Going fast enough, it gets one more step, so the
+      // rule that knocks actors down sees the two meet; then it stops against them.
+      if (!blocked && this.actorAhead(run.index, object, Math.abs(step), Math.sign(run.speed))) {
+        if (run.hit || Math.abs(run.speed) < KNOCK_SPEED) blocked = true;
+        else run.hit = true;
+      }
       if (!blocked) object.position.addScaledVector(this.nose, step);
       const slower = Math.max(0, Math.abs(run.speed) - ROLL_FRICTION * delta);
       run.speed = Math.sign(run.speed) * slower;
@@ -578,6 +587,26 @@ export class PiecesSystem extends createSystem({
         if (this.rolling.length === 0 && this.drops.length === 0) this.save();
       }
     }
+  }
+
+  /** Whether a standing or fallen actor touches this vehicle's shape on the side it is rolling towards. */
+  private actorAhead(self: number, object: Object3D, step: number, way: number): boolean {
+    const box = this.bounds[self];
+    if (box == null) return false;
+    const scale = object.scale.x || 1;
+    this.turnBack.copy(object.quaternion).invert();
+    for (let j = 0; j < this.dressed.length; j++) {
+      const other = this.dressed[j];
+      const body = other.object3D;
+      if (j === self || body == null || !body.visible || other.hasComponent(Held)) continue;
+      if (other.getValue(SetPiece, 'role') !== SetRole.Actor) continue;
+      this.point.copy(body.position).sub(object.position).applyQuaternion(this.turnBack).divideScalar(scale);
+      // Only what is in front of the way it is going; an actor behind is left behind.
+      if (this.point.z * way <= 0) continue;
+      this.point.y = Math.min(Math.max(this.point.y, box.min.y), box.max.y);
+      if (box.distanceToPoint(this.point) * scale <= ACTOR_REACH + step) return true;
+    }
+    return false;
   }
 
   /** Whether a point on the stage is inside a solid piece other than this one. */

@@ -8,15 +8,14 @@
 import { Box3, createSystem, Entity, Mesh, Quaternion, ShaderMaterial, Vector3 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
+import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
 import { assetByLabel, assetTitle } from './catalog.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
 import { SquirmSystem } from './squirm.js';
 
 /** Metres a second on the slate: at 1:10 this is a car at walking pace. */
-const KNOCK_SPEED = 0.1;
 /** A piece that jumps this far in one frame was put there, not driven there. */
 const JUMP = 0.12;
-const ACTOR_REACH = 0.03;
 /** How far around itself each kind of water wets, in metres on the slate. */
 // Snow is left out: a campfire keeps burning through a snowfall, and Winter camp depends on it.
 const WETS: Record<string, number> = { Rain: 0.3, Water: 0.14 };

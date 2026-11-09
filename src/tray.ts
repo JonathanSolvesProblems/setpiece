@@ -431,6 +431,8 @@ export class TraySystem extends createSystem({
     this.setOn(next);
     for (const label of placed) this.clearSpot(label);
     this.layoutDone();
+    // A set started over is a new blocking: everyone on it is back on their feet.
+    if (request.clear) g.setupRecalled.value = g.setupRecalled.peek() + 1;
     // "A burning car": the fire goes on the thing that was named before it.
     const fire = request.items.findIndex((item) => item.label === 'Fire');
     if (fire > 0 && BURNING.test(text)) {
