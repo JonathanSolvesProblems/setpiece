@@ -1,25 +1,25 @@
 # Live site checks
 
-Run on 2026-11-09 13:42 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: n13ogm9zs-20261107T2253.
+Run on 2026-11-09 14:08 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 8d7ab6b-20261109T1408.
 
 **35 of 35 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 182 ms |
+| the page answers over HTTPS | pass | 200, 279 ms |
 | it is Setpiece | pass |  |
-| search engines are allowed to index it | pass |  |
+| search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
-| the app script is named in the page | pass | assets/index-4MRK4WWP.js |
+| the app script is named in the page | pass | assets/index-Dri4x9MR.js |
 | version.json is served | pass | 200 |
-| version.json names a build | pass | n13ogm9zs-20261107T2253 |
+| version.json names a build | pass | 8d7ab6b-20261109T1408 |
 | the app script is served | pass | 200, 2.55 MB |
 | the app script is under 3 MB | pass | 2.55 MB |
 | the served script carries the same build as version.json | pass |  |
-| the icon library is not in the build | pass |  |
 | the voice words include the directing words | pass | 2 chunks |
+| the icon library is not in any chunk | pass |  |
 | the headset panel is served | pass |  |
 | the panel has btn-snap | pass |  |
 | the panel has btn-record | pass |  |

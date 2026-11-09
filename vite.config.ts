@@ -14,10 +14,12 @@ import { defineConfig } from 'vite';
 // The host builds without the git folder, so the build's own time is part of it: every build differs.
 const BUILD = (() => {
   const made = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '');
+  const hosted = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
+  if (hosted) return `${hosted}-${made}`;
   try {
     return `${execSync('git rev-parse --short HEAD').toString().trim()}-${made}`;
   } catch {
-    return `${process.env.VERCEL_URL?.split('-')[1] ?? 'host'}-${made}`;
+    return `host-${made}`;
   }
 })();
 
