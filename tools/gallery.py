@@ -146,7 +146,8 @@ async def wait_ready(page):
 async def shot(page, path: Path, selector: str | None = None, bottom: int | None = None):
     """A full-viewport screenshot, cropped afterwards: a clipped capture fails under software GL."""
     from PIL import Image
-    await page.screenshot(path=str(path))
+    # Software GL can take the better part of a minute on a full set; the default 30 s cuts some renders off.
+    await page.screenshot(path=str(path), timeout=120000)
     if selector is None and bottom is None:
         return
     box = await page.evaluate(f"(() => {{ const r = document.querySelector('{selector or '.flag'}').getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }})()")
@@ -291,14 +292,14 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             x += i.width + 16
         sheet.save(png)
     elif recipe == 'pieces':
-        # The rebuilt vehicles and set dressing, standing on the slate together.
-        await say('new scene with a van, a motorbike, a tree and a rock')
+        # Six shelves' worth of rebuilt pieces standing on the slate together.
+        await say('new scene with a pickup, a motorbike, a lamp post, a tree, a crate and a rock')
         await page.wait_for_timeout(1800)
-        # Spread out so each one reads: the van across the middle, the tree behind it, the bike and the rock in front.
+        # Spread out so each one reads: the pickup across the back, the tree behind its nose, the lamp post at the front left, the bike, crate and rock in front.
         placed = await page.evaluate("""(async () => {
           const w = globalThis.setpiece.world;
           const tray = [...w.getSystems()].find((s) => s.managed && s.finish);
-          const at = { Van: [-0.04, -0.05, 90], Motorbike: [0.15, 0.12, 135], Tree: [0.25, -0.16, 0], Rock: [-0.14, 0.135, 30] };
+          const at = { Pickup: [-0.04, -0.09, 80], Motorbike: [0.18, 0.11, 135], 'Lamp post': [-0.27, 0.04, 160], Tree: [0.26, -0.14, 0], Crate: [0.04, 0.15, 20], Rock: [-0.12, 0.15, 30] };
           const found = [];
           for (const p of tray.managed) {
             const k = tray.key(p); const spot = at[k];
@@ -310,7 +311,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
           await new Promise((d) => setTimeout(d, 800));
           return found.sort();
         })()""")
-        assert placed == ['Motorbike', 'Rock', 'Tree', 'Van'], placed
+        assert placed == ['Crate', 'Lamp post', 'Motorbike', 'Pickup', 'Rock', 'Tree'], placed
         await stage_png(page, png)
     elif recipe == 'exports':
         # What a director actually leaves with: the board image and the shot list, saved by the page's own buttons.
