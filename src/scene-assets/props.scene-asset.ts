@@ -7,7 +7,10 @@ import { buildMotorbike } from './lib/motorbike.js';
 import { buildTree } from './lib/nature.js';
 import { sedanShell } from './lib/sedan.js';
 import { vanShell } from './lib/van.js';
-import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial } from '@iwsdk/core';
+import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from '@iwsdk/core';
+import type { BufferGeometry, Material } from '@iwsdk/core';
+import { alignSpan, bevelBox } from './lib/hardsurface.js';
+import { mergeByMaterial } from './lib/vehicle.js';
 
 /** Bare basswood, as a model maker's maquette comes before anyone paints it. */
 const primer = new MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.72 });
@@ -78,6 +81,8 @@ const concrete = new MeshStandardMaterial({ color: 0x9b9a94, roughness: 0.95 });
 const timber = new MeshStandardMaterial({ color: 0x8a6a48, roughness: 0.85 });
 const leaf = new MeshStandardMaterial({ color: 0x4d6b45, roughness: 0.95 });
 const lampGlow = new MeshStandardMaterial({ color: 0xfff2c4, emissive: 0xffe6a0, emissiveIntensity: 0.9 });
+const mortar = new MeshStandardMaterial({ color: 0x7c7a73, roughness: 0.95 });
+const timberDark = new MeshStandardMaterial({ color: 0x5e4630, roughness: 0.9 });
 
 function van(): Group {
   const g = new Group();
@@ -92,36 +97,49 @@ function motorbike(): Group {
   return buildMotorbike(primer, rubber);
 }
 
+/** A garden wall between two pilasters: a coping on top, the mortar courses marked on both faces. */
 function wall(): Group {
   const g = new Group();
   g.name = 'Wall';
-  const slab = new Mesh(new BoxGeometry(0.32, 0.22, 0.02), concrete);
-  slab.name = 'Slab';
-  slab.position.y = 0.11;
-  const cap = new Mesh(new BoxGeometry(0.33, 0.008, 0.028), concrete);
-  cap.name = 'Coping';
-  cap.position.y = 0.224;
-  g.add(slab, cap);
+  const put = (geometry: BufferGeometry, material: MeshStandardMaterial, x: number, y: number): void => {
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(x, y, 0);
+    g.add(mesh);
+  };
+  put(bevelBox(0.3, 0.22, 0.022, 0.002), concrete, 0, 0.11);
+  put(bevelBox(0.31, 0.01, 0.032, 0.002), concrete, 0, 0.225);
+  for (const side of [-1, 1]) {
+    put(bevelBox(0.03, 0.236, 0.034, 0.003), concrete, side * 0.15, 0.118);
+    put(bevelBox(0.038, 0.008, 0.042, 0.002), concrete, side * 0.15, 0.24);
+  }
+  for (let y = 0.04; y < 0.21; y += 0.04) put(new BoxGeometry(0.296, 0.0014, 0.0236), mortar, 0, y);
+  mergeByMaterial(g, new Map<Material, string>([[concrete, 'Wall'], [mortar, 'Mortar']]));
   return g;
 }
 
+/** A street lamp: a fluted base with its access door, a tapering pole, a curved arm and a lantern lit from below. */
 function lampPost(): Group {
   const g = new Group();
   g.name = 'LampPost';
-  const foot = new Mesh(new CylinderGeometry(0.016, 0.02, 0.012, 14), rubber);
-  foot.name = 'Foot';
-  foot.position.y = 0.006;
-  const pole = new Mesh(new CylinderGeometry(0.0035, 0.0055, 0.4, 10), rubber);
-  pole.name = 'Pole';
-  pole.position.y = 0.2;
-  const arm = new Mesh(new CylinderGeometry(0.0028, 0.0028, 0.05, 8), rubber);
-  arm.name = 'Arm';
-  arm.rotation.x = Math.PI / 2;
-  arm.position.set(0, 0.396, 0.025);
-  const head = new Mesh(new BoxGeometry(0.018, 0.008, 0.04), lampGlow);
-  head.name = 'Lamp';
-  head.position.set(0, 0.39, 0.05);
-  g.add(foot, pole, arm, head);
+  const put = (mesh: Mesh, x: number, y: number, z: number): void => {
+    mesh.position.set(x, y, z);
+    g.add(mesh);
+  };
+  put(new Mesh(new CylinderGeometry(0.014, 0.02, 0.01, 12), rubber), 0, 0.005, 0);
+  put(new Mesh(new CylinderGeometry(0.009, 0.013, 0.05, 12), rubber), 0, 0.035, 0);
+  put(new Mesh(new CylinderGeometry(0.0065, 0.0095, 0.012, 12), rubber), 0, 0.066, 0);
+  put(new Mesh(new CylinderGeometry(0.0034, 0.0062, 0.31, 10), rubber), 0, 0.227, 0);
+  put(new Mesh(new CylinderGeometry(0.0045, 0.0045, 0.008, 10), rubber), 0, 0.384, 0);
+  put(new Mesh(bevelBox(0.008, 0.016, 0.004, 0.001), rubber), 0, 0.045, 0.0105);
+  // The arm rises out of the top collar, then runs level to the lantern.
+  const rise = new Mesh(new CylinderGeometry(0.0028, 0.0032, 1, 8), rubber);
+  rise.scale.y = alignSpan(rise, new Vector3(0, 0.386, 0), new Vector3(0, 0.405, 0.03));
+  const reach = new Mesh(new CylinderGeometry(0.0026, 0.0028, 1, 8), rubber);
+  reach.scale.y = alignSpan(reach, new Vector3(0, 0.405, 0.028), new Vector3(0, 0.405, 0.062));
+  g.add(rise, reach);
+  put(new Mesh(bevelBox(0.024, 0.014, 0.05, 0.003), rubber), 0, 0.398, 0.062);
+  put(new Mesh(bevelBox(0.02, 0.004, 0.044, 0.001), lampGlow), 0, 0.3895, 0.062);
+  mergeByMaterial(g, new Map<Material, string>([[rubber, 'Post'], [lampGlow, 'Lamp']]));
   return g;
 }
 
@@ -129,24 +147,26 @@ function tree(): Group {
   return buildTree(leaf, timber);
 }
 
+/** A wooden crate: a darker box inside, corner posts, three boards a face, bands top and bottom. */
 function crate(): Group {
   const g = new Group();
   g.name = 'Crate';
-  const box = new Mesh(new BoxGeometry(0.075, 0.075, 0.075), timber);
-  box.name = 'Box';
-  box.position.y = 0.0375;
-  g.add(box);
-  for (const [y, name] of [
-    [0.006, 'BandLow'],
-    [0.069, 'BandHigh'],
-  ] as [number, string][]) {
-    const band = new Mesh(new BoxGeometry(0.079, 0.01, 0.079), timber);
-    band.name = name;
-    band.position.y = y;
-    g.add(band);
+  const put = (geometry: BufferGeometry, material: MeshStandardMaterial, x: number, y: number, z: number, turn = 0): void => {
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(x, y, z).applyAxisAngle(UP, turn);
+    mesh.rotation.y = turn;
+    g.add(mesh);
+  };
+  put(new BoxGeometry(0.072, 0.072, 0.072), timberDark, 0, 0.0375, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(bevelBox(0.009, 0.075, 0.009, 0.0015), timber, sx * 0.0345, 0.0375, sz * 0.0345);
+  for (let face = 0; face < 4; face += 1) {
+    for (const across of [-0.021, 0, 0.021]) put(new BoxGeometry(0.017, 0.058, 0.003), timber, across, 0.0375, 0.0375, (face * Math.PI) / 2);
   }
+  for (const y of [0.006, 0.069]) put(new BoxGeometry(0.08, 0.009, 0.08), timber, 0, y, 0);
+  mergeByMaterial(g, new Map<Material, string>([[timber, 'Boards'], [timberDark, 'Box']]));
   return g;
 }
+const UP = new Vector3(0, 1, 0);
 
 export const vanProp = van();
 export const motorbikeProp = motorbike();
