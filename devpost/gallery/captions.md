@@ -47,7 +47,7 @@ Carry an actor across while it records and they walk it back, in step, on the fl
 ## 08 fire
 
 ```
-Rain moved over the fire and the flames die down. The same rules knock an actor down when a car is driven into them during a take.
+Rain over the fire puts it out. A car pushed hard and let go drives on, and the actor in its way goes down.
 ```
 
 ## 09 library

@@ -64,8 +64,8 @@ SLIDES = [
     dict(slug='take', badge=LIVE_BADGE, headline='Record a take', picture=('live', 'take'),
          caption='Carry an actor across while it records and they walk it back, in step, on the floor. Up to twelve seconds, kept with the board.'),
     dict(slug='fire', badge=LIVE_BADGE, headline='Pieces answer each other', picture=('live', 'fire'),
-         caption='Rain moved over the fire and the flames die down. The same rules knock an actor down when a car is driven into them during a take.'),
-    dict(slug='library', badge='Emulator · the panel at 1 mm per pixel', headline='{assets} pieces on six shelves', picture='../.design/shots/pass2/panel/assets-held.jpg',
+         caption='Rain over the fire puts it out. A car pushed hard and let go drives on, and the actor in its way goes down.'),
+    dict(slug='library', badge=LIVE_BADGE, headline='{assets} pieces on six shelves', picture=('live', 'pieces'),
          caption='Cast, creatures, vehicles, effects, set and props, every one a bare maquette you can paint, size and fit out. {scenes} scenes to start from.'),
     dict(slug='scene', badge=LIVE_BADGE, headline='Ten scenes to start from', picture=('live', 'dragon'),
          caption='Dragon attack: a dragon, a house on fire and two actors, placed as a blocking. Start here, then move anything.'),
@@ -255,6 +255,62 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         await page.wait_for_timeout(1200)
         await page.evaluate("(() => { const w = globalThis.setpiece.world; const f = w.scene.getObjectByName('Fire'); const r = w.scene.getObjectByName('Rain'); if (f && r) { r.position.x = f.position.x; r.position.z = f.position.z; w.globals.layoutChanged.value += 1; } })()")
         await page.wait_for_timeout(2500)
+        fire_png = out / 'live-fire-rain.png'
+        await stage_png(page, fire_png)
+        # Then a car let go while moving: it rolls on along its nose and the actor in its way goes down.
+        # The roll is started on the same code path a hand push takes, at a set speed, since a script has no hand.
+        await say('new scene with a car and an actor')
+        await page.wait_for_timeout(1200)
+        rolled = await page.evaluate("""(async () => {
+          const w = globalThis.setpiece.world; const wait = (ms) => new Promise((d) => setTimeout(d, ms));
+          const systems = [...w.getSystems()];
+          const tray = systems.find((s) => s.managed && s.finish);
+          const pieces = systems.find((s) => Array.isArray(s.rolling) && Array.isArray(s.dressed));
+          const squirm = systems.find((s) => typeof s.isDown === 'function');
+          const car = tray.managed.find((p) => tray.key(p) === 'Car');
+          const actor = tray.managed.find((p) => tray.key(p) === 'A');
+          car.object3D.position.set(-0.27, 0, -0.09); car.object3D.rotation.set(0, Math.PI / 2, 0);
+          actor.object3D.position.set(0.1, 0, -0.07); actor.object3D.rotation.set(0, -Math.PI / 2, 0);
+          w.globals.layoutChanged.value += 1;
+          await wait(600);
+          pieces.rolling.push({ index: pieces.dressed.indexOf(car), speed: 0.3, hit: false });
+          await wait(2800);
+          return { car: car.object3D.position.x, rolling: pieces.rolling.length, down: squirm ? squirm.isDown(actor) : null };
+        })()""")
+        assert rolled['rolling'] == 0 and rolled['car'] > -0.2 and rolled['down'] is True, rolled
+        drive_png = out / 'live-drive.png'
+        await stage_png(page, drive_png)
+        from PIL import Image
+        ims = [Image.open(p).convert('RGB') for p in (fire_png, drive_png)]
+        h = min(i.height for i in ims)
+        ims = [i.resize((int(i.width * h / i.height), h)) for i in ims]
+        sheet = Image.new('RGB', (sum(i.width for i in ims) + 16, h), (27, 20, 17))
+        x = 0
+        for i in ims:
+            sheet.paste(i, (x, 0))
+            x += i.width + 16
+        sheet.save(png)
+    elif recipe == 'pieces':
+        # The rebuilt vehicles and set dressing, standing on the slate together.
+        await say('new scene with a van, a motorbike, a tree and a rock')
+        await page.wait_for_timeout(1800)
+        # Spread out so each one reads: the van across the middle, the tree behind it, the bike and the rock in front.
+        placed = await page.evaluate("""(async () => {
+          const w = globalThis.setpiece.world;
+          const tray = [...w.getSystems()].find((s) => s.managed && s.finish);
+          const at = { Van: [-0.04, -0.05, 90], Motorbike: [0.15, 0.12, 135], Tree: [0.25, -0.16, 0], Rock: [-0.14, 0.135, 30] };
+          const found = [];
+          for (const p of tray.managed) {
+            const k = tray.key(p); const spot = at[k];
+            if (!spot || !p.object3D.visible) continue;
+            p.object3D.position.set(spot[0], 0, spot[1]); p.object3D.rotation.set(0, spot[2] * Math.PI / 180, 0);
+            found.push(k);
+          }
+          w.globals.layoutChanged.value += 1;
+          await new Promise((d) => setTimeout(d, 800));
+          return found.sort();
+        })()""")
+        assert placed == ['Motorbike', 'Rock', 'Tree', 'Van'], placed
         await stage_png(page, png)
     elif recipe == 'exports':
         # What a director actually leaves with: the board image and the shot list, saved by the page's own buttons.
