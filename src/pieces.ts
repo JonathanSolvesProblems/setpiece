@@ -112,9 +112,24 @@ const ROLL_LONGEST_FRAME = 0.5;
 const SPEED_FOLLOW = 30;
 /** Seconds a push is remembered after the hand slows. */
 const PUSH_MEMORY = 0.2;
+/**
+ * At the moment of letting go, the hand must still be moving at least this share of its
+ * push. A hand that stopped reads near zero within a tenth of a second, so this only
+ * decides pushes the hand was easing off from.
+ */
+const STILL_MOVING = 0.4;
 /** The slate's half size, in metres on the stage. */
 const SLATE_HALF_X = 0.3;
 const SLATE_HALF_Z = 0.2;
+/** A roll stops this far inside the knock-down rule's reach, so a take plays the contact back. */
+const CONTACT_INSET = 0.002;
+/** A push let go this close above the slate rolls on once it lands; from higher, it just lands. */
+const LOW_DROP = 0.05;
+/** What a roll goes through: effects, the kit, and the cast, who are met as actors instead. */
+const ROLL_THROUGH = new Set(['Effects', 'Kit', 'Cast']);
+/** A roll stops this short of a piece in its way, and its leading end is probed this often across its width. */
+const ROLL_MARGIN = 0.02;
+const ROLL_PROBES = 2;
 /** Scaled past this, a piece is too large for being near it to mean reaching for it. */
 const OVERSIZE = 1.2;
 /**
@@ -147,7 +162,7 @@ type SavedPieces = Record<string, Pose>;
 type Side = 'left' | 'right';
 const SIDES: Side[] = ['left', 'right'];
 type Carry = { piece: Entity; by: 'pinch' | 'fist' | 'pad'; offset: Vector3; at: Vector3; lost: number; opening: number };
-type Drop = { piece: Entity; speed: number; floor: number };
+type Drop = { piece: Entity; speed: number; floor: number; roll?: number };
 type Globals = {
   newBoardRequested: Signal<number>;
   coachTarget: Signal<string>;
@@ -188,6 +203,10 @@ export class PiecesSystem extends createSystem({
   private nose = new Vector3();
   private probe = new Vector3();
   private turnBack = new Quaternion();
+  private side = new Vector3();
+  /** Where the actor in a rolling vehicle's path stands: ahead of its leading end, and out from its side. */
+  private aheadFwd = 0;
+  private aheadLat = 0;
   private rings: Mesh[] = [];
   private turns: HandTurn[] = [];
   /** Grabs that began inside the guard window and were let go at once. */
@@ -206,6 +225,8 @@ export class PiecesSystem extends createSystem({
   private bounds: Box3[] = [];
   /** The shape of each piece that others can be set down on, by index; null for the rest. */
   private solids: (Box3 | null)[] = [];
+  /** The shape a rolling vehicle stops against, for every piece that has one: not an effect, an actor or a camera. */
+  private blockers: (Box3 | null)[] = [];
   /** How far each piece reaches from its own origin, by index: a quick way to rule a hand out. */
   private spans: number[] = [];
   private readings: Record<Side, HandReading> = { left: new HandReading(), right: new HandReading() };
@@ -266,6 +287,8 @@ export class PiecesSystem extends createSystem({
       }),
       // Poses during a take belong to the take; the blocking is kept once it is over.
       g.takeState.subscribe((state) => {
+        // A take that starts or plays moves the pieces itself: nothing rolls on under it.
+        this.rolling.length = 0;
         if (state === 'idle' && this.ready) this.save();
       }),
       // The card sent every piece back to a frame's setup: that is the blocking to keep now.
@@ -298,7 +321,10 @@ export class PiecesSystem extends createSystem({
     if (this.released.length === 0) return;
     for (const piece of this.released) {
       // A piece taken off the set while it was held has nowhere to stand.
-      if (piece.object3D == null || !piece.object3D.visible) continue;
+      if (piece.object3D == null || !piece.object3D.visible) {
+        this.forgetPush(piece);
+        continue;
+      }
       this.settle(piece);
       this.maybeRoll(piece);
     }
@@ -520,12 +546,6 @@ export class PiecesSystem extends createSystem({
     for (let i = 0; i < this.dressed.length; i++) {
       const piece = this.dressed[i];
       const object = piece.object3D;
-      if (this.heldSpeed[i] == null) {
-        this.heldSpeed[i] = new Vector3();
-        this.heldNow[i] = new Vector3();
-        this.heldLast[i] = new Vector3();
-        this.heldSeen[i] = false;
-      }
       if (object == null || !piece.hasComponent(Held)) {
         this.heldSeen[i] = false;
         continue;
@@ -545,22 +565,49 @@ export class PiecesSystem extends createSystem({
     }
   }
 
+  /** The push a piece was let go with is spent: whatever it was, it is not a roll later. */
+  private forgetPush(piece: Entity): void {
+    const index = this.dressed.indexOf(piece);
+    if (index < 0) return;
+    this.heldSpeed[index].set(0, 0, 0);
+    this.heldNow[index].set(0, 0, 0);
+  }
+
   /** A vehicle let go while moving keeps going along its nose. */
   private maybeRoll(piece: Entity): void {
     const index = this.dressed.indexOf(piece);
     const object = piece.object3D;
-    if (index < 0 || object == null || this.heldSpeed[index] == null) return;
+    if (index < 0 || object == null) return;
+    // The push is read once and spent, so a later flicker of the hold cannot replay it.
+    this.probe.copy(this.heldSpeed[index]);
+    this.point.copy(this.heldNow[index]);
+    this.forgetPush(piece);
     const asset = assetByLabel(String(piece.getValue(SetPiece, 'label') ?? ''));
     if (!ROLLING_VEHICLES.has(asset?.spareOf ?? asset?.label ?? '')) return;
-    // Only a vehicle on its wheels rolls; one dropped from the air lands first.
-    for (let i = 0; i < this.drops.length; i++) if (this.drops[i].piece === piece) return;
     this.nose.set(0, 0, 1).applyQuaternion(object.quaternion);
     this.nose.y = 0;
     this.nose.normalize();
-    const along = this.heldSpeed[index].x * this.nose.x + this.heldSpeed[index].z * this.nose.z;
+    const along = this.probe.x * this.nose.x + this.probe.z * this.nose.z;
     if (Math.abs(along) < ROLL_FROM) return;
+    // A push is let go while the hand is still moving. A hand that stopped and then
+    // opened was setting the car down, however fast it arrived, so the car stays put.
+    const now = this.point.x * this.nose.x + this.point.z * this.nose.z;
+    if (now * along <= 0 || Math.abs(now) < STILL_MOVING * Math.abs(along)) return;
+    const speed = Math.sign(along) * Math.min(Math.abs(along), ROLL_TOP);
+    // Only on the slate itself: a car pushed along a roof has nowhere to roll to.
+    for (let i = 0; i < this.drops.length; i++) {
+      if (this.drops[i].piece !== piece) continue;
+      // Let go a little above the slate, it rolls on from where it lands; from higher, it just lands.
+      if (this.drops[i].floor <= FALL_FROM && object.position.y - this.drops[i].floor <= LOW_DROP) this.drops[i].roll = speed;
+      return;
+    }
+    if (object.position.y <= FALL_FROM) this.startRoll(index, speed);
+  }
+
+  private startRoll(index: number, speed: number): void {
+    if (index < 0 || speed === 0) return;
     for (let i = 0; i < this.rolling.length; i++) if (this.rolling[i].index === index) this.rolling.splice(i, 1);
-    this.rolling.push({ index, speed: Math.sign(along) * Math.min(Math.abs(along), ROLL_TOP) });
+    this.rolling.push({ index, speed });
   }
 
   private roll(delta: number): void {
@@ -575,20 +622,25 @@ export class PiecesSystem extends createSystem({
       this.nose.set(0, 0, 1).applyQuaternion(object.quaternion);
       this.nose.y = 0;
       this.nose.normalize();
-      const step = run.speed * delta;
+      const way = Math.sign(run.speed);
+      const length = Math.abs(run.speed) * delta;
       // The leading end of the vehicle, a step ahead, is what meets the edge or a wall.
-      const reach = (localBoundsDepth(this.bounds[run.index], object) + Math.abs(step)) * Math.sign(run.speed);
-      this.probe.copy(object.position).addScaledVector(this.nose, reach);
-      let blocked = Math.abs(this.probe.x) > SLATE_HALF_X || Math.abs(this.probe.z) > SLATE_HALF_Z || this.solidAt(this.probe, run.index);
-      // An actor in the way stops it, and goes down if it was still going fast enough.
-      // The roll knocks them itself: a long frame can carry it past the contact the
-      // knock-down rule would otherwise have to see.
-      const actor = blocked ? null : this.actorAhead(run.index, object, Math.abs(step), Math.sign(run.speed));
+      let blocked = this.leadingEndBlocked(run.index, object, localBoundsDepth(this.bounds[run.index], object) + length, way);
+      let move = blocked ? 0 : length;
+      // An actor in the way stops it, and goes down if it was still going fast enough. It
+      // stops just inside the knock-down rule's reach, so a take plays the contact back, and
+      // the roll knocks them itself, since a long frame can jump past the moment of contact.
+      const actor = blocked ? null : this.actorAhead(run.index, object, way);
       if (actor != null) {
-        blocked = true;
-        if (Math.abs(run.speed) >= KNOCK_SPEED) this.knockDown(actor, Math.sign(run.speed));
+        const contact = ACTOR_REACH - CONTACT_INSET;
+        const stopAt = Math.sqrt(Math.max(0, contact * contact - this.aheadLat * this.aheadLat));
+        if (this.aheadFwd - length <= stopAt) {
+          move = Math.max(0, Math.min(length, this.aheadFwd - stopAt));
+          blocked = true;
+          if (Math.abs(run.speed) >= KNOCK_SPEED) this.knockDown(actor, way);
+        }
       }
-      if (!blocked) object.position.addScaledVector(this.nose, step);
+      if (move > 0) object.position.addScaledVector(this.nose, way * move);
       const slower = Math.max(0, Math.abs(run.speed) - ROLL_FRICTION * delta);
       run.speed = Math.sign(run.speed) * slower;
       if (blocked || slower < ROLL_STOP) {
@@ -610,35 +662,64 @@ export class PiecesSystem extends createSystem({
     }
   }
 
-  /** A standing or fallen actor touching this vehicle's shape on the side it is rolling towards. */
-  private actorAhead(self: number, object: Object3D, step: number, way: number): Entity | null {
+  /**
+   * Whether the vehicle's leading end, `reach` ahead of its centre, meets the slate's
+   * edge or a solid piece, at its middle or at either corner.
+   */
+  private leadingEndBlocked(self: number, object: Object3D, reach: number, way: number): boolean {
+    const box = this.bounds[self];
+    const halfWidth = (box == null ? 0.05 : Math.max(Math.abs(box.min.x), Math.abs(box.max.x))) * object.scale.x;
+    this.side.set(this.nose.z, 0, -this.nose.x);
+    for (let k = -ROLL_PROBES; k <= ROLL_PROBES; k++) {
+      this.probe.copy(object.position).addScaledVector(this.nose, way * reach).addScaledVector(this.side, (k / ROLL_PROBES) * halfWidth);
+      if (Math.abs(this.probe.x) > SLATE_HALF_X || Math.abs(this.probe.z) > SLATE_HALF_Z || this.blockedAt(this.probe, self)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The nearest actor in this vehicle's path, standing or fallen, with how far ahead of
+   * the leading end they are and how far out from the vehicle's side, in stage metres.
+   */
+  private actorAhead(self: number, object: Object3D, way: number): Entity | null {
     const box = this.bounds[self];
     if (box == null) return null;
     const scale = object.scale.x || 1;
+    const halfWidth = Math.max(Math.abs(box.min.x), Math.abs(box.max.x));
+    const front = way > 0 ? box.max.z : -box.min.z;
+    const height = (box.max.y - box.min.y) * scale;
     this.turnBack.copy(object.quaternion).invert();
+    let found: Entity | null = null;
     for (let j = 0; j < this.dressed.length; j++) {
       const other = this.dressed[j];
       const body = other.object3D;
       if (j === self || body == null || !body.visible || other.hasComponent(Held)) continue;
       if (other.getValue(SetPiece, 'role') !== SetRole.Actor) continue;
+      // Standing on something else, at another height, they are out of its way.
+      if (Math.abs(body.position.y - object.position.y) > height) continue;
       this.point.copy(body.position).sub(object.position).applyQuaternion(this.turnBack).divideScalar(scale);
-      // Only what is in front of the way it is going; an actor behind is left behind.
-      if (this.point.z * way <= 0) continue;
-      this.point.y = Math.min(Math.max(this.point.y, box.min.y), box.max.y);
-      if (box.distanceToPoint(this.point) * scale <= ACTOR_REACH + step) return other;
+      const lat = Math.max(0, Math.abs(this.point.x) - halfWidth) * scale;
+      const fwd = (this.point.z * way - front) * scale;
+      // In the way: within the vehicle's width, and ahead of its leading end or just touching it.
+      if (lat > ACTOR_REACH || fwd < -ACTOR_REACH) continue;
+      if (found != null && fwd >= this.aheadFwd) continue;
+      found = other;
+      this.aheadFwd = fwd;
+      this.aheadLat = lat;
     }
-    return null;
+    return found;
   }
 
-  /** Whether a point on the stage is inside a solid piece other than this one. */
-  private solidAt(point: Vector3, self: number): boolean {
+  /** Whether a point on the stage is within a roll's margin of a piece in the way, other than this one. */
+  private blockedAt(point: Vector3, self: number): boolean {
     for (let j = 0; j < this.dressed.length; j++) {
-      const box = this.solids[j];
+      const box = this.blockers[j];
       const other = this.dressed[j].object3D;
-      if (j === self || box == null || other == null || !other.visible) continue;
+      if (j === self || box == null || other == null || !other.visible || this.dressed[j].hasComponent(Held)) continue;
+      const scale = other.scale.x || 1;
       this.point.copy(point).sub(other.position).applyQuaternion(this.turnBack.copy(other.quaternion).invert());
-      this.point.divideScalar(other.scale.x || 1);
-      if (box.containsPoint(this.point)) return true;
+      this.point.divideScalar(scale);
+      if (box.distanceToPoint(this.point) * scale <= ROLL_MARGIN) return true;
     }
     return false;
   }
@@ -664,6 +745,7 @@ export class PiecesSystem extends createSystem({
       object.position.y = drop.floor;
       this.knock(Cue.Place, drop.piece);
       this.drops.splice(i, 1);
+      if (drop.roll) this.startRoll(this.dressed.indexOf(drop.piece), drop.roll);
       if (this.drops.length === 0) this.save();
     }
   }
@@ -760,7 +842,11 @@ export class PiecesSystem extends createSystem({
     if (size == null) return;
     const [radius, height] = size;
     const shape = localBounds(object);
-    this.solids.push(assetByLabel(String(piece.getValue(SetPiece, 'label')))?.solid === true ? shape.clone() : null);
+    const asset = assetByLabel(String(piece.getValue(SetPiece, 'label')));
+    const role = piece.getValue(SetPiece, 'role');
+    this.solids.push(asset?.solid === true ? shape.clone() : null);
+    const inTheWay = asset != null && !ROLL_THROUGH.has(asset.shelf) && role !== SetRole.Actor && role !== SetRole.Camera && !shape.isEmpty();
+    this.blockers.push(inTheWay ? shape.clone() : null);
     // A thin piece gets room around it for the hand; a big one is its own shape, so a hand
     // passing near a car does not count as a hand on the car.
     const room = shape.isEmpty() ? radius : Math.min(radius, THIN_REACH);
@@ -785,6 +871,10 @@ export class PiecesSystem extends createSystem({
     object.add(volume, ring);
     this.world.getSystem(ViewfinderSystem)?.hideFromLens(ring);
     this.dressed.push(piece);
+    this.heldSpeed.push(new Vector3());
+    this.heldNow.push(new Vector3());
+    this.heldLast.push(new Vector3());
+    this.heldSeen.push(false);
     this.rings.push(ring);
     this.turns.push(new HandTurn());
   }

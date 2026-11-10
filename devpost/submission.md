@@ -43,7 +43,7 @@ You leave with a board image, a shot list and a short animatic. Every number on 
 
 How I built it: Immersive Web SDK in the Quest Browser, nothing to install. The set is 51 hand-built pieces and 10 starting scenes, made in code as plain maquettes you paint yourself. Passthrough makes your table the stage. Hit testing lands the set where you point, with no room scan at all. On a Quest 3S, in three sittings of normal use on 5 and 6 November, it ran at a median of 90 frames a second (46 one-second samples; the lowest was 65.5, in the first minute, none under 60). Those were the builds of those days; the build you load is measured again before the deadline [X, the new number]. The monitor's second view of the set is redrawn only when something on the set moved.
 
-What I haven't proven yet: the set coming back on the same spot after the browser is closed and opened again, in a room I haven't been in; voice through the headset's own microphone (it has been tested with synthetic voices into the same recogniser); the frame rate while a take plays. [X, update after the next headset session.]
+What I haven't proven yet: the set coming back on the same spot after the browser is closed and opened again, in a room I haven't been in; voice through the headset's own microphone (it has been tested with synthetic voices into the same recogniser); the frame rate while a take plays; a car pushed by a real hand (the roll has only been driven by scripted hands in the emulator). [X, update after the next headset session.]
 
 [X, measured: one unbroken take, headset on to a six-frame board, in minutes.]
 

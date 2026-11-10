@@ -273,7 +273,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
           actor.object3D.position.set(0.1, 0, -0.07); actor.object3D.rotation.set(0, -Math.PI / 2, 0);
           w.globals.layoutChanged.value += 1;
           await wait(600);
-          pieces.rolling.push({ index: pieces.dressed.indexOf(car), speed: 0.3, hit: false });
+          pieces.rolling.push({ index: pieces.dressed.indexOf(car), speed: 0.3 });
           await wait(2800);
           return { car: car.object3D.position.x, rolling: pieces.rolling.length, down: squirm ? squirm.isDown(actor) : null };
         })()""")
