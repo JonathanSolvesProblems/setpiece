@@ -36,12 +36,13 @@ import {
 import type { Intersection, UIKitMLAsset } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
-import { assetByLabel } from './catalog.js';
+import { assetByLabel, assetTitle } from './catalog.js';
 import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
 import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
 import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
+import { SquirmSystem } from './squirm.js';
 import { ViewfinderSystem } from './viewfinder.js';
 
 /** A piece carried further than this from the slate's centre goes back to where it started. */
@@ -148,6 +149,7 @@ type Globals = {
   newBoardRequested: Signal<number>;
   coachTarget: Signal<string>;
   setupRecalled: Signal<number>;
+  coachNote: Signal<string>;
   cameraRig: Signal<string>;
   takeState: Signal<string>;
   trayOn: Signal<string[]>;
@@ -179,7 +181,7 @@ export class PiecesSystem extends createSystem({
   private heldNow: Vector3[] = [];
   private heldSeen: boolean[] = [];
   /** Vehicles rolling on after being let go: index into dressed, and signed speed along their nose. */
-  private rolling: { index: number; speed: number; hit: boolean }[] = [];
+  private rolling: { index: number; speed: number }[] = [];
   private nose = new Vector3();
   private probe = new Vector3();
   private turnBack = new Quaternion();
@@ -552,7 +554,7 @@ export class PiecesSystem extends createSystem({
     const along = this.heldSpeed[index].x * this.nose.x + this.heldSpeed[index].z * this.nose.z;
     if (Math.abs(along) < ROLL_FROM) return;
     for (let i = 0; i < this.rolling.length; i++) if (this.rolling[i].index === index) this.rolling.splice(i, 1);
-    this.rolling.push({ index, speed: Math.sign(along) * Math.min(Math.abs(along), ROLL_TOP), hit: false });
+    this.rolling.push({ index, speed: Math.sign(along) * Math.min(Math.abs(along), ROLL_TOP) });
   }
 
   private roll(delta: number): void {
@@ -572,11 +574,13 @@ export class PiecesSystem extends createSystem({
       const reach = (localBoundsDepth(this.bounds[run.index], object) + Math.abs(step)) * Math.sign(run.speed);
       this.probe.copy(object.position).addScaledVector(this.nose, reach);
       let blocked = Math.abs(this.probe.x) > SLATE_HALF_X || Math.abs(this.probe.z) > SLATE_HALF_Z || this.solidAt(this.probe, run.index);
-      // An actor in the way stops it. Going fast enough, it gets one more step, so the
-      // rule that knocks actors down sees the two meet; then it stops against them.
-      if (!blocked && this.actorAhead(run.index, object, Math.abs(step), Math.sign(run.speed))) {
-        if (run.hit || Math.abs(run.speed) < KNOCK_SPEED) blocked = true;
-        else run.hit = true;
+      // An actor in the way stops it, and goes down if it was still going fast enough.
+      // The roll knocks them itself: a long frame can carry it past the contact the
+      // knock-down rule would otherwise have to see.
+      const actor = blocked ? null : this.actorAhead(run.index, object, Math.abs(step), Math.sign(run.speed));
+      if (actor != null) {
+        blocked = true;
+        if (Math.abs(run.speed) >= KNOCK_SPEED) this.knockDown(actor, Math.sign(run.speed));
       }
       if (!blocked) object.position.addScaledVector(this.nose, step);
       const slower = Math.max(0, Math.abs(run.speed) - ROLL_FRICTION * delta);
@@ -589,10 +593,21 @@ export class PiecesSystem extends createSystem({
     }
   }
 
-  /** Whether a standing or fallen actor touches this vehicle's shape on the side it is rolling towards. */
-  private actorAhead(self: number, object: Object3D, step: number, way: number): boolean {
+  /** An actor knocked over by a vehicle rolling along `this.nose`, `way` being forwards or back. */
+  private knockDown(actor: Entity, way: number): void {
+    const body = actor.object3D;
+    if (body == null) return;
+    this.probe.copy(this.nose).multiplyScalar(way).applyQuaternion(this.turnBack.copy(body.quaternion).invert());
+    if (this.world.getSystem(SquirmSystem)?.knock(actor, this.probe.x, this.probe.z) === true) {
+      const who = assetTitle(String(actor.getValue(SetPiece, 'label'))).toUpperCase();
+      (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick them up to stand them again.`;
+    }
+  }
+
+  /** A standing or fallen actor touching this vehicle's shape on the side it is rolling towards. */
+  private actorAhead(self: number, object: Object3D, step: number, way: number): Entity | null {
     const box = this.bounds[self];
-    if (box == null) return false;
+    if (box == null) return null;
     const scale = object.scale.x || 1;
     this.turnBack.copy(object.quaternion).invert();
     for (let j = 0; j < this.dressed.length; j++) {
@@ -604,9 +619,9 @@ export class PiecesSystem extends createSystem({
       // Only what is in front of the way it is going; an actor behind is left behind.
       if (this.point.z * way <= 0) continue;
       this.point.y = Math.min(Math.max(this.point.y, box.min.y), box.max.y);
-      if (box.distanceToPoint(this.point) * scale <= ACTOR_REACH + step) return true;
+      if (box.distanceToPoint(this.point) * scale <= ACTOR_REACH + step) return other;
     }
-    return false;
+    return null;
   }
 
   /** Whether a point on the stage is inside a solid piece other than this one. */
