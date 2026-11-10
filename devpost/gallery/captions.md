@@ -77,7 +77,7 @@ After a reload in the headset the panel lists what came back: the set, the piece
 ## 13 load
 
 ```
-While the set builds, the card names each step. The app is 2.56 MB, down from 6.78; a reload on the Quest is ready in 3.4 s.
+While the set builds, the card names each step. The app is 2.57 MB, down from 6.78; a reload on the Quest is ready in 3.4 s.
 ```
 
 ## 14 leave
