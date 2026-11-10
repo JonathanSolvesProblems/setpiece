@@ -105,6 +105,9 @@ const ROLL_FROM = 0.12;
 const ROLL_TOP = 0.9;
 const ROLL_FRICTION = 0.2;
 const ROLL_STOP = 0.015;
+/** The longest step a roll takes at once, and the most of one frame it will make up. */
+const ROLL_STEP = 1 / 60;
+const ROLL_LONGEST_FRAME = 0.5;
 /** How quickly the measured speed of a held piece follows its last moves, per second. */
 const SPEED_FOLLOW = 30;
 /** Seconds a push is remembered after the hand slows. */
@@ -288,7 +291,10 @@ export class PiecesSystem extends createSystem({
     this.followHands(delta, time);
     this.measureHeld(delta);
     if (this.drops.length > 0) this.fall(delta);
-    if (this.rolling.length > 0) this.roll(delta);
+    // A long frame is rolled in short steps, so a stall cannot carry a car past an edge or an actor.
+    for (let left = Math.min(delta, ROLL_LONGEST_FRAME); left > 0 && this.rolling.length > 0; left -= ROLL_STEP) {
+      this.roll(Math.min(left, ROLL_STEP));
+    }
     if (this.released.length === 0) return;
     for (const piece of this.released) {
       // A piece taken off the set while it was held has nowhere to stand.
