@@ -23,6 +23,10 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { bevelBox } from './lib/hardsurface.js';
+import { boatShell } from './lib/boat.js';
+import { busShell } from './lib/bus.js';
+import { pickupShell } from './lib/pickup.js';
+import { truckLoads, truckShell } from './lib/truck.js';
 import { buildRock } from './lib/nature.js';
 import { BEAD, Kit, SIDES, ball, idleGroup, limb, loft, plate, sec, v } from './lib/kit.js';
 
@@ -31,8 +35,6 @@ const glass = new MeshStandardMaterial({ color: 0x20262e, roughness: 0.25, metal
 const rubber = new MeshStandardMaterial({ color: 0x17191c, roughness: 0.9 });
 const steel = new MeshStandardMaterial({ color: 0x4a4f55, roughness: 0.45, metalness: 0.6 });
 const trim = new MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.7 });
-const headlamp = new MeshStandardMaterial({ color: 0xfff2c4, emissive: 0xffe6a0, emissiveIntensity: 0.9 });
-const taillamp = new MeshStandardMaterial({ color: 0xb3202a, emissive: 0x8a0f17, emissiveIntensity: 0.6 });
 const beacon = new MeshStandardMaterial({ color: 0x9fffe0, emissive: 0x4dffc4, emissiveIntensity: 0.9 });
 const concrete = new MeshStandardMaterial({ color: 0x9b9a94, roughness: 0.95 });
 const stone = new MeshStandardMaterial({ color: 0x8e877c, roughness: 0.92 });
@@ -73,141 +75,28 @@ function outline(points: [number, number][]): Shape {
   return s;
 }
 
-/** Tyres and hubs on both sides at each axle. */
-function wheels(kit: Kit, halfTrack: number, axles: number[], radius: number, tyre: number): void {
-  for (const s of SIDES) {
-    for (const z of axles) {
-      const tyreMesh = new Mesh(new CylinderGeometry(radius, radius, tyre, 14));
-      tyreMesh.rotation.z = Math.PI / 2;
-      tyreMesh.position.set(s * halfTrack, radius, z);
-      const hub = new Mesh(new CylinderGeometry(radius * 0.5, radius * 0.5, tyre + 0.002, 10));
-      hub.rotation.z = Math.PI / 2;
-      hub.position.copy(tyreMesh.position);
-      kit.put('Tyres', rubber, tyreMesh);
-      kit.put('Hubs', steel, hub);
-    }
-  }
-}
-
-/** One of several looks, hidden unless it is the first. */
-function style(index: number, build: (kit: Kit) => void): Group {
-  const group = new Group();
-  group.name = `Style${index}`;
-  const kit = new Kit();
-  build(kit);
-  kit.build(group);
-  group.visible = index === 0;
-  return group;
-}
-
-/** A cab-forward box truck on a ladder chassis; the load behind the cab is one of three styles. */
+/** A cab-over truck on a ladder chassis; the load behind the cab is one of three styles. */
 function truck(): Group {
   const g = new Group();
   g.name = 'Truck';
-  const width = 0.22;
-  const kit = new Kit();
-  const cab = new Shape();
-  cab.moveTo(0.17, 0.045);
-  cab.lineTo(0.17, 0.275);
-  cab.lineTo(0.255, 0.275);
-  cab.quadraticCurveTo(0.275, 0.273, 0.28, 0.25);
-  cab.lineTo(0.3, 0.17);
-  cab.lineTo(0.31, 0.15);
-  cab.lineTo(0.31, 0.06);
-  cab.lineTo(0.305, 0.045);
-  cab.closePath();
-  kit.put('BodyCab', primer, side(cab, width));
-  kit.put('Glass', glass, side(outline([[0.2, 0.175], [0.2, 0.258], [0.27, 0.258], [0.288, 0.25], [0.308, 0.175]]), width + 0.001, 0));
-  kit.put('Chassis', steel, block(0.14, 0.025, 0.58, 0, 0.06, -0.01));
-  kit.put('Trim', trim, block(0.23, 0.03, 0.02, 0, 0.055, 0.314), block(0.12, 0.05, 0.004, 0, 0.11, 0.311, 0.001));
-  for (const s of SIDES) {
-    kit.put('Headlamps', headlamp, block(0.035, 0.018, 0.006, s * 0.08, 0.09, 0.312, 0.001));
-    kit.put('Taillamps', taillamp, block(0.02, 0.012, 0.006, s * 0.09, 0.072, -0.302, 0.001));
-  }
-  wheels(kit, 0.093, [0.245, -0.15, -0.24], 0.045, 0.03);
-  kit.build(g);
-  g.add(
-    style(0, (k) => {
-      k.put('BodyBox', primer, block(0.23, 0.245, 0.43, 0, 0.2075, -0.075, 0.008));
-      k.put('Trim', trim, block(0.004, 0.225, 0.003, 0, 0.2075, -0.291, 0.001));
-    }),
-    style(1, (k) => {
-      k.put('BodyDeck', primer, block(0.23, 0.018, 0.44, 0, 0.094, -0.08), block(0.23, 0.07, 0.012, 0, 0.138, 0.135));
-      for (const s of SIDES) for (const z of [-0.28, -0.15, -0.02, 0.1]) k.put('Stakes', steel, block(0.006, 0.03, 0.008, s * 0.112, 0.118, z, 0.001));
-    }),
-    style(2, (k) => {
-      k.put('BodyTank', primer, loft([
-        sec(-0.295, 0.19, 0.04, 0.04),
-        sec(-0.285, 0.19, 0.08, 0.08),
-        sec(-0.27, 0.19, 0.095, 0.095),
-        sec(0.1, 0.19, 0.095, 0.095),
-        sec(0.115, 0.19, 0.08, 0.08),
-        sec(0.125, 0.19, 0.04, 0.04),
-      ], 20, 1).mesh);
-      for (const z of [-0.2, -0.05, 0.07]) k.put('Saddles', steel, block(0.16, 0.03, 0.02, 0, 0.087, z));
-      k.put('Saddles', steel, block(0.04, 0.006, 0.36, 0, 0.288, -0.085, 0.001));
-    }),
-  );
+  truckShell(g, primer, glass, rubber, steel);
+  truckLoads(g, primer, rubber, steel);
   return g;
 }
 
-/** A pickup: bonnet, crew cab, open bed with a tailgate. */
+/** A crew-cab pickup with an open bed. */
 function pickup(): Group {
   const g = new Group();
   g.name = 'Pickup';
-  const width = 0.19;
-  const kit = new Kit();
-  const cab = new Shape();
-  cab.moveTo(-0.075, 0.045);
-  cab.lineTo(-0.075, 0.175);
-  cab.quadraticCurveTo(-0.07, 0.18, -0.06, 0.18);
-  cab.lineTo(0.015, 0.18);
-  cab.lineTo(0.07, 0.128);
-  cab.lineTo(0.215, 0.12);
-  cab.quadraticCurveTo(0.245, 0.116, 0.248, 0.095);
-  cab.lineTo(0.25, 0.06);
-  cab.lineTo(0.245, 0.045);
-  cab.closePath();
-  kit.put('BodyShell', primer,
-    side(cab, width),
-    block(width, 0.045, 0.17, 0, 0.0675, -0.165),
-    block(0.012, 0.042, 0.17, -0.089, 0.104, -0.165),
-    block(0.012, 0.042, 0.17, 0.089, 0.104, -0.165),
-    block(width, 0.042, 0.012, 0, 0.104, -0.244));
-  kit.put('Glass', glass, side(outline([[-0.068, 0.125], [-0.068, 0.172], [0.029, 0.172], [0.08, 0.126]]), width + 0.001, 0));
-  kit.put('Trim', trim, block(0.2, 0.022, 0.016, 0, 0.058, 0.252), block(0.2, 0.02, 0.014, 0, 0.058, -0.252));
-  for (const s of SIDES) {
-    kit.put('Headlamps', headlamp, block(0.03, 0.014, 0.006, s * 0.068, 0.095, 0.249, 0.001));
-    kit.put('Taillamps', taillamp, block(0.008, 0.025, 0.006, s * 0.085, 0.1, -0.251, 0.001));
-  }
-  wheels(kit, 0.083, [0.165, -0.165], 0.036, 0.026);
-  kit.build(g);
+  pickupShell(g, primer, glass, rubber);
   return g;
 }
 
-/** A single-deck city bus: one rounded box, a window band, doors on the kerb side. */
+/** A single-deck city bus. */
 function bus(): Group {
   const g = new Group();
   g.name = 'Bus';
-  const kit = new Kit();
-  const shell = new Mesh(bevelBox(0.25, 0.27, 0.75, 0.02, 0.03));
-  shell.position.set(0, 0.175, 0);
-  kit.put('BodyShell', primer, shell, block(0.14, 0.025, 0.18, 0, 0.322, -0.1, 0.006));
-  kit.put('Glass', glass,
-    block(0.254, 0.075, 0.6, 0, 0.225, -0.04, 0.004),
-    block(0.22, 0.13, 0.006, 0, 0.21, 0.375, 0.002),
-    block(0.004, 0.2, 0.06, -0.126, 0.145, 0.29, 0.001),
-    block(0.004, 0.2, 0.06, -0.126, 0.145, -0.02, 0.001));
-  kit.put('Trim', trim,
-    block(0.25, 0.03, 0.015, 0, 0.055, 0.377),
-    block(0.25, 0.03, 0.015, 0, 0.055, -0.377),
-    block(0.16, 0.025, 0.004, 0, 0.29, 0.376, 0.001));
-  for (const s of SIDES) {
-    kit.put('Headlamps', headlamp, block(0.03, 0.016, 0.006, s * 0.09, 0.085, 0.376, 0.001));
-    kit.put('Taillamps', taillamp, block(0.016, 0.04, 0.006, s * 0.105, 0.1, -0.376, 0.001));
-  }
-  wheels(kit, 0.107, [0.24, -0.22], 0.05, 0.035);
-  kit.build(g);
+  busShell(g, primer, glass, rubber);
   return g;
 }
 
@@ -278,21 +167,7 @@ function helicopter(): Group {
 function boat(): Group {
   const g = new Group();
   g.name = 'Boat';
-  const kit = new Kit();
-  kit.put('BodyHull', primer, loft([
-    sec(-0.23, 0.055, 0.085, 0.03, 0.05, 0, 3),
-    sec(-0.15, 0.055, 0.092, 0.03, 0.055, 0, 2.6),
-    sec(0, 0.058, 0.09, 0.03, 0.058, 0, 2.3),
-    sec(0.12, 0.065, 0.07, 0.03, 0.06, 0, 2),
-    sec(0.2, 0.075, 0.04, 0.028, 0.06, 0, 1.8),
-    sec(0.245, 0.085, 0.008, 0.012, 0.05, 0, 1.6),
-  ], 16).mesh, block(0.13, 0.045, 0.13, 0, 0.1, 0.05, 0.008));
-  kit.put('Glass', glass, plate(v(0, 0.118, -0.012), v(0, 0.152, -0.03), 0.13, 0.004, 0.001));
-  kit.put('Trim', trim,
-    block(0.06, 0.035, 0.04, 0, 0.1, -0.08, 0.005),
-    block(0.04, 0.05, 0.045, 0, 0.115, -0.255, 0.008),
-    limb(v(0, 0.095, -0.25), v(0, 0.012, -0.25), 0.007, 0.006));
-  kit.build(g);
+  boatShell(g, primer, glass, rubber);
   return g;
 }
 

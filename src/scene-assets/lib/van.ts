@@ -7,8 +7,8 @@
  */
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, Vector3 } from '@iwsdk/core';
 import type { Material } from '@iwsdk/core';
-import { bevelBox, LoftSurface, sampleRange, type TubeSection } from './hardsurface.js';
-import { archedWheel, bar, hub, lens, mergeByMaterial, named, skinAt, tail } from './vehicle.js';
+import { bevelBox, LoftSurface, type TubeSection } from './hardsurface.js';
+import { alongs, archedWheel, bar, hub, lens, mergeByMaterial, named, skinAt, tail } from './vehicle.js';
 
 const SIDES = [-1, 1] as const;
 const WHEEL_RADIUS = 0.036;
@@ -40,13 +40,6 @@ const CAB = [pane(0.026, 0.0945, 0.205), pane(0.092, 0.0945, 0.2035), pane(0.118
 /** The roof skin over the cab, proud of the glass, so the windows read beneath it. */
 const roof = (z: number, halfW: number, top: number): TubeSection => ({ z, halfW, cy: 0.198, hUp: top - 0.198, hDown: 0.004, power: 8 });
 const CAB_ROOF = [roof(0.02, 0.0958, ROOF), roof(0.088, 0.0958, 0.2095), roof(0.1, 0.0948, 0.2045)];
-
-/** Sample points along a loft that always include its stations, so creases stay sharp. */
-function alongs(sections: TubeSection[], count: number): number[] {
-  const stations = sections.map((s) => s.z);
-  const between = sampleRange(stations[0], stations[stations.length - 1], count).filter((z) => stations.every((s) => Math.abs(s - z) > 0.006));
-  return [...stations, ...between].sort((a, b) => a - b);
-}
 
 export function vanShell(g: Group, paint: MeshStandardMaterial, glass: MeshStandardMaterial, rubber: MeshStandardMaterial): void {
   const body = LoftSurface.tube(LOWER);

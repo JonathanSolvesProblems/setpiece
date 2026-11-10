@@ -14,7 +14,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import type { Material } from '@iwsdk/core';
-import { alignSpan, type LoftSurface } from './hardsurface.js';
+import { alignSpan, sampleRange, type LoftSurface, type TubeSection } from './hardsurface.js';
 
 export const lens = new MeshStandardMaterial({ color: 0xe4dcc6, roughness: 0.3, metalness: 0.2 });
 export const tail = new MeshStandardMaterial({ color: 0x7c2c25, roughness: 0.35 });
@@ -36,6 +36,24 @@ export function skinAt(surface: LoftSurface, z: number, y: number, side: number)
     best = point;
   }
   return best;
+}
+
+/** Sample points along a loft that always include its stations, so creases stay sharp. */
+export function alongs(sections: TubeSection[], count: number): number[] {
+  const stations = sections.map((s) => s.z);
+  const between = sampleRange(stations[0], stations[stations.length - 1], count).filter((z) => stations.every((s) => Math.abs(s - z) > 0.006));
+  return [...stations, ...between].sort((a, b) => a - b);
+}
+
+/** A tyre and hub cap with no arch, for an axle under a load bed or a bare chassis. */
+export function plainWheel(g: Group, side: number, z: number, radius: number, tyreWidth: number, wheelX: number, rubber: Material, tag: string): void {
+  const tyre = named(new Mesh(new CylinderGeometry(radius, radius, tyreWidth, 16), rubber), `Wheel${tag}`);
+  tyre.rotation.z = Math.PI / 2;
+  tyre.position.set(side * wheelX, radius, z);
+  const cap = named(new Mesh(new CylinderGeometry(radius * 0.576, radius * 0.636, 0.004, 10), hub), 'Hub');
+  cap.rotation.z = Math.PI / 2;
+  cap.position.set(side * (wheelX + tyreWidth / 2 + 0.0005), radius, z);
+  g.add(tyre, cap);
 }
 
 /** A thin bar lying on the skin between two points, for pillars and seams. */
