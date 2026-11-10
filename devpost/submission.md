@@ -11,7 +11,7 @@ Setpiece
 ## Tagline
 
 ```
-Block a VFX shot on your kitchen table with your hands and leave with the storyboard. Hands only, 90 frames a second on a Quest 3S.
+Block a VFX shot on your kitchen table with your hands and leave with the storyboard. No controllers needed, median 90 fps on a Quest 3S.
 ```
 
 ## Track
@@ -31,23 +31,23 @@ New Experience
 ```
 I wanted to be a VFX filmmaker before I switched to computer science. The short I'm least embarrassed by has a creature added weeks after the shoot. On the day there was nothing for the actor to look at and nothing to frame against.
 
-On a real creature shoot the stand-in is a tennis ball on a stand, raised to the creature's eye height. Joe Bauer, the visual effects supervisor on Game of Thrones, put it this way in befores & afters in 2023: "When Daenerys' dragons were 3' long they were tennis balls on sticks." Scott Squires, who supervised Dragonheart: "Trying to get actors to look where you need them to is always an issue." Setpiece puts that ball, the actors and the camera on your kitchen table a week before the shoot.
+On a real creature shoot the stand-in is a tennis ball on a stand, raised to the creature's eye height, and getting actors to look where you need them to is a known problem on set. Setpiece puts that ball, the actors and the camera on your kitchen table a week before the shoot.
 
-It is for an indie director or a VFX supervisor in prep: one blocking per shot, across the days before the shoot, with the board building up as they go. Desktop previs is a mouse and a screen; here the table sets the scale, your hands move the stand-ins, and the eyeline is in the room with you. It is a web page in the Quest Browser, nothing to install.
+It is for an indie director or a VFX supervisor in prep: a board for each scene, built up over the days before the shoot and opened again on the day. Here the table sets the scale, your hands move the stand-ins, and the eyeline is in the room with you.
 
-You sit down, point at the table and pinch. A 1:10 set lands on it, in your real room. You pick up wooden stand-ins with your fingers, put the ball where the creature will be, pick a lens from 18 to 135 mm and look through the camera. The monitor shows what that lens sees. Snap, and the frame goes on a storyboard with its lens, camera height, distance and eyelines already written on it.
+You sit down and a 1:10 set lands on your table: by itself if the headset already knows the table, with a point and a pinch if it doesn't. You pick up wooden stand-ins with your fingers, put the ball where the creature will be, pick a lens from 18 to 135 mm and look through the camera. Snap, and the frame goes on a storyboard with its lens, camera height, distance and eyelines written on it.
 
-Record a take and carry an actor across the set: they walk it back to you, in step. Add a second camera and cut between the two while you record. Say "a Mexican standoff after a car chase" and three actors take their marks, each aiming at the next, with two crashed cars behind them. Push a car and let go and it drives on until it stops; push it hard and an actor in its way goes down. Rain over a fire puts it out.
+Record a take and carry an actor across the set: they walk it back to you. Say "a Mexican standoff after a car chase" and three actors take their marks, each aiming at the next, with two crashed cars behind them. Push a car and let go and it drives on; push it hard and an actor in its way goes down.
 
-You leave with a board image, a shot list and a short animatic. Every number on the board is measured from where the pieces stood at that moment. Nothing on it is estimated or generated. Voice runs inside the page, from a 40 MB model fetched the first time you press it, so what you say stays on the headset.
+You leave with a board image, a shot list and a short animatic. Every number on the board is measured from where the pieces stood. No number on it is estimated. Voice runs inside the page, so what you say stays on the headset.
 
-How I built it: Immersive Web SDK in the Quest Browser, nothing to install. The set is 51 hand-built pieces and 10 starting scenes, made in code as plain maquettes you paint yourself. Passthrough makes your table the stage. Hit testing lands the set where you point, with no room scan at all. On a Quest 3S, in three sittings of normal use on 5 and 6 November, it ran at a median of 90 frames a second (46 one-second samples; the lowest was 65.5, in the first minute, none under 60). Those were the builds of those days; the build you load is measured again before the deadline [X, the new number]. The monitor's second view of the set is redrawn only when something on the set moved.
+How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage; scene understanding and hit testing land the set; a room anchor keeps it there; hands do everything. The set is 51 pieces and 10 starting scenes, built in code as plain maquettes you paint yourself. On a Quest 3S it ran at a median of 90 frames a second in normal use, never under 60 (46 samples, 5 and 6 November). [X, the number on the submitted build.]
 
-What I haven't proven yet: the set coming back on the same spot after the browser is closed and opened again, in a room I haven't been in; voice through the headset's own microphone (it has been tested with synthetic voices into the same recogniser); the frame rate while a take plays; a car pushed by a real hand (the roll has only been driven by scripted hands in the emulator). [X, update after the next headset session.]
+Not yet proven on the headset: the set returning to the same spot after a relaunch, voice through the headset's microphone, and the frame rate during a take. [X, update after the next headset session.]
 
 [X, measured: one unbroken take, headset on to a six-frame board, in minutes.]
 
-[X, Jonathan: what you want to do next, in your words, and the person you wrote to: "I've written to <name>, a <storyboard artist / previs supervisor>, to put it in front of <them> before <date>."]
+[X, Jonathan: future plans, and who you wrote to.]
 ```
 
 ## Hand interactions, and what excites me about VR

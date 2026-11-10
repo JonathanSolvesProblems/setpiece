@@ -905,7 +905,7 @@ export class PlacementSystem extends createSystem({
     const pose = this.load();
     const object = stage.object3D;
     if (pose == null || object == null || pose.anchored !== anchored) return false;
-    if (pose.position.length !== 3 || pose.quaternion.length !== 4) return false;
+    if (!Array.isArray(pose.position) || !Array.isArray(pose.quaternion) || pose.position.length !== 3 || pose.quaternion.length !== 4) return false;
     object.position.fromArray(pose.position);
     object.quaternion.fromArray(pose.quaternion);
     this.endLanding(stage);

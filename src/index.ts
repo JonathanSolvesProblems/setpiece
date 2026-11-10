@@ -310,8 +310,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
         index.textContent = String(shot.index);
         const text = document.createElement('span');
         text.textContent =
-          `${shot.lensMm} mm, camera ${shot.cameraHeightM.toFixed(1)} m high, ` +
-          `${shot.distanceToCreatureM.toFixed(1)} m from the creature`;
+          `${shot.lensMm} mm, camera ${shot.cameraHeightM.toFixed(1)} m high` +
+          (shot.distanceToCreatureM >= 0 ? `, ${shot.distanceToCreatureM.toFixed(1)} m from the creature` : ', no eyeline ball');
         row.append(index, text);
         return row;
       });

@@ -178,6 +178,22 @@ type AsyncReader = WebGLRenderer & {
   ) => Promise<Uint8Array>;
 };
 
+/** A frame's distance to the ball when there was no ball on the set to measure to. */
+export const NO_BALL = -1;
+
+/** A saved frame an older build could have written without the fields the card draws. */
+function validShot(shot: Shot | null | undefined): shot is Shot {
+  return (
+    shot != null &&
+    Number.isFinite(shot.index) &&
+    Number.isFinite(shot.lensMm) &&
+    Number.isFinite(shot.cameraHeightM) &&
+    Number.isFinite(shot.distanceToCreatureM) &&
+    typeof shot.eyelines === 'string' &&
+    typeof shot.dataUrl === 'string'
+  );
+}
+
 export class ViewfinderSystem extends createSystem({
   cams: { required: [ShotCamera] },
   pieces: { required: [SetPiece] },
@@ -447,7 +463,7 @@ export class ViewfinderSystem extends createSystem({
       const line = Math.round(caption * 0.4);
       this.fitText(
         ctx,
-        `${shot.lensMm} mm${shot.format ? ` ${shot.format}` : ''} · ${shot.cameraHeightM.toFixed(1)} m high · ${shot.distanceToCreatureM.toFixed(1)} m away`,
+        `${shot.lensMm} mm${shot.format ? ` ${shot.format}` : ''} · ${shot.cameraHeightM.toFixed(1)} m high${shot.distanceToCreatureM >= 0 ? ` · ${shot.distanceToCreatureM.toFixed(1)} m away` : ''}`,
         x + 2,
         y + frameH + line * 1.05,
         frameW - 4,
@@ -483,8 +499,8 @@ export class ViewfinderSystem extends createSystem({
     const g = this.globals as Globals;
     g.shotList.value = this.shots.map(
       (s) =>
-        `${s.index}. ${s.lensMm} mm, cam ${s.cameraHeightM.toFixed(1)} m high, ` +
-        `${s.distanceToCreatureM.toFixed(1)} m from creature`,
+        `${s.index}. ${s.lensMm} mm, cam ${s.cameraHeightM.toFixed(1)} m high` +
+        (s.distanceToCreatureM >= 0 ? `, ${s.distanceToCreatureM.toFixed(1)} m from creature` : ''),
     );
     g.shotFrames.value = this.shots.slice();
   }
@@ -493,7 +509,8 @@ export class ViewfinderSystem extends createSystem({
   private restoreBoard(): void {
     const saved = loadJson<SavedBoard>(StoreKey.Board);
     if (saved == null || !Array.isArray(saved.shots) || saved.shots.length === 0) return;
-    this.shots = saved.shots.slice(-MAX_FRAMES);
+    this.shots = saved.shots.filter(validShot).slice(-MAX_FRAMES);
+    if (this.shots.length === 0) return;
     this.taken = Math.max(saved.taken ?? 0, this.shots.length);
     this.thumbs = this.shots.map((shot) => {
       const image = new Image();
@@ -539,7 +556,7 @@ export class ViewfinderSystem extends createSystem({
     const live = this.cameraEntity();
     live?.setValue(ShotCamera, 'tilt', setup.tilt);
     live?.setValue(ShotCamera, 'aimed', setup.aimed);
-    g.lensMm.value = setup.lensMm;
+    if (Number.isFinite(setup.lensMm)) g.lensMm.value = setup.lensMm;
     if (setup.sensor != null) g.sensorIndex.value = setup.sensor;
     this.recalledIndex = shot.index;
     this.recalledSignature = Number.NaN;
@@ -1188,19 +1205,21 @@ export class ViewfinderSystem extends createSystem({
     this.lensCamera.getWorldPosition(this.a);
     const stageY = stageObject ? stageObject.getWorldPosition(this.b).y : this.a.y;
     const lensY = this.a.y;
-    let distance = 0;
-    if (creatureObject) {
+    // A frame carries only what was measured: with no ball on the set there is no eyeline and no distance to it.
+    const ballOn = creatureObject?.visible === true;
+    let distance = NO_BALL;
+    if (creatureObject && ballOn) {
       creatureObject.getWorldPosition(this.b);
       distance = Math.hypot(this.b.x - this.a.x, this.b.z - this.a.z);
     }
     const g = this.globals as Globals;
     let eyelines = '';
-    for (let i = 0; i < this.actors.length; i++) {
+    for (let i = 0; ballOn && i < this.actors.length; i++) {
       const label = this.actors[i].getValue(SetPiece, 'label') || `Actor ${i + 1}`;
       const deg = this.eyelineDeg(i);
       eyelines += `${i > 0 ? ' · ' : ''}${label} ${deg >= 0 ? 'up' : 'down'} ${Math.abs(deg).toFixed(0)}°`;
     }
-    const firstEyeline = this.actors.length > 0 ? this.eyelineDeg(0) : 0;
+    const firstEyeline = ballOn && this.actors.length > 0 ? this.eyelineDeg(0) : 0;
     const lensMm = g.lensMm.peek();
     const sensorIndex = g.sensorIndex.peek();
     const renderer = this.renderer as AsyncReader;
@@ -1225,9 +1244,9 @@ export class ViewfinderSystem extends createSystem({
       index: this.taken,
       lensMm,
       cameraHeightM: (lensY - stageY) * SET_SCALE,
-      distanceToCreatureM: distance * SET_SCALE,
+      distanceToCreatureM: distance < 0 ? NO_BALL : distance * SET_SCALE,
       eyelineDeg: firstEyeline,
-      eyelines: eyelines || 'no actor on the set',
+      eyelines: eyelines || (ballOn ? 'no actor on the set' : 'no eyeline ball on the set'),
       dataUrl: canvas.toDataURL('image/jpeg', 0.86),
       setup,
     };

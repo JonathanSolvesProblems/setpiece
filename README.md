@@ -62,7 +62,7 @@ I wanted to be a VFX filmmaker before I switched to computer science. The short 
 
 ## What it does not do
 
-Every number on the board is measured from where the pieces stand at the moment of the frame. Nothing on it is estimated or generated. A take is the poses your own hands gave the pieces, thirty times a second, and it can only replay those: nothing in it is acted for you. The motion Setpiece adds itself is short and listed above: a held actor squirms, a moving actor walks, wings and rotors turn, an actor falls when something is driven into them, a fire goes out under water. Setpiece does not choose a lens for you, it does not know the real location, and a frame is a blocking diagram with wooden figures, not a render of the finished shot.
+Every number on the board is measured from where the pieces stand at the moment of the frame. No number on it is estimated. A take is the poses your own hands gave the pieces, thirty times a second, and it can only replay those: nothing in it is acted for you. The motion Setpiece adds itself is short and listed above: a held actor squirms, a moving actor walks, wings and rotors turn, an actor falls when something is driven into them, a fire goes out under water. Setpiece does not choose a lens for you, it does not know the real location, and a frame is a blocking diagram with wooden figures, not a render of the finished shot.
 
 ## Built on
 

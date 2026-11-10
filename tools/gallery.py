@@ -57,7 +57,7 @@ SLIDES = [
          caption='"A Mexican standoff after a car chase": three actors on marks, each aiming at the next, two crashed cars behind. All of it movable.'),
     dict(slug='heard', badge='Result · devpost/results/voice-recognition.json', headline='What the recogniser wrote down', picture=('result', 'voice'),
          caption='Synthetic voices into the page\u2019s own recogniser, on a desktop. {voice_heard} of {voice_runs} standoff lines came through. The headset microphone is next.'),
-    dict(slug='board', badge=LIVE_BADGE, headline='Snap, and the frame carries its numbers', picture=('live', 'board'),
+    dict(slug='board', badge=LIVE_BADGE, headline='Six setups, each with its numbers', picture=('live', 'board'),
          caption='Each frame on the board is stamped with its lens, camera height, distance and every actor’s eyeline, measured where the pieces stood.'),
     dict(slug='lenses', badge=LIVE_BADGE, headline='Six lenses, 18 to 135 mm', picture=('live', 'lenses'),
          caption='The same blocking through an 18 mm and a 50 mm. The monitor above the set shows what the lens sees before you snap.'),
@@ -72,9 +72,9 @@ SLIDES = [
     dict(slug='back', badge=QUEST, headline='It keeps your set and your board', picture='captures/quest-car-bicycle.jpg',
          caption='After a reload in the headset the panel lists what came back: the set, the pieces and the board. Same spot after a relaunch: next to prove.'),
     dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
-         caption='{fps_samples} one-second samples over three sittings on a Quest 3S, 5 and 6 Nov builds: median {fps_median}, lowest {fps_min} in the first minute.'),
+         caption='{fps_samples} one-second samples over two days on a Quest 3S, 5 and 6 Nov builds: median {fps_median}, lowest {fps_min} in the first minute.'),
     dict(slug='load', badge=LIVE_BADGE, headline='The wait is a call sheet', picture=('live', 'loading'),
-         caption='While the set builds, the card names each step. The app is {bundle_mb} MB, down from {bundle_before_mb}; a reload on the Quest is ready in {quest_reload_s} s.'),
+         caption='While the set builds, the card names each step. The main script is {bundle_mb} MB, down from {bundle_before_mb}. On the Quest: {quest_first_s} s on a first visit, {quest_reload_s} s on a reload.'),
     dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
          caption='Saved from the page: the board as an image with each frame’s numbers, and the shot list as a CSV. A take saves as a short video too.'),
     dict(slug='camera', badge=QUEST, headline='Format, rig, second camera', picture='captures/quest-camera-tab.jpg',
@@ -130,6 +130,44 @@ def result_body(kind: str) -> str:
         return (f'<div class="result"><div class="big">{N["checks_passed"]}<span class="unit">of {N["checks_total"]} checks passed</span></div>'
                 f'<p class="muted">node tools/check-live.mjs, against the live site, no account and no key. The first fourteen:</p><table>{rows}</table></div>')
     raise ValueError(kind)
+
+
+# Six setups a director would actually board: where the camera stands, what it looks at, the lens,
+# and where actor A stands for it. Stage coordinates in metres on the slate; the lens looks along -Z.
+SETUPS = [
+    ('18', (-0.27, 0.17), (0.08, 0.0), (-0.02, 0.06)),    # wide, establishing
+    ('35', (-0.1, 0.19), (0.1, -0.03), (-0.02, 0.06)),    # two-shot from the side
+    ('50', (-0.15, 0.125), (0.2, -0.05), (-0.02, 0.06)),  # over A's shoulder to the creature
+    ('24', (0.28, -0.15), (0.03, 0.0), (0.07, 0.03)),     # the creature's side, A has stepped in
+    ('85', (-0.09, -0.17), (0.05, -0.1), (0.07, 0.03)),   # close on B
+    ('24', (0.27, 0.16), (0.04, -0.03), (0.07, 0.03)),    # reverse, past the creature
+]
+
+
+async def six_setups(page, click, say, count=6):
+    """Two actors and the eyeline ball, then `count` frames snapped from different setups."""
+    await say('new scene with two actors')
+    await page.wait_for_timeout(1500)
+    for lens, cam, look, actor in SETUPS[:count]:
+        await click(f'.lens[data-lens="{lens}"]')
+        ok = await page.evaluate("""(async ([cam, look, actor]) => {
+          const w = globalThis.setpiece.world; const g = w.globals;
+          const tray = [...w.getSystems()].find((s) => s.managed && s.finish);
+          if (!g.trayOn.peek().includes('Creature')) { tray.toggle('Creature'); await new Promise((d) => setTimeout(d, 600)); }
+          const at = (name) => w.scene.getObjectByName(name);
+          const face = (o, x, z) => { o.rotation.set(0, Math.atan2(-(x - o.position.x), -(z - o.position.z)), 0); };
+          const ball = at('Creature'); ball.position.set(0.2, 0, -0.05);
+          const a = at('Actor A'); a.position.set(actor[0], 0, actor[1]); face(a, 0.2, -0.05);
+          const b = at('Actor B'); b.position.set(0.05, 0, -0.1); face(b, 0.2, -0.05);
+          const rig = at('Camera Rig'); rig.position.set(cam[0], 0, cam[1]); face(rig, look[0], look[1]);
+          g.layoutChanged.value += 1;
+          return g.trayOn.peek().includes('Creature');
+        })""", [list(cam), list(look), list(actor)])
+        assert ok, 'the eyeline ball is not on the set'
+        await page.wait_for_timeout(1500)
+        await click('#page-snap')
+        # The snap waits for a fresh lens pass; software rendering needs the time.
+        await page.wait_for_timeout(2500)
 
 
 READY = "(() => { const w = globalThis.setpiece && globalThis.setpiece.world; return !!(w && w.globals.setReady.peek()); })()"
@@ -204,16 +242,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         await page.wait_for_timeout(1500)
         await stage_png(page, png)
     elif recipe == 'board':
-        # The library's Dragon attack, whose camera is composed for the slate, so the frames read as shots.
-        await page.evaluate('globalThis.setpiece.world.globals.sceneStart.value = 1')
-        await page.wait_for_timeout(1200)
-        for lens, dz in [('24', 0), ('35', -0.03), ('50', 0.04), ('85', -0.02)]:
-            await click(f'.lens[data-lens="{lens}"]')
-            await page.evaluate(f"(() => {{ const w = globalThis.setpiece.world; const a = w.scene.getObjectByName('Actor A'); a.position.z += {dz}; w.globals.layoutChanged.value += 1; }})()")
-            await page.wait_for_timeout(1200)
-            await click('#page-snap')
-            # The snap waits for a fresh lens pass; software rendering needs the time.
-            await page.wait_for_timeout(2500)
+        await six_setups(page, click, say)
         # The board itself, as the app saves it: the real deliverable, with every frame's numbers stamped on.
         async with page.expect_download(timeout=30000) as waiting:
             await click('#page-save-board')
@@ -316,13 +345,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
     elif recipe == 'exports':
         # What a director actually leaves with: the board image and the shot list, saved by the page's own buttons.
         from PIL import Image, ImageDraw, ImageFont
-        await page.evaluate('globalThis.setpiece.world.globals.sceneStart.value = 1')
-        await page.wait_for_timeout(1200)
-        for lens in ['18', '35', '85']:
-            await click(f'.lens[data-lens="{lens}"]')
-            await page.wait_for_timeout(1200)
-            await click('#page-snap')
-            await page.wait_for_timeout(2500)
+        await six_setups(page, click, say)
         async with page.expect_download(timeout=30000) as waiting:
             await click('#page-save-board')
         board_path = out / 'saved-board.png'

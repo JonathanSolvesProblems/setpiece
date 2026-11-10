@@ -1,12 +1,12 @@
 # Live site checks
 
-Run on 2026-11-10 14:01 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 549db05-20261110T1401.
+Run on 2026-11-10 17:18 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 549db05-20261110T1401.
 
 **35 of 35 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 318 ms |
+| the page answers over HTTPS | pass | 200, 351 ms |
 | it is Setpiece | pass |  |
 | search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |

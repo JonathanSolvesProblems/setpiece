@@ -309,7 +309,7 @@ export class TakeSystem extends createSystem({
     if (!this.passManual) this.cutTo(Math.max(0, this.written));
     for (let i = 0; i < this.tracks.length; i++) {
       const track = this.tracks[i];
-      if (track.recorded && !track.touched) this.applyAt(track, this.time);
+      if (track.recorded && !track.touched && !track.piece.hasComponent(Held)) this.applyAt(track, this.time);
     }
     this.setSeconds();
     if (this.time * RATE >= limit) this.stopRecording();
@@ -409,7 +409,7 @@ export class TakeSystem extends createSystem({
     }
     this.time += delta;
     const seconds = this.length / RATE;
-    if (this.time >= seconds) this.time -= seconds;
+    if (this.time >= seconds) this.time %= seconds;
     for (let i = 0; i < this.tracks.length; i++) {
       if (this.tracks[i].recorded) this.applyAt(this.tracks[i], this.time);
     }

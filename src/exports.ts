@@ -33,7 +33,7 @@ export function downloadShotList(shots: readonly Shot[]): void {
       shot.lensMm,
       shot.format ?? 'FF',
       shot.cameraHeightM.toFixed(2),
-      shot.distanceToCreatureM.toFixed(2),
+      shot.distanceToCreatureM >= 0 ? shot.distanceToCreatureM.toFixed(2) : '',
       shot.eyelines,
       shot.printed ?? '',
     ]

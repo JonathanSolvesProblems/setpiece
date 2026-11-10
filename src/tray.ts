@@ -207,7 +207,9 @@ export class TraySystem extends createSystem({
   private prepare(): boolean {
     for (const piece of this.queries.pieces.entities) if (piece.object3D == null) return false;
     const saved = loadJson<Saved>(StoreKey.Tray);
-    for (const label of saved?.on ?? STARTING_ASSETS) this.on.add(label);
+    // What an older build saved may name pieces this one does not have.
+    const kept = Array.isArray(saved?.on) ? saved.on.filter((label) => assetByLabel(label) != null) : STARTING_ASSETS;
+    for (const label of kept) this.on.add(label);
     for (const [key, value] of Object.entries(saved?.cast ?? {})) this.cast.set(key, value);
     for (const [key, value] of Object.entries(saved?.finish ?? {})) this.finish.set(key, value);
     for (const piece of this.queries.pieces.entities) {
@@ -255,7 +257,7 @@ export class TraySystem extends createSystem({
   private freeze(piece: Entity): void {
     const root = piece.object3D!;
     root.traverse((part) => {
-      if (part === root) return;
+      if (part === root || part.name === 'HoverRing') return;
       const idle = part.userData.idle as Idle | undefined;
       if (idle != null) {
         // A pair of wings carries opposite amounts, so one clock beats both together.
@@ -694,9 +696,9 @@ export class TraySystem extends createSystem({
     const [pose, look] = this.cast.get(key) ?? [0, 0];
     const [paint, size, style] = this.finishOf(key);
     const words: string[] = [];
-    if (actor) words.push(POSES[pose], LOOKS[look].name);
-    if (asset.paint === true && paint > 0) words.push(PAINTS[paint].name);
-    if (size > 0) words.push(SIZES[size].name);
+    if (actor) words.push(POSES[pose] ?? POSES[0], (LOOKS[look] ?? LOOKS[0]).name);
+    if (asset.paint === true && paint > 0 && PAINTS[paint]) words.push(PAINTS[paint].name);
+    if (size > 0 && SIZES[size]) words.push(SIZES[size].name);
     if (style > 0 && asset.styles) words.push(asset.styles[style]);
     g.castLine.value = words.length > 0 ? `${assetTitle(key)}: ${words.join(', ')}` : assetTitle(key);
     g.selectedIsActor.value = actor;
