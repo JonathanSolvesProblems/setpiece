@@ -74,7 +74,7 @@ SLIDES = [
     dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
          caption='{fps_samples} one-second samples over two days on a Quest 3S, 5 and 6 Nov builds: median {fps_median}, lowest {fps_min} in the first minute.'),
     dict(slug='load', badge=LIVE_BADGE, headline='The wait is a call sheet', picture=('live', 'loading'),
-         caption='While the set builds, the card names each step. The main script is {bundle_mb} MB, down from {bundle_before_mb}. On the Quest: {quest_first_s} s on a first visit, {quest_reload_s} s on a reload.'),
+         caption='Main script {bundle_mb} MB, down from {bundle_before_mb}. On the Quest: a set in {quest_first_s} s on a first visit, {quest_reload_s} s on a reload.'),
     dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
          caption='Saved from the page: the board as an image with each frame’s numbers, and the shot list as a CSV. A take saves as a short video too.'),
     dict(slug='camera', badge=QUEST, headline='Format, rig, second camera', picture='captures/quest-camera-tab.jpg',
@@ -136,10 +136,10 @@ def result_body(kind: str) -> str:
 # and where actor A stands for it. Stage coordinates in metres on the slate; the lens looks along -Z.
 SETUPS = [
     ('18', (-0.27, 0.17), (0.08, 0.0), (-0.02, 0.06)),    # wide, establishing
-    ('35', (-0.1, 0.19), (0.1, -0.03), (-0.02, 0.06)),    # two-shot from the side
-    ('50', (-0.15, 0.125), (0.2, -0.05), (-0.02, 0.06)),  # over A's shoulder to the creature
+    ('35', (-0.27, -0.02), (0.1, 0.0), (-0.02, 0.06)),    # two-shot from the side
+    ('50', (-0.26, 0.13), (0.2, -0.05), (-0.02, 0.06)),  # over A's shoulder to the creature
     ('24', (0.28, -0.15), (0.03, 0.0), (0.07, 0.03)),     # the creature's side, A has stepped in
-    ('85', (-0.09, -0.17), (0.05, -0.1), (0.07, 0.03)),   # close on B
+    ('85', (0.27, -0.18), (0.05, -0.1), (0.07, 0.03)),   # close on B, from the front
     ('24', (0.27, 0.16), (0.04, -0.03), (0.07, 0.03)),    # reverse, past the creature
 ]
 
@@ -165,9 +165,16 @@ async def six_setups(page, click, say, count=6):
         })""", [list(cam), list(look), list(actor)])
         assert ok, 'the eyeline ball is not on the set'
         await page.wait_for_timeout(1500)
+        # The snap waits for a fresh lens pass; under software rendering one can be missed, so each is confirmed.
+        last = "(() => { const f = globalThis.setpiece.world.globals.shotFrames.peek(); return f.length ? f[f.length - 1].index : 0; })()"
+        before = await page.evaluate(last)
         await click('#page-snap')
-        # The snap waits for a fresh lens pass; software rendering needs the time.
-        await page.wait_for_timeout(2500)
+        for _ in range(40):
+            await page.wait_for_timeout(500)
+            if await page.evaluate(last) > before:
+                break
+        else:
+            raise RuntimeError('a frame did not land on the board')
 
 
 READY = "(() => { const w = globalThis.setpiece && globalThis.setpiece.world; return !!(w && w.globals.setReady.peek()); })()"

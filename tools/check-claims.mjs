@@ -43,10 +43,10 @@ expect('the tagline has no open value in it', !tagline.includes('[X'));
 const frames = JSON.parse(read('devpost/results/quest-frame-rate.json'));
 const fps = frames.samples.map((sample) => sample.fps).sort((a, b) => a - b);
 const median = fps[Math.floor(fps.length / 2)];
-expect(`the tagline's frame rate is the measured median, ${median}`, tagline.includes(`${median} frames`));
-expect('the submission makes no anchor or table-label claim it has not proven', !/anchors bring it back|finds a labelled table/.test(submission.split('What I haven')[0]));
-expect(`the submission says ${fps.length} one-second samples, a median of ${median} and a lowest of ${fps[0]}`, submission.includes(`${fps.length} one-second samples`) && submission.includes(`median of ${median} frames`) && submission.includes(`the lowest was ${fps[0]}`));
-expect(`the submission says ${assets} pieces and ${lenses[0]} to ${lenses[lenses.length - 1]} mm`, submission.includes(`${assets} hand-built pieces`) && submission.includes(`${lenses[0]} to ${lenses[lenses.length - 1]} mm`));
+expect(`the tagline's frame rate is the measured median, ${median}`, tagline.includes(`median ${median} fps`));
+expect('the submission makes no anchor or table-label claim it has not proven', !/anchors bring it back|finds a labelled table/.test(submission.split('Not yet proven')[0]));
+expect(`the submission says ${fps.length} samples, a median of ${median} and never under 60 (lowest ${fps[0]})`, submission.includes(`${fps.length} samples`) && submission.includes(`median of ${median} frames`) && submission.includes('never under 60') && fps[0] >= 60);
+expect(`the submission says ${assets} pieces and ${lenses[0]} to ${lenses[lenses.length - 1]} mm`, submission.includes(`${assets} pieces`) && submission.includes(`${lenses[0]} to ${lenses[lenses.length - 1]} mm`));
 for (const file of readdirSync(new URL('../devpost/results/', import.meta.url))) {
   expect(`sources.md names devpost/results/${file}`, sources.includes(file));
 }

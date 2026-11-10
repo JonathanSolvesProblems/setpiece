@@ -35,13 +35,13 @@ On a real creature shoot the stand-in is a tennis ball on a stand, raised to the
 
 It is for an indie director or a VFX supervisor in prep: a board for each scene, built up over the days before the shoot and opened again on the day. Here the table sets the scale, your hands move the stand-ins, and the eyeline is in the room with you.
 
-You sit down and a 1:10 set lands on your table: by itself if the headset already knows the table, with a point and a pinch if it doesn't. You pick up wooden stand-ins with your fingers, put the ball where the creature will be, pick a lens from 18 to 135 mm and look through the camera. Snap, and the frame goes on a storyboard with its lens, camera height, distance and eyelines written on it.
+You sit down, point at the table and pinch. A 1:10 set lands on it, in your real room. You pick up wooden stand-ins with your fingers, put the ball where the creature will be, pick a lens from 18 to 135 mm and look through the camera. Snap, and the frame goes on a storyboard with its lens, camera height, distance and eyelines written on it.
 
 Record a take and carry an actor across the set: they walk it back to you. Say "a Mexican standoff after a car chase" and three actors take their marks, each aiming at the next, with two crashed cars behind them. Push a car and let go and it drives on; push it hard and an actor in its way goes down.
 
 You leave with a board image, a shot list and a short animatic. Every number on the board is measured from where the pieces stood. No number on it is estimated. Voice runs inside the page, so what you say stays on the headset.
 
-How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage; scene understanding and hit testing land the set; a room anchor keeps it there; hands do everything. The set is 51 pieces and 10 starting scenes, built in code as plain maquettes you paint yourself. On a Quest 3S it ran at a median of 90 frames a second in normal use, never under 60 (46 samples, 5 and 6 November). [X, the number on the submitted build.]
+How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage, hit testing lands the set where you point with no room scan needed, and hands do everything. The set is 51 pieces and 10 starting scenes, built in code as plain maquettes you paint yourself. On a Quest 3S it ran at a median of 90 frames a second in normal use, never under 60 (46 samples, 5 and 6 November). [X, the number on the submitted build.]
 
 Not yet proven on the headset: the set returning to the same spot after a relaunch, voice through the headset's microphone, and the frame rate during a take. [X, update after the next headset session.]
 

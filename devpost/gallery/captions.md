@@ -71,13 +71,13 @@ After a reload in the headset the panel lists what came back: the set, the piece
 ## 12 fps
 
 ```
-46 one-second samples over three sittings on a Quest 3S, 5 and 6 Nov builds: median 90.0, lowest 65.5 in the first minute.
+46 one-second samples over two days on a Quest 3S, 5 and 6 Nov builds: median 90.0, lowest 65.5 in the first minute.
 ```
 
 ## 13 load
 
 ```
-While the set builds, the card names each step. The app is 2.57 MB, down from 6.78; a reload on the Quest is ready in 3.4 s.
+Main script 2.57 MB, down from 6.78. On the Quest: a set in 11.2 s on a first visit, 3.4 s on a reload.
 ```
 
 ## 14 leave
