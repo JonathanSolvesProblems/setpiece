@@ -17,6 +17,8 @@ import {
   Shape,
   SphereGeometry,
 } from '@iwsdk/core';
+import type { Material } from '@iwsdk/core';
+import { mergeByMaterial } from './lib/vehicle.js';
 
 export const STAGE_WIDTH = 0.6;
 export const STAGE_DEPTH = 0.4;
@@ -47,7 +49,8 @@ function clapperStripe(length: number, height: number, depth: number): Group {
     mesh.name = i % 2 === 0 ? 'StripeChalk' : 'StripeSlate';
     g.add(mesh);
   }
-  // Worn ends: the paint is gone at the corners, so the last stripes are slate.
+  // Twenty-four stripes drawn as two meshes, one for each paint.
+  mergeByMaterial(g, new Map<Material, string>([[chalk, 'StripeChalk'], [slateShadow, 'StripeSlate']]));
   return g;
 }
 
@@ -72,94 +75,94 @@ function stage(): Group {
   return g;
 }
 
+/**
+ * Built part by part, then baked to five meshes: the tripod in two (Base, Post), the head that tilts
+ * in three (Body, FocusRing, Tally). The names are the ones the app looks for when it hides the legs
+ * of a flown camera and hangs the head on its tilt pivot.
+ */
 function filmCamera(): Group {
   const g = new Group();
   g.name = 'CameraRig';
+  const tripod = new Group();
+  const top = new Group();
   const base = new Mesh(new CylinderGeometry(0.02, 0.022, 0.004, 20), slateShadow);
-  base.name = 'Base';
   base.position.y = 0.002;
   const post = new Mesh(new CylinderGeometry(0.0035, 0.004, 0.1, 10), chrome);
-  post.name = 'Post';
   post.position.y = 0.054;
   for (let i = 0; i < 3; i++) {
     const leg = new Mesh(new CylinderGeometry(0.0015, 0.0015, 0.06, 6), chrome);
-    leg.name = `Leg${i + 1}`;
     const a = (i / 3) * Math.PI * 2 + Math.PI / 6;
     leg.position.set(Math.cos(a) * 0.012, 0.03, Math.sin(a) * 0.012);
     leg.rotation.z = -Math.cos(a) * 0.38;
     leg.rotation.x = Math.sin(a) * 0.38;
-    g.add(leg);
+    tripod.add(leg);
   }
   const head = new Mesh(new BoxGeometry(0.016, 0.008, 0.016), slateShadow);
-  head.name = 'TripodHead';
   head.position.y = 0.108;
+  tripod.add(base, post, head);
   const body = new Mesh(new BoxGeometry(0.03, 0.028, 0.056), slateShadow);
-  body.name = 'Body';
   body.position.set(0, 0.126, 0.004);
-  for (const [x, nm] of [[-0.013, 'MagazineFeed'], [0.013, 'MagazineTake']] as [number, string][]) {
+  for (const x of [-0.013, 0.013]) {
     const mag = new Mesh(new CylinderGeometry(0.014, 0.014, 0.01, 18), slateShadow);
-    mag.name = nm;
     mag.rotation.x = Math.PI / 2;
     mag.position.set(x, 0.152, 0.016);
     const latch = new Mesh(new CylinderGeometry(0.004, 0.004, 0.012, 10), chrome);
-    latch.name = `${nm}Latch`;
     latch.rotation.x = Math.PI / 2;
     latch.position.set(x, 0.152, 0.016);
-    g.add(mag, latch);
+    top.add(mag, latch);
   }
   const lens = new Mesh(new CylinderGeometry(0.0085, 0.0105, 0.028, 16), slateShadow);
-  lens.name = 'Lens';
   lens.rotation.x = Math.PI / 2;
   lens.position.set(0, 0.124, -0.038);
   const ring = new Mesh(new CylinderGeometry(0.0115, 0.0115, 0.004, 16), chrome);
-  ring.name = 'FocusRing';
   ring.rotation.x = Math.PI / 2;
   ring.position.set(0, 0.124, -0.03);
   const matteBox = new Mesh(new BoxGeometry(0.03, 0.024, 0.01), slateShadow);
-  matteBox.name = 'MatteBox';
   matteBox.position.set(0, 0.126, -0.056);
   const eyepiece = new Mesh(new CylinderGeometry(0.004, 0.005, 0.014, 10), slateShadow);
-  eyepiece.name = 'Eyepiece';
   eyepiece.rotation.x = Math.PI / 2;
   eyepiece.position.set(0.012, 0.134, 0.036);
   const tally = new Mesh(new SphereGeometry(0.0028, 8, 6), tallyRed);
-  tally.name = 'Tally';
   tally.position.set(-0.012, 0.142, -0.02);
-  g.add(base, post, head, body, lens, ring, matteBox, eyepiece, tally, droneFrame());
+  top.add(body, lens, ring, matteBox, eyepiece, tally);
+  mergeByMaterial(tripod, new Map<Material, string>([[slateShadow, 'Base'], [chrome, 'Post']]));
+  mergeByMaterial(top, new Map<Material, string>([[slateShadow, 'Body'], [chrome, 'FocusRing'], [tallyRed, 'Tally']]));
+  g.add(...tripod.children, ...top.children, droneFrame());
   return g;
 }
 
 /**
  * The same camera flown instead of stood: a quadcopter frame above the body,
- * hidden until the rig is switched. Its rotors are named so they can spin.
+ * hidden until the rig is switched. Its rotors stay their own meshes, named so they can spin.
  */
 function droneFrame(): Group {
   const g = new Group();
   g.name = 'DroneFrame';
   g.position.y = 0.176;
   g.visible = false;
+  const still = new Group();
   const plate = new Mesh(new CylinderGeometry(0.022, 0.026, 0.01, 16), slateShadow);
-  plate.name = 'DronePlate';
   const mast = new Mesh(new CylinderGeometry(0.003, 0.003, 0.012, 8), chrome);
-  mast.name = 'DroneMast';
   mast.position.y = -0.011;
-  g.add(plate, mast);
+  still.add(plate, mast);
   const reach = 0.078;
   const blade = new BoxGeometry(0.075, 0.0012, 0.007);
+  const rotors: Mesh[] = [];
   for (let i = 0; i < 4; i++) {
     const a = Math.PI / 4 + (i * Math.PI) / 2;
     const arm = new Mesh(new BoxGeometry(reach, 0.0045, 0.008), slateShadow);
-    arm.name = `DroneArm${i + 1}`;
     arm.position.set((Math.cos(a) * reach) / 2, 0, (Math.sin(a) * reach) / 2);
     arm.rotation.y = -a;
     const motor = new Mesh(new CylinderGeometry(0.0075, 0.0085, 0.011, 12), chrome);
-    motor.name = `DroneMotor${i + 1}`;
     motor.position.set(Math.cos(a) * reach, 0.005, Math.sin(a) * reach);
     const rotor = new Mesh(blade, slateShadow);
     rotor.name = `DroneRotor${i + 1}`;
     rotor.position.set(Math.cos(a) * reach, 0.0125, Math.sin(a) * reach);
-    g.add(arm, motor, rotor);
+    still.add(arm, motor);
+    rotors.push(rotor);
   }
+  mergeByMaterial(still, new Map<Material, string>([[slateShadow, 'DronePlate'], [chrome, 'DroneMast']]));
+  g.add(...still.children, ...rotors);
   return g;
 }
 

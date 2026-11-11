@@ -46,6 +46,8 @@ const BURNING = /\b(burning|on fire|in flames|ablaze)\b/;
 
 /** Paint, size and fitting, each an index. */
 type Finish = [number, number, number];
+/** The pointer events library reads this off any object: false, and it does not look inside. */
+type Walked = Object3D & { intersectChildren?: boolean };
 type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
 type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: number };
 export type Dress = { cast: Record<string, [number, number]>; finish: Record<string, Finish> };
@@ -273,6 +275,8 @@ export class TraySystem extends createSystem({
   private show(piece: Entity, on: boolean): void {
     const object = piece.object3D!;
     object.visible = on;
+    // A pointer walks every child of everything it may touch, seen or not: a piece on the shelf is closed to it.
+    (object as Walked).intersectChildren = on;
     // At full size nothing is within reach; coming back to the table sets this from `visible`.
     if (!(this.globals as Globals).lifeSize.peek()) object.pointerEvents = on ? 'auto' : 'none';
   }
@@ -612,6 +616,7 @@ export class TraySystem extends createSystem({
       const match = /^Pose(\d)$/.exec(child.name);
       if (match == null) continue;
       child.visible = Number(match[1]) === pose;
+      (child as Walked).intersectChildren = child.visible;
       child.traverse((object) => {
         if (object.name === 'Hair') object.visible = style.hair;
         if (!(object instanceof Mesh)) return;
@@ -649,6 +654,7 @@ export class TraySystem extends createSystem({
       const fitting = /^Style(\d)$/.exec(part.name);
       if (fitting != null) {
         part.visible = Number(fitting[1]) === style;
+        (part as Walked).intersectChildren = part.visible;
         return;
       }
       if (part.name === 'Horn') {

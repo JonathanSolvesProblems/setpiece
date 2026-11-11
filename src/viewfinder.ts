@@ -969,10 +969,13 @@ export class ViewfinderSystem extends createSystem({
       // frame. While a piece is being carried it is redrawn every other frame,
       // 11 ms behind at worst; the last frame of a move and a snap always redraw it.
       this.shadowTick = !this.shadowTick;
-      if (this.shadowTick || this.liveFrames === 0 || this.snapPending) this.renderer.shadowMap.needsUpdate = true;
+      // The last frame of a move, and a snap, get both; in between, the shadow and the monitor take turns,
+      // so no single frame pays for the two of them (measured on the headset: 2.4 ms for the lens pass alone).
+      const settle = this.liveFrames === 0 || this.snapPending;
+      if (this.shadowTick || settle) this.renderer.shadowMap.needsUpdate = true;
       this.aimLens(cam);
       // With the monitor left on the table there is nobody to watch it.
-      if (this.monitor?.visible === true || this.snapPending) {
+      if ((this.monitor?.visible === true && (!this.shadowTick || settle)) || this.snapPending) {
         this.renderViewfinder();
         this.lensPasses++;
       }
