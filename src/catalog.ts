@@ -72,7 +72,7 @@ export const ASSETS: Asset[] = [
   { label: 'Ghost', shelf: 'Creatures', grab: [0.06, 0.2], paint: true },
   { label: 'Spider', shelf: 'Creatures', grab: [0.12, 0.12], paint: true, mover: true },
   { label: 'Kraken', shelf: 'Creatures', grab: [0.12, 0.35], paint: true, aliases: ['tentacles', 'octopus', 'squid'] },
-  { label: 'Horse', shelf: 'Cast', grab: [0.07, 0.17], paint: true, mover: true, styles: ['Plain', 'Unicorn'], aliases: ['unicorn'] },
+  { label: 'Horse', shelf: 'Cast', grab: [0.08, 0.23], paint: true, mover: true, styles: ['Plain', 'Unicorn'], aliases: ['unicorn'] },
   { label: 'Wolf', shelf: 'Cast', grab: [0.06, 0.1], paint: true, mover: true, aliases: ['dog'] },
   { label: 'Truck', shelf: 'Vehicles', grab: [0.15, 0.33], paint: true, solid: true, mover: true, styles: ['Box', 'Flatbed', 'Tanker'], aliases: ['lorry'] },
   { label: 'Pickup', shelf: 'Vehicles', grab: [0.13, 0.18], paint: true, solid: true, mover: true },

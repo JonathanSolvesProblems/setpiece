@@ -452,83 +452,114 @@ function kraken(): Group {
   return g;
 }
 
-/** A horse standing square; the Horn mesh is hidden until a look asks for a unicorn. */
+/**
+ * A horse standing square, 1.55 m at the withers: deep girth, quarters and shoulders with mass on
+ * them, legs with knees, hocks and fetlocks, a thick arched neck under a crest of mane, a head with
+ * a jaw and a blunt muzzle. The Horn mesh is hidden until a look asks for a unicorn.
+ */
 function horse(): Group {
   const g = new Group();
   g.name = 'Horse';
-  // Drawn at a round 1.95 m to the poll, fitted to 1.7 m.
-  const kit = new Kit(0.872);
+  const kit = new Kit(1.03);
   const { mesh: head, surface } = loft([
-    sec(0.075, 0.172, 0.012, 0.013, 0.012),
-    sec(0.095, 0.163, 0.011, 0.012, 0.012),
-    sec(0.12, 0.147, 0.009, 0.01, 0.011),
-    sec(0.137, 0.137, 0.0075, 0.008, 0.009),
-    sec(0.145, 0.133, 0.004, 0.005, 0.005),
-  ], 10);
-  kit.put('BodyCoat', primer, head, loft([
-    sec(-0.085, 0.108, 0.016, 0.014, 0.016),
-    sec(-0.07, 0.11, 0.028, 0.024, 0.026),
-    sec(-0.035, 0.108, 0.031, 0.025, 0.03),
-    sec(0.01, 0.107, 0.031, 0.024, 0.031),
-    sec(0.045, 0.113, 0.028, 0.026, 0.028),
-    sec(0.065, 0.118, 0.018, 0.02, 0.02),
-    sec(0.072, 0.12, 0.006, 0.008, 0.008),
-  ], 12).mesh, loft([
-    sec(0.035, 0.118, 0.016, 0.026, 0.02),
-    sec(0.06, 0.14, 0.014, 0.022, 0.018),
-    sec(0.08, 0.16, 0.012, 0.016, 0.014),
-    sec(0.09, 0.17, 0.01, 0.011, 0.011),
-  ], 10).mesh);
+    sec(0.088, 0.189, 0.0125, 0.012, 0.016),
+    sec(0.1, 0.183, 0.0145, 0.015, 0.022),
+    sec(0.116, 0.169, 0.0125, 0.013, 0.018),
+    sec(0.132, 0.153, 0.0105, 0.011, 0.013),
+    sec(0.144, 0.141, 0.0105, 0.0105, 0.0115),
+    sec(0.152, 0.136, 0.007, 0.0075, 0.008),
+  ], 12);
+  kit.put('BodyCoat', primer, head,
+    // The barrel: croup, quarters, loin, the belly at its lowest behind the girth, withers, chest.
+    loft([
+      sec(-0.087, 0.122, 0.01, 0.01, 0.012),
+      sec(-0.078, 0.122, 0.025, 0.022, 0.026),
+      sec(-0.054, 0.12, 0.036, 0.027, 0.034),
+      sec(-0.024, 0.117, 0.033, 0.024, 0.036),
+      sec(0.007, 0.115, 0.036, 0.025, 0.04),
+      sec(0.033, 0.116, 0.034, 0.03, 0.04),
+      sec(0.052, 0.12, 0.03, 0.03, 0.036),
+      sec(0.068, 0.12, 0.021, 0.022, 0.03),
+      sec(0.077, 0.12, 0.008, 0.01, 0.014),
+    ], 14).mesh,
+    // The neck rises out of the withers and the chest: deep at the base, arched along the crest, fine at the throat.
+    loft([
+      sec(0.032, 0.13, 0.023, 0.034, 0.034),
+      sec(0.05, 0.146, 0.02, 0.034, 0.03),
+      sec(0.068, 0.163, 0.016, 0.03, 0.026),
+      sec(0.084, 0.178, 0.0135, 0.022, 0.022),
+      sec(0.094, 0.188, 0.012, 0.012, 0.016),
+    ], 12).mesh);
   kit.put('Mane', hair,
-    ...chain([v(0, 0.184, 0.079), v(0, 0.163, 0.058), v(0, 0.136, 0.034)], [0.0045, 0.0055, 0.004]),
-    ...chain([v(0, 0.118, -0.083), v(0, 0.1, -0.1), v(0, 0.058, -0.104)], [0.005, 0.007, 0.0035]));
-  kit.put('Horn', bone, spike(v(0, 0.177, 0.094), v(0, 0.203, 0.124), 0.0045));
+    ...chain([v(0, 0.204, 0.096), v(0, 0.202, 0.084), v(0, 0.194, 0.068), v(0, 0.181, 0.05), v(0, 0.166, 0.034), v(0, 0.154, 0.026)], [0.004, 0.0075, 0.0085, 0.0085, 0.0075, 0.004]),
+    // The forelock, between the ears.
+    ball(v(0, 0.198, 0.104), 0.005, 0.004, 0.008),
+    ...chain([v(0, 0.136, -0.085), v(0, 0.124, -0.104), v(0, 0.084, -0.114), v(0, 0.04, -0.11)], [0.007, 0.011, 0.009, 0.0035]));
+  kit.put('Horn', bone, spike(v(0, 0.196, 0.102), v(0, 0.232, 0.124), 0.0045));
   for (const side of SIDES) {
-    kit.put('Eyes', eyeDark, ball(onLoft(surface, 0.1, side > 0 ? 0.45 : Math.PI - 0.45), 0.003, 0.003, 0.003, BEAD));
+    kit.put('Eyes', eyeDark, ball(onLoft(surface, 0.106, side > 0 ? 0.5 : Math.PI - 0.5), 0.0034, 0.0034, 0.0034, BEAD));
     kit.put('BodyCoat', primer,
-      spike(v(side * 0.006, 0.178, 0.081), v(side * 0.008, 0.194, 0.075), 0.0035),
-      ...chain([v(side * 0.018, 0.1, 0.045), v(side * 0.018, 0.06, 0.047), v(side * 0.018, 0.03, 0.046), v(side * 0.018, 0.01, 0.048)], [0.011, 0.0062, 0.0055, 0.0055]),
-      ...chain([v(side * 0.019, 0.105, -0.058), v(side * 0.019, 0.07, -0.05), v(side * 0.019, 0.042, -0.072), v(side * 0.019, 0.01, -0.066)], [0.014, 0.009, 0.006, 0.0055]));
+      // Ears, pricked.
+      spike(v(side * 0.008, 0.2, 0.094), v(side * 0.012, 0.222, 0.089), 0.0044, 0.6, v(0, 0, 1)),
+      // The shoulder and the quarter: the muscle a leg hangs from.
+      ball(v(side * 0.02, 0.114, 0.05), 0.014, 0.027, 0.022),
+      ball(v(side * 0.021, 0.116, -0.054), 0.018, 0.03, 0.03),
+      // Foreleg, upright: forearm, knee, cannon, fetlock, pastern.
+      ...chain([v(side * 0.021, 0.094, 0.05), v(side * 0.021, 0.054, 0.051), v(side * 0.021, 0.02, 0.05), v(side * 0.021, 0.01, 0.055)], [0.0135, 0.0078, 0.0062, 0.0058]),
+      // Hind leg: gaskin back to the hock, cannon forward to the fetlock.
+      ...chain([v(side * 0.023, 0.1, -0.052), v(side * 0.023, 0.058, -0.076), v(side * 0.023, 0.022, -0.068), v(side * 0.023, 0.01, -0.062)], [0.018, 0.0088, 0.0062, 0.0058]));
     kit.put('Hooves', horn,
-      limb(v(side * 0.018, 0, 0.049), v(side * 0.018, 0.011, 0.048), 0.0075, 0.0062),
-      limb(v(side * 0.019, 0, -0.065), v(side * 0.019, 0.011, -0.066), 0.0075, 0.0062));
+      limb(v(side * 0.021, 0, 0.058), v(side * 0.021, 0.012, 0.055), 0.0088, 0.0066),
+      limb(v(side * 0.023, 0, -0.059), v(side * 0.023, 0.012, -0.062), 0.0088, 0.0066));
   }
   kit.build(g);
   g.getObjectByName('Horn')!.visible = false;
   return g;
 }
 
-/** A wolf standing alert: ears up, long snout, tail hanging bushy. */
+/** A wolf standing alert: deep chest, tucked waist, a ruff at the neck, ears up, long muzzle, tail hanging bushy. */
 function wolf(): Group {
   const g = new Group();
   g.name = 'Wolf';
   // Drawn a touch large, fitted to 1 m at the ear tips.
-  const kit = new Kit(0.91);
+  const kit = new Kit(0.88);
   const { mesh: head, surface } = loft([
-    sec(0.035, 0.075, 0.014, 0.016, 0.016),
-    sec(0.055, 0.085, 0.013, 0.015, 0.014),
-    sec(0.07, 0.088, 0.014, 0.014, 0.012),
-    sec(0.085, 0.084, 0.01, 0.009, 0.008),
-    sec(0.1, 0.079, 0.006, 0.006, 0.005),
-    sec(0.106, 0.078, 0.003, 0.003, 0.003),
-  ], 10);
-  kit.put('BodyCoat', primer, head, loft([
-    sec(-0.07, 0.062, 0.012, 0.012),
-    sec(-0.055, 0.064, 0.018, 0.017, 0.018),
-    sec(-0.02, 0.066, 0.019, 0.018, 0.02),
-    sec(0.02, 0.07, 0.021, 0.021, 0.024),
-    sec(0.04, 0.074, 0.018, 0.02, 0.02),
-    sec(0.05, 0.076, 0.01, 0.012, 0.012),
-  ], 12).mesh, ...chain([v(0, 0.066, -0.065), v(0, 0.05, -0.085), v(0, 0.028, -0.092)], [0.006, 0.0095, 0.004]));
-  kit.put('Nose', eyeDark, ball(v(0, 0.08, 0.106), 0.0032, 0.0028, 0.003, BEAD));
+    sec(0.04, 0.08, 0.015, 0.016, 0.016),
+    sec(0.056, 0.088, 0.0165, 0.016, 0.016),
+    sec(0.072, 0.089, 0.015, 0.014, 0.014),
+    sec(0.084, 0.085, 0.011, 0.0098, 0.0105),
+    sec(0.095, 0.082, 0.0088, 0.008, 0.0085),
+    sec(0.104, 0.08, 0.0075, 0.0066, 0.007),
+    sec(0.109, 0.079, 0.0045, 0.0042, 0.0045),
+  ], 12);
+  kit.put('BodyCoat', primer, head,
+    // Rump, a waist tucked up behind the ribs, a deep chest between the shoulders.
+    loft([
+      sec(-0.075, 0.064, 0.01, 0.01, 0.01),
+      sec(-0.062, 0.065, 0.018, 0.017, 0.017),
+      sec(-0.04, 0.066, 0.0195, 0.018, 0.017),
+      sec(-0.012, 0.068, 0.018, 0.017, 0.016),
+      sec(0.018, 0.069, 0.022, 0.021, 0.027),
+      sec(0.038, 0.073, 0.021, 0.022, 0.026),
+      sec(0.05, 0.076, 0.013, 0.014, 0.015),
+    ], 14).mesh,
+    // The ruff: thick fur over the neck and shoulders.
+    ball(v(0, 0.08, 0.036), 0.02, 0.019, 0.022),
+    // A brush of a tail, hanging.
+    ...chain([v(0, 0.067, -0.07), v(0, 0.054, -0.088), v(0, 0.034, -0.098), v(0, 0.018, -0.097)], [0.006, 0.011, 0.01, 0.003]));
+  kit.put('Nose', eyeDark, ball(v(0, 0.081, 0.109), 0.0036, 0.0032, 0.0032, BEAD));
   for (const side of SIDES) {
-    kit.put('Eyes', eyeGlow, ball(onLoft(surface, 0.078, side > 0 ? 0.5 : Math.PI - 0.5), 0.0024, 0.0024, 0.0024, BEAD));
+    kit.put('Eyes', eyeGlow, ball(onLoft(surface, 0.077, side > 0 ? 0.55 : Math.PI - 0.55), 0.0026, 0.0026, 0.0026, BEAD));
     kit.put('BodyCoat', primer,
-      spike(v(side * 0.008, 0.096, 0.066), v(side * 0.01, 0.11, 0.062), 0.0045, 0.5, v(0, 0, 1)),
-      ...chain([v(side * 0.014, 0.06, 0.032), v(side * 0.014, 0.032, 0.034), v(side * 0.014, 0.01, 0.03), v(side * 0.014, 0.004, 0.036)], [0.007, 0.0045, 0.004, 0.0035]),
-      ball(v(side * 0.014, 0.003, 0.037), 0.005, 0.003, 0.007),
-      ...chain([v(side * 0.014, 0.062, -0.05), v(side * 0.014, 0.04, -0.04), v(side * 0.014, 0.022, -0.06), v(side * 0.014, 0.004, -0.054)], [0.009, 0.005, 0.004, 0.0035]),
-      ball(v(side * 0.014, 0.003, -0.052), 0.005, 0.003, 0.007));
+      spike(v(side * 0.0095, 0.098, 0.058), v(side * 0.013, 0.117, 0.053), 0.0058, 0.55, v(0, 0, 1)),
+      // Foreleg: shoulder, elbow, a straight forearm, the wrist, the paw.
+      ball(v(side * 0.014, 0.064, 0.032), 0.009, 0.015, 0.012),
+      ...chain([v(side * 0.015, 0.06, 0.033), v(side * 0.015, 0.033, 0.035), v(side * 0.015, 0.011, 0.032), v(side * 0.015, 0.004, 0.037)], [0.008, 0.005, 0.0042, 0.0038]),
+      ball(v(side * 0.015, 0.0032, 0.039), 0.0055, 0.0032, 0.0075),
+      // Hind leg: thigh, the knee forward, the hock back, the paw.
+      ball(v(side * 0.014, 0.064, -0.05), 0.011, 0.017, 0.016),
+      ...chain([v(side * 0.015, 0.06, -0.05), v(side * 0.015, 0.04, -0.04), v(side * 0.015, 0.022, -0.061), v(side * 0.015, 0.004, -0.055)], [0.0105, 0.0058, 0.0042, 0.0038]),
+      ball(v(side * 0.015, 0.0032, -0.053), 0.0055, 0.0032, 0.0075));
   }
   kit.build(g);
   return g;

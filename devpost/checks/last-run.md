@@ -1,22 +1,22 @@
 # Live site checks
 
-Run on 2026-11-11 22:08 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 3fd4d64-20261111T2208.
+Run on 2026-11-11 22:41 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: a15bf3b-20261111T2241.
 
 **35 of 35 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 292 ms |
+| the page answers over HTTPS | pass | 200, 284 ms |
 | it is Setpiece | pass |  |
 | search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
-| the app script is named in the page | pass | assets/index-Cd04_O8n.js |
+| the app script is named in the page | pass | assets/index-YREH-6EB.js |
 | version.json is served | pass | 200 |
-| version.json names a build | pass | 3fd4d64-20261111T2208 |
-| the app script is served | pass | 200, 2.57 MB |
-| the app script is under 3 MB | pass | 2.57 MB |
+| version.json names a build | pass | a15bf3b-20261111T2241 |
+| the app script is served | pass | 200, 2.58 MB |
+| the app script is under 3 MB | pass | 2.58 MB |
 | the served script carries the same build as version.json | pass |  |
 | the voice words include the directing words | pass | 2 chunks |
 | the icon library is not in any chunk | pass |  |
