@@ -45,7 +45,8 @@ const NAMED_AT_MOST = 5;
 const BURNING = /\b(burning|on fire|in flames|ablaze)\b/;
 
 /** Paint, size and fitting, each an index. */
-type Finish = [number, number, number];
+/** Paint, size step, fitting, and a size set by two hands (0 or absent: the size step counts). */
+type Finish = [number, number, number, number?];
 /** The pointer events library reads this off any object: false, and it does not look inside. */
 type Walked = Object3D & { intersectChildren?: boolean };
 type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
@@ -78,6 +79,7 @@ type Globals = {
   selectedIsActor: Signal<boolean>;
   selectedPaint: Signal<number>;
   selectedLabel: Signal<string>;
+  sizedByHand: Signal<{ label: string; scale: number } | null>;
   selectedCopies: Signal<boolean>;
   copyRequested: Signal<number>;
   trayPress: Signal<string>;
@@ -157,6 +159,12 @@ export class TraySystem extends createSystem({
         if (dress == null) return;
         g.trayDressRestore.value = null;
         if (this.ready) this.wear(dress);
+      }),
+      // Two hands pulled a piece bigger or pushed it smaller: that is its size now, kept like its paint.
+      g.sizedByHand.subscribe((sized) => {
+        if (sized == null) return;
+        g.sizedByHand.value = null;
+        if (this.ready) this.resize(sized.label, sized.scale);
       }),
       g.paintPick.subscribe((index) => {
         if (index < 0) return;
@@ -579,6 +587,18 @@ export class TraySystem extends createSystem({
     this.save();
   }
 
+  private resize(label: string, scale: number): void {
+    const piece = this.managed.find((entity) => this.key(entity) === label);
+    if (piece == null || assetByLabel(label) == null) return;
+    const value: Finish = [...this.finishOf(label)];
+    value[3] = Math.round(scale * 100) / 100;
+    this.finish.set(label, value);
+    this.coat(piece, value);
+    this.selected = piece;
+    this.publishSelected();
+    this.save();
+  }
+
   /** How a piece is finished: what the wearer chose, or the paint it comes in. */
   private finishOf(key: string): Finish {
     return this.finish.get(key) ?? [0, 0, 0];
@@ -598,6 +618,8 @@ export class TraySystem extends createSystem({
       value[0] = pick;
     } else if (field === 1) {
       value[1] = (value[1] + 1) % SIZES.length;
+      // The Size button goes back to its own steps from whatever two hands made of it.
+      value[3] = 0;
     } else {
       const count = asset.styles?.length ?? 0;
       if (count < 2) return;
@@ -645,10 +667,10 @@ export class TraySystem extends createSystem({
   }
 
   /** Paint on the body, the size of the whole piece, and which fitting shows. */
-  private coat(piece: Entity, [paint, size, style]: Finish): void {
+  private coat(piece: Entity, [paint, size, style, free]: Finish): void {
     const object = piece.object3D!;
     const asset = assetByLabel(this.key(piece));
-    const scale = SIZES[size]?.scale ?? 1;
+    const scale = free != null && free > 0 ? free : (SIZES[size]?.scale ?? 1);
     object.scale.setScalar(scale);
     object.traverse((part) => {
       const fitting = /^Style(\d)$/.exec(part.name);
@@ -700,11 +722,12 @@ export class TraySystem extends createSystem({
     const actor = piece.getValue(SetPiece, 'role') === SetRole.Actor;
     const key = this.key(piece);
     const [pose, look] = this.cast.get(key) ?? [0, 0];
-    const [paint, size, style] = this.finishOf(key);
+    const [paint, size, style, free] = this.finishOf(key);
     const words: string[] = [];
     if (actor) words.push(POSES[pose] ?? POSES[0], (LOOKS[look] ?? LOOKS[0]).name);
     if (asset.paint === true && paint > 0 && PAINTS[paint]) words.push(PAINTS[paint].name);
-    if (size > 0 && SIZES[size]) words.push(SIZES[size].name);
+    if (free != null && free > 0) words.push(`${Math.round(free * 100)} %`);
+    else if (size > 0 && SIZES[size]) words.push(SIZES[size].name);
     if (style > 0 && asset.styles) words.push(asset.styles[style]);
     g.castLine.value = words.length > 0 ? `${assetTitle(key)}: ${words.join(', ')}` : assetTitle(key);
     g.selectedIsActor.value = actor;

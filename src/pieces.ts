@@ -163,6 +163,8 @@ type Side = 'left' | 'right';
 const SIDES: Side[] = ['left', 'right'];
 type Carry = { piece: Entity; by: 'pinch' | 'fist' | 'pad'; offset: Vector3; at: Vector3; lost: number; opening: number };
 type Drop = { piece: Entity; speed: number; floor: number; roll?: number };
+/** A second hand on a held piece: which hand, how far apart the two were when it closed, and the size then. */
+type Stretch = { side: Side; piece: Entity; from: number; scale: number; offset: Vector3; opening: number; lost: number; told: number };
 type Globals = {
   newBoardRequested: Signal<number>;
   coachTarget: Signal<string>;
@@ -172,7 +174,12 @@ type Globals = {
   takeState: Signal<string>;
   trayOn: Signal<string[]>;
   layoutChanged: Signal<number>;
+  sizedByHand: Signal<{ label: string; scale: number } | null>;
 };
+/** A second hand pinching a held piece sizes it: how near that hand must be, and how small and big a piece goes. */
+const STRETCH_REACH = 0.07;
+const STRETCH_MIN = 0.4;
+const STRETCH_MAX = 3;
 /** A flown camera stays where it is let go, between these heights. */
 const DRONE_MIN_HEIGHT = 0.2;
 const DRONE_MAX_HEIGHT = 1.1;
@@ -231,6 +238,7 @@ export class PiecesSystem extends createSystem({
   private spans: number[] = [];
   private readings: Record<Side, HandReading> = { left: new HandReading(), right: new HandReading() };
   private carrying: Record<Side, Carry | null> = { left: null, right: null };
+  private stretch: Stretch | null = null;
   private panelRay = new Raycaster();
   private panelHits: Intersection[] = [];
   /** The piece each hand is on, by index, or -1. */
@@ -453,6 +461,21 @@ export class PiecesSystem extends createSystem({
       this.carry(side, carry, byHand, live, carry.by === 'fist' ? fistAt : pinchAt, delta);
       return;
     }
+    // The other hand has a piece: this hand's pinch on the same piece stretches or squeezes it.
+    if (this.stretch?.side === side) {
+      this.stretchWith(side, byHand, live, pinchAt, delta);
+      return;
+    }
+    const held = this.carrying[side === 'left' ? 'right' : 'left'];
+    if (live && held != null && this.stretch == null && this.guard <= 0 && !held.piece.hasComponent(ShotCamera) && this.onPiece(held.piece, pinchAt, STRETCH_REACH)) {
+      this.near[side] = -1;
+      this.setRayAside(side, true);
+      if (pad?.getSelectStart() === true || (!byHand && pad?.getButtonDown(InputComponent.Squeeze) === true)) {
+        const scale = held.piece.object3D!.scale.x;
+        this.stretch = { side, piece: held.piece, from: Math.max(0.02, held.at.distanceTo(pinchAt)), scale, offset: held.offset.clone(), opening: 0, lost: 0, told: 0 };
+      }
+      return;
+    }
     if (!live || this.rayBusy(side)) {
       this.near[side] = -1;
       this.setRayAside(side, false);
@@ -477,6 +500,54 @@ export class PiecesSystem extends createSystem({
     const by: Carry['by'] = !byHand ? 'pad' : fisted && !pinched ? 'fist' : 'pinch';
     const point = by === 'fist' || fromFist ? fistAt : pinchAt;
     this.take(side, this.dressed[index], by, by === 'pinch' && fromFist ? pinchAt : point);
+  }
+
+  /** Whether this point is on the piece, within reach of its shape, in metres. */
+  private onPiece(piece: Entity, point: Vector3, reach: number): boolean {
+    const index = this.dressed.indexOf(piece);
+    const object = piece.object3D;
+    if (index < 0 || object == null) return false;
+    object.worldToLocal(this.local.copy(point));
+    return this.bounds[index].distanceToPoint(this.local) * object.scale.x <= reach;
+  }
+
+  /**
+   * Two hands on one piece: the first carries it, and the distance to the second sets its size, the
+   * way anyone stretches a thing between their hands. Letting go with the second hand keeps the size.
+   */
+  private stretchWith(side: Side, byHand: boolean, live: boolean, point: Vector3, delta: number): void {
+    const stretch = this.stretch!;
+    const first = this.carrying[side === 'left' ? 'right' : 'left'];
+    const pad = this.input.xr.gamepads[side];
+    const object = stretch.piece.object3D;
+    const open = byHand ? pad != null && !pad.getSelecting() : pad?.getSelecting() !== true && pad?.getButtonPressed(InputComponent.Squeeze) !== true;
+    stretch.opening = open ? stretch.opening + delta : 0;
+    stretch.lost = live ? 0 : stretch.lost + delta;
+    const letGo = byHand
+      ? stretch.opening >= PINCH_GONE_SECONDS || (stretch.opening >= OPENING_SECONDS && live && this.readings[side].pinchGap > FINGERS_APART)
+      : stretch.opening > 0;
+    if (letGo || stretch.lost > LOST_HAND_SECONDS || first?.piece !== stretch.piece || object == null || !object.visible) {
+      this.stretch = null;
+      this.setRayAside(side, false);
+      // The size is the piece's own from here on: kept with its paint, on every frame that remembers it.
+      if (object != null && object.scale.x !== stretch.scale) {
+        (this.globals as Globals).sizedByHand.value = { label: String(stretch.piece.getValue(SetPiece, 'label')), scale: object.scale.x };
+      }
+      return;
+    }
+    this.setRayAside(side, true);
+    if (!live) return;
+    const scale = Math.max(STRETCH_MIN, Math.min(STRETCH_MAX, (stretch.scale * first.at.distanceTo(point)) / stretch.from));
+    object.scale.setScalar(scale);
+    // The spot the first hand took stays under its fingers as the piece grows.
+    first.offset.copy(stretch.offset).multiplyScalar(scale / stretch.scale);
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    const tenth = Math.round(scale * 10);
+    if (tenth !== stretch.told) {
+      stretch.told = tenth;
+      const title = assetTitle(String(stretch.piece.getValue(SetPiece, 'label'))).toUpperCase();
+      (this.globals as Globals).coachNote.value = `${title} AT ${tenth * 10} % | Hands apart to grow it, together to shrink it. Let go to keep it.`;
+    }
   }
 
   /** Whether this hand's ray lands on the control panel. */
@@ -845,7 +916,7 @@ export class PiecesSystem extends createSystem({
     const asset = assetByLabel(String(piece.getValue(SetPiece, 'label')));
     const role = piece.getValue(SetPiece, 'role');
     this.solids.push(asset?.solid === true ? shape.clone() : null);
-    const inTheWay = asset != null && !ROLL_THROUGH.has(asset.shelf) && role !== SetRole.Actor && role !== SetRole.Camera && !shape.isEmpty();
+    const inTheWay = asset != null && (!ROLL_THROUGH.has(asset.shelf) || asset.mover === true) && role !== SetRole.Actor && role !== SetRole.Camera && !shape.isEmpty();
     this.blockers.push(inTheWay ? shape.clone() : null);
     // A thin piece gets room around it for the hand; a big one is its own shape, so a hand
     // passing near a car does not count as a hand on the car.

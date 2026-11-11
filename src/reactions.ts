@@ -5,7 +5,7 @@
  * worked out from the blocking alone, a take plays them back the same way
  * every time.
  */
-import { Box3, createSystem, Entity, Mesh, Quaternion, ShaderMaterial, Vector3 } from '@iwsdk/core';
+import { Box3, createSystem, Entity, Mesh, Object3D, Quaternion, ShaderMaterial, Vector3 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
 import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
@@ -24,6 +24,12 @@ const WET_RATE = 1.6;
 
 type Mover = { piece: Entity; box: Box3; last: Vector3; seen: boolean };
 type Fire = { piece: Entity; material: ShaderMaterial; wet: number; told: boolean };
+/** An animal a vehicle can tip over: its shape, half its width, how far over it is, which way, and how it stood. */
+type Animal = { piece: Entity; box: Box3; half: number; down: boolean; amount: number; side: number; yaw: number; floor: number };
+const ANIMALS = new Set(['Horse', 'Wolf']);
+const TIP_RATE = 7;
+const UP = new Vector3(0, 1, 0);
+const NOSE = new Vector3(0, 0, 1);
 type Globals = {
   coachNote: Signal<string>;
   takeState: Signal<string>;
@@ -39,6 +45,9 @@ export class ReactionsSystem extends createSystem({
   private movers: Mover[] = [];
   private actors: Entity[] = [];
   private fires: Fire[] = [];
+  private animals: Animal[] = [];
+  private roll = new Quaternion();
+  private forward = new Vector3();
   private waters: { piece: Entity; reach: number }[] = [];
   private squirm: SquirmSystem | undefined;
   private at = new Vector3();
@@ -49,7 +58,10 @@ export class ReactionsSystem extends createSystem({
 
   init(): void {
     const g = this.globals as Globals;
-    const stand = (): void => this.squirm?.standAll();
+    const stand = (): void => {
+      this.squirm?.standAll();
+      for (let n = 0; n < this.animals.length; n++) this.standUp(this.animals[n], true);
+    };
     this.cleanupFuncs.push(
       g.takeState.subscribe(stand),
       // A take that loops starts again with everyone on their feet.
@@ -72,6 +84,10 @@ export class ReactionsSystem extends createSystem({
       if (role === SetRole.Actor) this.actors.push(piece);
       if (assetByLabel(label)?.mover === true) this.movers.push({ piece, box: localBounds(object), last: new Vector3(), seen: false });
       if (WETS[label] != null) this.waters.push({ piece, reach: WETS[label] });
+      if (ANIMALS.has(assetByLabel(label)?.spareOf ?? label)) {
+        const box = localBounds(object);
+        this.animals.push({ piece, box, half: (box.max.x - box.min.x) / 2, down: false, amount: 0, side: 1, yaw: 0, floor: 0 });
+      }
       if (BURNS.includes(label)) {
         object.traverse((part) => {
           if (part.name === 'EffectParticles') this.fires.push({ piece, material: (part as Mesh).material as ShaderMaterial, wet: 0, told: false });
@@ -88,6 +104,7 @@ export class ReactionsSystem extends createSystem({
     }
     if (delta <= 0) return;
     this.knockDown(delta);
+    this.tip(delta);
     this.putOut(delta);
   }
 
@@ -123,7 +140,62 @@ export class ReactionsSystem extends createSystem({
           (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick them up to stand them again.`;
         }
       }
+      for (let n = 0; n < this.animals.length; n++) {
+        const animal = this.animals[n];
+        const body = animal.piece.object3D!;
+        if (animal.down || animal.piece === mover.piece || !body.visible || body.parent !== object.parent || animal.piece.hasComponent(Held)) continue;
+        if (!this.touches(mover, object, animal, body, reach)) continue;
+        // Over on the side away from what hit it, lying the way it was facing.
+        this.local.set(this.velocity.x, 0, this.velocity.z).applyQuaternion(this.turn.copy(body.quaternion).invert());
+        this.forward.copy(NOSE).applyQuaternion(body.quaternion);
+        animal.yaw = Math.atan2(this.forward.x, this.forward.z);
+        animal.side = this.local.x >= 0 ? -1 : 1;
+        animal.floor = body.position.y;
+        animal.down = true;
+        const who = assetTitle(String(animal.piece.getValue(SetPiece, 'label'))).toUpperCase();
+        (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick it up to stand it again.`;
+      }
     }
+  }
+
+  /** Whether the mover's shape reaches the animal's: its four corners and its middle, at half its height. */
+  private touches(mover: Mover, object: Object3D, animal: Animal, body: Object3D, reach: number): boolean {
+    const box = animal.box;
+    const y = (box.min.y + box.max.y) / 2;
+    for (let i = 0; i < 5; i++) {
+      this.at.set(i === 4 ? 0 : i % 2 === 0 ? box.min.x : box.max.x, y, i === 4 ? (box.min.z + box.max.z) / 2 : i < 2 ? box.min.z : box.max.z);
+      object.worldToLocal(body.localToWorld(this.at));
+      if (mover.box.distanceToPoint(this.at) <= reach) return true;
+    }
+    return false;
+  }
+
+  /** A tipped animal goes over onto its side; a hand that picks it up has it back on its feet. */
+  private tip(delta: number): void {
+    for (let n = 0; n < this.animals.length; n++) {
+      const animal = this.animals[n];
+      if (!animal.down) continue;
+      const body = animal.piece.object3D!;
+      if (animal.piece.hasComponent(Held) || !body.visible) {
+        this.standUp(animal, false);
+        continue;
+      }
+      if (animal.amount >= 1) continue;
+      animal.amount = Math.min(1, animal.amount + delta * TIP_RATE);
+      this.turn.setFromAxisAngle(UP, animal.yaw);
+      this.roll.setFromAxisAngle(NOSE, (animal.side * animal.amount * Math.PI) / 2);
+      body.quaternion.copy(this.turn).multiply(this.roll);
+      body.position.y = animal.floor + animal.half * body.scale.x * animal.amount;
+    }
+  }
+
+  private standUp(animal: Animal, toFloor: boolean): void {
+    if (!animal.down) return;
+    const body = animal.piece.object3D!;
+    animal.down = false;
+    animal.amount = 0;
+    body.quaternion.setFromAxisAngle(UP, animal.yaw);
+    if (toFloor) body.position.y = animal.floor;
   }
 
   private putOut(delta: number): void {

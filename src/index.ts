@@ -72,6 +72,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.takeClear = signal(0);
   globals.layoutChanged = signal(0);
   globals.selectedLabel = signal('');
+  globals.sizedByHand = signal<{ label: string; scale: number } | null>(null);
   globals.selectedCopies = signal(false);
   globals.copyRequested = signal(0);
   globals.trayPress = signal('');
