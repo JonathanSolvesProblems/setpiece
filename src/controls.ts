@@ -275,7 +275,14 @@ export class ControlsSystem extends createSystem({
       element?.addEventListener('click', run);
       this.cleanupFuncs.push(() => element?.removeEventListener('click', run));
     };
+    let openTab: string = 'shoot';
+    // What the piece last touched can be given follows the wearer to every tab; the Assets tab shows it always.
+    const showPieceBar = (): void => {
+      panel.getElementById('held-block')?.setProperties({ display: openTab === 'assets' || g.castLine.peek() !== '' ? 'flex' : 'none' });
+    };
     const showTab = (tab: string): void => {
+      openTab = tab;
+      showPieceBar();
       for (const name of TABS) {
         panel.getElementById(`page-${name}`)?.setProperties({ display: name === tab ? 'flex' : 'none' });
         panel.getElementById(`tab-${name}`)?.setProperties({
@@ -553,6 +560,7 @@ export class ControlsSystem extends createSystem({
         const selected = line !== '';
         cast?.setProperties({ text: selected ? line : 'Press a piece here, or pick it up' });
         panel.getElementById('held-row')?.setProperties({ display: selected ? 'flex' : 'none' });
+        showPieceBar();
       }),
       g.selectedPaint.subscribe((paint) => {
         panel.getElementById('paint-row')?.setProperties({ display: paint >= 0 ? 'flex' : 'none' });

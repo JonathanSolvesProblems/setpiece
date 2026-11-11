@@ -80,6 +80,7 @@ type Globals = {
   selectedPaint: Signal<number>;
   selectedLabel: Signal<string>;
   sizedByHand: Signal<{ label: string; scale: number } | null>;
+  coachLine: Signal<string>;
   selectedCopies: Signal<boolean>;
   copyRequested: Signal<number>;
   trayPress: Signal<string>;
@@ -110,6 +111,7 @@ export class TraySystem extends createSystem({
   private cast = new Map<string, [number, number]>();
   private finish = new Map<string, Finish>();
   private selected: Entity | null = null;
+  private toldChanges = false;
   private ready = false;
   private seen = { pose: 0, look: 0, board: 0, remove: 0, clear: 0, size: 0, style: 0, copy: 0 };
 
@@ -189,6 +191,7 @@ export class TraySystem extends createSystem({
       this.queries.held.subscribe('qualify', (piece) => {
         this.selected = piece;
         this.publishSelected();
+        this.sayWhereChangesAre(piece);
       }),
     );
   }
@@ -585,6 +588,21 @@ export class TraySystem extends createSystem({
     this.dress(actor, value);
     this.publishSelected();
     this.save();
+  }
+
+  /**
+   * The first piece picked up once the opening steps are done says where its changes are: on the
+   * panel, whatever tab is open, and in the other hand. Said once a visit.
+   */
+  private sayWhereChangesAre(piece: Entity): void {
+    const g = this.globals as Globals;
+    const key = this.key(piece);
+    const asset = assetByLabel(key);
+    if (this.toldChanges || asset == null || asset.shelf === 'Kit' || /^\d OF \d/.test(g.coachLine.peek())) return;
+    this.toldChanges = true;
+    const actor = piece.getValue(SetPiece, 'role') === SetRole.Actor;
+    const what = actor ? 'pose, look and size are' : asset.paint === true ? 'paint, size and fitting are' : 'size is';
+    g.coachNote.value = `${assetTitle(key).toUpperCase()} | Its ${what} on the panel, on any tab. Pinch it with your other hand to stretch it.`;
   }
 
   private resize(label: string, scale: number): void {

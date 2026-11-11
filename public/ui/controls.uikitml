@@ -330,31 +330,6 @@
       <div id="btn-more" class="word">More</div>
     </div>
     <div id="fx-note" class="line muted" style="display: none">Effects are stand-ins, not simulations.</div>
-    <div id="held-block" class="page">
-    <div class="rule"></div>
-    <div class="field">
-      <div class="label short">HELD</div>
-      <div id="cast-line" class="line">Pick up a piece to change it</div>
-    </div>
-    <div id="paint-row" class="chips" style="display: none">
-      <div id="paint-0" class="chip" style="background-color: #c4a07a"></div>
-      <div id="paint-1" class="chip" style="background-color: #9c3a2e"></div>
-      <div id="paint-2" class="chip" style="background-color: #b86f33"></div>
-      <div id="paint-3" class="chip" style="background-color: #c4a23f"></div>
-      <div id="paint-4" class="chip" style="background-color: #4c6e52"></div>
-      <div id="paint-5" class="chip" style="background-color: #3d5b7c"></div>
-      <div id="paint-6" class="chip" style="background-color: #d8d3c4"></div>
-      <div id="paint-7" class="chip" style="background-color: #2a2826"></div>
-    </div>
-    <div id="held-row" class="takes" style="display: none">
-      <div id="btn-size" class="word">Size</div>
-      <div id="btn-style" class="word" style="display: none">Fit</div>
-      <div id="btn-copy" class="word" style="display: none">Copy</div>
-      <div id="btn-pose" class="word" style="display: none">Pose</div>
-      <div id="btn-look" class="word" style="display: none">Look</div>
-      <div id="btn-remove" class="word">Remove</div>
-    </div>
-    </div>
     <div class="field">
       <div id="assets-count" class="line muted">3 on the set</div>
       <div id="btn-clear-set" class="word">Clear set</div>
@@ -388,6 +363,31 @@
       <div class="label short">LEAVE</div>
       <div id="exit-button" class="word">Exit to browser</div>
     </div>
+  </div>
+  <div id="held-block" class="page" style="display: none">
+  <div class="rule"></div>
+  <div class="field">
+    <div class="label short">PIECE</div>
+    <div id="cast-line" class="line">Pick up a piece to change it</div>
+  </div>
+  <div id="paint-row" class="chips" style="display: none">
+    <div id="paint-0" class="chip" style="background-color: #c4a07a"></div>
+    <div id="paint-1" class="chip" style="background-color: #9c3a2e"></div>
+    <div id="paint-2" class="chip" style="background-color: #b86f33"></div>
+    <div id="paint-3" class="chip" style="background-color: #c4a23f"></div>
+    <div id="paint-4" class="chip" style="background-color: #4c6e52"></div>
+    <div id="paint-5" class="chip" style="background-color: #3d5b7c"></div>
+    <div id="paint-6" class="chip" style="background-color: #d8d3c4"></div>
+    <div id="paint-7" class="chip" style="background-color: #2a2826"></div>
+  </div>
+  <div id="held-row" class="takes" style="display: none">
+    <div id="btn-size" class="word">Size</div>
+    <div id="btn-style" class="word" style="display: none">Fit</div>
+    <div id="btn-copy" class="word" style="display: none">Copy</div>
+    <div id="btn-pose" class="word" style="display: none">Pose</div>
+    <div id="btn-look" class="word" style="display: none">Look</div>
+    <div id="btn-remove" class="word">Remove</div>
+  </div>
   </div>
   <div id="xr-button" class="primary" style="display: none">Enter XR</div>
 </div>

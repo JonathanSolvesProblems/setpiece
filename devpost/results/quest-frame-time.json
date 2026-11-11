@@ -1,0 +1,26 @@
+{
+ "what": "Where each frame's time goes inside the immersive session on a Meta Quest 3S, Quest Browser, both hands tracked, on the live site. Read by a three-second probe attached over the Chrome DevTools Protocol (tmp/q-prof.js, tmp/q-sys.js, tmp/q-input.js in the working tree): it times the session's frame callback, each render pass and each system's update, then removes itself. The budget at the headset's 90 Hz is 11.1 ms a frame.",
+ "before": {
+  "date": "2026-11-11",
+  "build": "5f1bca4",
+  "on_the_set": ["A", "B", "Creature", "C", "Horse", "Truck"],
+  "hands_tracked": 2,
+  "frames_per_second": [66.4, 68.2],
+  "frame_ms": { "median": 15.0, "p95": 17.1, "worst": 18.1, "over_23_ms": 0 },
+  "javascript_ms_per_frame": 12.8,
+  "of_which": {
+   "main_view_ms": 5.1,
+   "main_view_draw_calls": 163,
+   "monitor_lens_pass_ms": 2.4,
+   "pointer_system_ms": 2.7,
+   "everything_else_ms": 2.6
+  },
+  "found": [
+   "The hand rays walked 2,553 scene nodes a frame for each hand: 70 interactable roots, 60 of them pieces off the set, every piece twice because the slate that holds them is interactable too, and all five poses of each actor.",
+   "Three actors were 69 of the 163 draw calls, the slate's striped edge 24, the camera 16.",
+   "The monitor's lens view was redrawn on every frame while anything moved, on top of the shadow pass.",
+   "With both hands out of view the same set ran at 90."
+  ]
+ },
+ "after": null
+}
