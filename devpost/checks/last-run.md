@@ -1,20 +1,20 @@
 # Live site checks
 
-Run on 2026-11-12 16:14 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 8d57cfb-20261112T1613.
+Run on 2026-11-12 16:18 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 3de589d-20261112T1617.
 
 **35 of 35 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 280 ms |
+| the page answers over HTTPS | pass | 200, 315 ms |
 | it is Setpiece | pass |  |
 | search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
-| the app script is named in the page | pass | assets/index-BjQut5Zk.js |
+| the app script is named in the page | pass | assets/index-MY_lXVSD.js |
 | version.json is served | pass | 200 |
-| version.json names a build | pass | 8d57cfb-20261112T1613 |
+| version.json names a build | pass | 3de589d-20261112T1617 |
 | the app script is served | pass | 200, 2.59 MB |
 | the app script is under 3 MB | pass | 2.59 MB |
 | the served script carries the same build as version.json | pass |  |
@@ -35,7 +35,7 @@ Run on 2026-11-12 16:14 UTC against https://setpiece.jonathansolvesproblems.com/
 | baked type SchibstedGrotesk-SemiBold is served with its page | pass | 200/200 |
 | the scene file is served | pass |  |
 | the recogniser is served | pass | 200, 1146 bytes |
-| the preview image is served | pass | 200, 634218 bytes |
+| the preview image is served | pass | 200, 157901 bytes |
 | the icon is served | pass | 200, 360 bytes |
 | the loading card drawing is served | pass | 200, 105024 bytes |
 | the clap is served | pass | 200, 26504 bytes |
