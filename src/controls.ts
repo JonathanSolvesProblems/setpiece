@@ -435,7 +435,7 @@ export class ControlsSystem extends createSystem({
             if (text !== '') tell(`Heard: ${text}`);
             if (!final) return;
             if (text === '') {
-              tell(chained ? 'Quiet, so the listening stopped. Press Say a scene to start again.' : 'Heard nothing. Press it and try again.');
+              tell(halted ? 'Listening stopped.' : chained ? 'Quiet, so the listening stopped. Press Say a scene to start again.' : 'Heard nothing. Press it and try again.');
               chained = false;
               return;
             }

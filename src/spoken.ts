@@ -13,7 +13,7 @@ import type { Signal } from '@preact/signals-core';
 import { CAMERAS, LENSES, Rig } from './camera-formats.js';
 import { assetTitle, PAINTS } from './catalog.js';
 import { PiecesSystem } from './pieces.js';
-import { commandFor, understand } from './scene-request.js';
+import { partsOf, understand } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
 import type { Command } from './spoken-commands.js';
 import { TakeState } from './take.js';
@@ -44,18 +44,25 @@ const bump = (signal: Signal<number>): void => {
 
 const PAINT_LIST = PAINTS.map((paint) => paint.name.toLowerCase()).join(', ');
 
-/** Acts on one sentence, spoken or typed. */
+const TAKE_IS_RUNNING = 'A TAKE IS RUNNING | Say stop first, then say it again.';
+
+/** Acts on one sentence, spoken or typed: each thing it asks for, in the order it was said. */
 export function hear(world: World, text: string): void {
   const g = world.globals as unknown as Globals;
-  const command = commandFor(text);
-  if (command == null) {
-    g.sceneRequest.value = understand(text);
-    return;
+  for (const part of partsOf(text)) {
+    if (part.command == null) {
+      g.sceneRequest.value = understand(part.text);
+      continue;
+    }
+    const note = obey(world, g, part.command);
+    if (note !== '') g.coachNote.value = note;
   }
   g.lastSpoken.value = text;
-  const note = obey(world, g, command);
-  if (note !== '') g.coachNote.value = note;
 }
+
+/** How a change to one piece, or to several, is said back. */
+const changed = (title: string, count: number, now: string): string =>
+  count > 1 ? `${title.toUpperCase()} AND ${count - 1} MORE | Now ${now}.` : `${title.toUpperCase()} | Now ${now}.`;
 
 /** Does the one thing asked, and returns the line for the call sheet; empty when the thing speaks for itself. */
 function obey(world: World, g: Globals, command: Command): string {
@@ -122,21 +129,26 @@ function obey(world: World, g: Globals, command: Command): string {
     case 'paint': {
       const paint = PAINTS.findIndex((entry) => entry.name.toLowerCase() === command.colour);
       if (paint < 0) return `NO ${command.colour.toUpperCase()} IN THE KIT | The paints are ${PAINT_LIST}.`;
-      const changed = world.getSystem(TraySystem)?.change(command.labels, { paint });
-      if (changed == null || changed.why === 'none') return missing(command.labels, 'paint the car red');
-      if (changed.why === 'fixed') return `${changed.title.toUpperCase()} TAKES NO PAINT | Its size can change: say bigger or smaller.`;
-      return `${changed.title.toUpperCase()} | Now ${PAINTS[paint].name.toLowerCase()}.`;
+      // A take holds how the pieces stood; they are not repainted, resized or struck under it.
+      if (g.takeState.peek() !== TakeState.Idle) return TAKE_IS_RUNNING;
+      const done = world.getSystem(TraySystem)?.change(command.labels, command.all, { paint });
+      if (done == null || done.why === 'none') return missing(command.labels, 'paint the car red');
+      if (done.why === 'kit') return 'THE CAMERA KIT STAYS AS IT IS | It takes no paint and no other size.';
+      if (done.why === 'fixed') return `${done.title.toUpperCase()} TAKES NO PAINT | Its size can change: say bigger or smaller.`;
+      return changed(done.title, done.count, done.now);
     }
     case 'size': {
-      const changed = world.getSystem(TraySystem)?.change(command.labels, { size: command.size });
-      if (changed == null || changed.why === 'none') return missing(command.labels, 'make the car bigger');
-      if (changed.why === 'fixed') return `${changed.title.toUpperCase()} STAYS ITS SIZE | The camera kit is not resized.`;
-      if (changed.why === 'limit') return `${changed.title.toUpperCase()} | That is as ${command.size === 'bigger' ? 'big' : 'small'} as it goes by word. Two hands stretch it further.`;
-      return `${changed.title.toUpperCase()} | Now ${changed.now}.`;
+      if (g.takeState.peek() !== TakeState.Idle) return TAKE_IS_RUNNING;
+      const done = world.getSystem(TraySystem)?.change(command.labels, command.all, { size: command.size });
+      if (done == null || done.why === 'none') return missing(command.labels, 'make the car bigger');
+      if (done.why === 'kit' || done.why === 'fixed') return 'THE CAMERA KIT STAYS AS IT IS | It takes no paint and no other size.';
+      if (done.why === 'limit') return `${done.title.toUpperCase()} | That is as ${command.size === 'bigger' ? 'big' : 'small'} as it goes by word. Two hands stretch it further.`;
+      return changed(done.title, done.count, done.now);
     }
     case 'remove': {
       const label = g.selectedLabel.peek();
       if (label === '') return 'NOTHING PICKED | Touch a piece first, or name it: remove the dragon.';
+      if (g.takeState.peek() !== TakeState.Idle) return TAKE_IS_RUNNING;
       bump(g.removeSelected);
       return `${assetTitle(label).toUpperCase()} IS OFF THE SET | Say its name to bring it back.`;
     }

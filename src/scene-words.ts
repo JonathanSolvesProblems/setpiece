@@ -410,14 +410,18 @@ function freshAt(words: string[], at: number, removing: boolean): number {
   return 0;
 }
 
+/** A sentence as this reader takes it: lower case, plain words, the few known mis-hearings put right. */
+export const wordsOf = (text: string): string[] => mend(plain(text).split(' ').filter((word) => word !== ''));
+
 /**
- * Every piece the words name, in the order said, whatever the verbs around them: for words that
- * are about a piece already on the set. A name for a group ("the actors") gives all its members.
+ * Every piece these words name, in the order said, whatever the verbs around them: for words that
+ * are about a piece already on the set. `words` comes from wordsOf. Each name carries the word it
+ * starts at and how many words it is. A name for a group ("the actors") gives all its members, and
+ * `all` says the name was said for every one of them: a plural, or "everyone".
  */
-export function namesIn(text: string, vocab: Vocab): { labels: string[]; at: number }[] {
+export function namesIn(words: string[], vocab: Vocab): { labels: string[]; at: number; length: number; all: boolean }[] {
   const lexicon = lexiconFor(vocab);
-  const words = mend(plain(text).split(' ').filter((word) => word !== ''));
-  const found: { labels: string[]; at: number }[] = [];
+  const found: { labels: string[]; at: number; length: number; all: boolean }[] = [];
   for (let i = 0; i < words.length; ) {
     const match = nameAt(lexicon, words, i);
     if (match == null) {
@@ -425,8 +429,12 @@ export function namesIn(text: string, vocab: Vocab): { labels: string[]; at: num
       continue;
     }
     const name = match.name;
-    if (name.kind === 'piece' && !name.describing) found.push({ labels: [name.label], at: i });
-    else if (name.kind === 'group') found.push({ labels: lexicon.groups.get(name.group) ?? [], at: i });
+    if (name.kind === 'piece' && !name.describing) {
+      found.push({ labels: [name.label], at: i, length: match.length, all: name.plural });
+    } else if (name.kind === 'group') {
+      const labels = lexicon.groups.get(name.group) ?? [];
+      if (labels.length > 0) found.push({ labels, at: i, length: match.length, all: name.plural || name.every });
+    }
     i += match.length;
   }
   return found;

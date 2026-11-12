@@ -4,12 +4,12 @@
  * and whatever it names that is not there is said back, not invented.
  */
 import { assetTitle, SHELF_ASSETS } from './catalog.js';
-import { namesIn, parseRequest, speechWords } from './scene-words.js';
+import { namesIn, parseRequest, speechWords, wordsOf } from './scene-words.js';
 import type { Request, Vocab } from './scene-words.js';
 import { SCENES } from './scenes.js';
 import { asksToAim, stagingFor, stagingWords, withoutStaging } from './scene-stagings.js';
 import type { Staging } from './scene-stagings.js';
-import { commandIn, commandWords } from './spoken-commands.js';
+import { commandIn, commandWords, partsIn } from './spoken-commands.js';
 import type { Command } from './spoken-commands.js';
 
 export type Spoken = { request: Request; text: string; staging: Staging | null; aim: boolean };
@@ -26,8 +26,23 @@ export const wordsToHear = (): string[] => [
   ...new Set([...speechWords(VOCAB), ...stagingWords(), ...SCENES.map((scene) => scene.title.toLowerCase()), ...commandWords()]),
 ];
 
-/** The control these words ask for, when they ask for one and not for a blocking: see spoken-commands.ts. */
-export const commandFor = (text: string): Command | null => (stagingFor(text, SCENES) != null ? null : commandIn(text, namesIn(text, VOCAB)));
+/** The control these words ask for, when they ask for one and nothing else: see spoken-commands.ts. */
+const control = (words: string[]): Command | null => commandIn(words, namesIn(words, VOCAB));
+
+/** One thing a sentence asks for: a control, or words left for the scene reader. */
+export type Part = { text: string; command: Command | null };
+
+/**
+ * What a sentence asks for, in the order it was said: see partsIn in spoken-commands.ts. A
+ * blocking named in the words is always one request, and a sentence with no control in it goes
+ * to the scene reader exactly as it was said.
+ */
+export function partsOf(text: string): Part[] {
+  if (stagingFor(text, SCENES) != null) return [{ text, command: null }];
+  const parts = partsIn(wordsOf(text), control);
+  if (parts.length === 1 && parts[0].command == null) return [{ text, command: null }];
+  return parts.map((part) => ({ text: part.words.join(' '), command: part.command }));
+}
 
 export const understand = (text: string): Spoken => {
   const staging = stagingFor(text, SCENES);
