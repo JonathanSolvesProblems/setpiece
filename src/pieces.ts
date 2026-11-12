@@ -41,6 +41,7 @@ import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
 import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
 import { ReactionsSystem } from './reactions.js';
+import type { CameraStep } from './spoken-commands.js';
 import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { SquirmSystem } from './squirm.js';
@@ -122,8 +123,14 @@ const STILL_MOVING = 0.4;
 /** The slate's half size, in metres on the stage. */
 const SLATE_HALF_X = 0.3;
 const SLATE_HALF_Z = 0.2;
-/** A roll stops this far inside the knock-down rule's reach, so a take plays the contact back. */
-const CONTACT_INSET = 0.002;
+/**
+ * A roll stops this far inside the knock-down rule's reach, so a take plays the contact back. A
+ * take keeps 30 poses a second, and the stretch in which a roll stops plays back slower than the
+ * roll was going. The inset has to be more than a vehicle at the knock-down speed covers between
+ * two poses (3.3 mm), or the car can come within reach only in that slow stretch and the actor is
+ * left standing on playback.
+ */
+const CONTACT_INSET = 0.005;
 /** A push let go this close above the slate rolls on once it lands; from higher, it just lands. */
 const LOW_DROP = 0.05;
 /** What a roll goes through: effects, the kit, and the cast, who are met as actors instead. */
@@ -184,6 +191,9 @@ const STRETCH_MAX = 3;
 /** A flown camera stays where it is let go, between these heights. */
 const DRONE_MIN_HEIGHT = 0.2;
 const DRONE_MAX_HEIGHT = 1.1;
+/** One spoken step of the camera along the slate, and one up or down: half a metre and 20 cm on the real set. */
+const SPOKEN_STEP = 0.05;
+const SPOKEN_RISE = 0.02;
 /** The ring under the piece the call sheet is asking for breathes this much, this fast. */
 const BECKON_SWELL = 0.22;
 const BECKON_RATE = 5;
@@ -217,6 +227,8 @@ export class PiecesSystem extends createSystem({
   private aheadLat = 0;
   /** The piece that stopped the last roll step, by index; -1 when it was the slate's edge or nothing. */
   private blockedBy = -1;
+  /** The turn and the tilt a spoken aim asks of the camera. */
+  private aim: [number, number] = [0, 0];
   /** How far the last point given to nearestTo was from the piece it found, in metres. */
   private nearestGap = 0;
   private rings: Mesh[] = [];
@@ -1076,6 +1088,80 @@ export class PiecesSystem extends createSystem({
         this.knock(Cue.Place, piece);
       }
     }
+  }
+
+  /**
+   * Turns the live camera to look at a piece, asked for in words: the rig turns on its mark and
+   * its head tilts, as a hand would aim it. Returns the piece's title; 'none' when none of these
+   * is on the set; 'busy' when a hand has the camera or a take is running.
+   */
+  aimCamera(labels: string[]): string {
+    const viewfinder = this.world.getSystem(ViewfinderSystem);
+    const cam = viewfinder?.liveCamera();
+    const rig = cam?.object3D;
+    if (viewfinder == null || cam == null || rig == null) return 'busy';
+    if (cam.hasComponent(Held) || (this.globals as Globals).takeState.peek() !== 'idle') return 'busy';
+    let target: Entity | null = null;
+    for (let i = 0; i < this.dressed.length && target == null; i++) {
+      const piece = this.dressed[i];
+      if (piece.object3D?.visible === true && !piece.hasComponent(ShotCamera) && labels.includes(String(piece.getValue(SetPiece, 'label')))) target = piece;
+    }
+    if (target == null) return 'none';
+    const object = target.object3D!;
+    // Its eyes if it has them, else the middle of its shape.
+    const eyes = target.getValue(SetPiece, 'eyeHeight') ?? 0;
+    if (eyes > 0) this.point.set(0, eyes, 0);
+    else localBounds(object).getCenter(this.point);
+    object.updateWorldMatrix(true, false);
+    object.localToWorld(this.point);
+    if (!viewfinder.aimAt(this.point, this.aim)) return 'busy';
+    rig.rotateOnWorldAxis(UP, this.aim[0]);
+    cam.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, this.aim[1])));
+    cam.setValue(ShotCamera, 'aimed', true);
+    viewfinder.refresh();
+    this.knock(Cue.Place, cam);
+    this.save();
+    return assetTitle(String(target.getValue(SetPiece, 'label')));
+  }
+
+  /**
+   * Moves the live camera one step along the way it looks, or up or down, asked for in words.
+   * Returns how far that was; 'limit' when it is as far as it goes; 'busy' when a hand has the
+   * camera or a take is running.
+   */
+  stepCamera(step: CameraStep): string {
+    const viewfinder = this.world.getSystem(ViewfinderSystem);
+    const cam = viewfinder?.liveCamera();
+    const rig = cam?.object3D;
+    const parent = rig?.parent;
+    if (viewfinder == null || cam == null || rig == null || parent == null) return 'busy';
+    if (cam.hasComponent(Held) || (this.globals as Globals).takeState.peek() !== 'idle') return 'busy';
+    const rise = step === 'higher' || step === 'lower';
+    if (rise) {
+      const flying = (this.globals as Globals).cameraRig.peek() === 'drone' && this.key(cam) === FIRST_CAMERA;
+      const low = flying ? DRONE_MIN_HEIGHT : 0;
+      const high = flying ? DRONE_MAX_HEIGHT : CAMERA_MAX_HEIGHT;
+      const y = Math.max(low, Math.min(high, rig.position.y + (step === 'higher' ? SPOKEN_RISE : -SPOKEN_RISE)));
+      if (Math.abs(y - rig.position.y) < 1e-4) return 'limit';
+      rig.position.y = y;
+    } else {
+      rig.updateWorldMatrix(true, true);
+      viewfinder.lensPose(this.probe, this.forward);
+      // Along the slate, in the stage's own frame.
+      this.forward.applyQuaternion(parent.getWorldQuaternion(this.upright).invert());
+      this.forward.y = 0;
+      if (this.forward.lengthSq() < 1e-6) return 'limit';
+      this.forward.normalize().multiplyScalar(step === 'closer' ? SPOKEN_STEP : -SPOKEN_STEP);
+      const x = rig.position.x + this.forward.x;
+      const z = rig.position.z + this.forward.z;
+      if (Math.hypot(x, z) > MAX_FROM_CENTRE) return 'limit';
+      rig.position.x = x;
+      rig.position.z = z;
+    }
+    viewfinder.refresh();
+    this.knock(Cue.Place, cam);
+    this.save();
+    return rise ? '20 cm on the real set.' : 'Half a metre on the real set.';
   }
 
   /** The knock comes from the piece: the cue's source sits beside it under the stage. */

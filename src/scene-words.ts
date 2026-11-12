@@ -142,7 +142,7 @@ const DETERMINERS = new Set(['the', 'some', 'any', 'this', 'that', 'these', 'tho
 /** Words that sit inside "two more of the big new cars" without ending it. */
 const PASS_THROUGH = new Set([
   'of', 'more', 'extra', 'very', 'really', 'quite', 'new', 'old', 'whole', 'nice', 'scary', 'cool', 'angry',
-  'broken', 'flying', 'floating', 'dead', 'other',
+  'broken', 'flying', 'floating', 'dead', 'other', 'bigger', 'larger', 'smaller',
 ]);
 
 /** Verbs that are followed at once by the thing: "add spaceship". */
@@ -408,6 +408,28 @@ function freshAt(words: string[], at: number, removing: boolean): number {
   }
   if (removing && word === 'everything') return 1;
   return 0;
+}
+
+/**
+ * Every piece the words name, in the order said, whatever the verbs around them: for words that
+ * are about a piece already on the set. A name for a group ("the actors") gives all its members.
+ */
+export function namesIn(text: string, vocab: Vocab): { labels: string[]; at: number }[] {
+  const lexicon = lexiconFor(vocab);
+  const words = mend(plain(text).split(' ').filter((word) => word !== ''));
+  const found: { labels: string[]; at: number }[] = [];
+  for (let i = 0; i < words.length; ) {
+    const match = nameAt(lexicon, words, i);
+    if (match == null) {
+      i++;
+      continue;
+    }
+    const name = match.name;
+    if (name.kind === 'piece' && !name.describing) found.push({ labels: [name.label], at: i });
+    else if (name.kind === 'group') found.push({ labels: lexicon.groups.get(name.group) ?? [], at: i });
+    i += match.length;
+  }
+  return found;
 }
 
 export function parseRequest(text: string, vocab: Vocab): Request {

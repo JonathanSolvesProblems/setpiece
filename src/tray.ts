@@ -14,6 +14,7 @@ import { SCENES } from './scenes.js';
 import type { Scene } from './scenes.js';
 import { AIM } from './scene-stagings.js';
 import type { Spoken } from './scene-request.js';
+import type { SizeAsked } from './spoken-commands.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { withGrain } from './wood-grain.js';
@@ -53,6 +54,9 @@ type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: num
 type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: number };
 export type Dress = { cast: Record<string, [number, number]>; finish: Record<string, Finish> };
 type Saved = { on: string[]; sensor: number; rig: string } & Partial<Dress>;
+/** What came of a change asked for in words: the piece, what it is now, and what stopped it if anything did. */
+export type Changed = { title: string; now: string; why: '' | 'none' | 'fixed' | 'limit' };
+
 type Globals = {
   sceneRequest: Signal<Spoken | null>;
   sceneStart: Signal<number>;
@@ -631,6 +635,51 @@ export class TraySystem extends createSystem({
     this.selected = piece;
     this.publishSelected();
     this.save();
+  }
+
+  /**
+   * A change asked for in words, to the first of these pieces that is on the set or, with no
+   * name, to the piece last touched. `why` says what stopped it: no such piece on the set, a
+   * piece that does not take that change, or a size already at its end.
+   */
+  change(labels: string[] | null, what: { paint?: number; size?: SizeAsked }): Changed {
+    const piece = labels == null ? this.selected : this.managed.find((entity) => labels.includes(this.key(entity)) && this.on.has(this.key(entity)));
+    const key = piece == null ? '' : this.key(piece);
+    const asset = assetByLabel(key);
+    if (piece == null || asset == null || !this.on.has(key)) return { title: '', now: '', why: 'none' };
+    const title = assetTitle(key);
+    if (asset.shelf === 'Kit' || (what.paint != null && asset.paint !== true)) return { title, now: '', why: 'fixed' };
+    const value: Finish = [...this.finishOf(key)];
+    let now = '';
+    if (what.paint != null) {
+      value[0] = what.paint;
+      now = (PAINTS[what.paint]?.name ?? '').toLowerCase();
+    }
+    if (what.size != null) {
+      const scale = value[3] != null && value[3] > 0 ? value[3] : (SIZES[value[1]]?.scale ?? 1);
+      let next = SIZES.findIndex((size) => size.name.toLowerCase() === what.size);
+      if (what.size === 'bigger' || what.size === 'smaller') {
+        // The next of the kit's own sizes above or below where the piece is now, however it got there.
+        const up = what.size === 'bigger';
+        next = -1;
+        for (let i = 0; i < SIZES.length; i++) {
+          const step = SIZES[i].scale;
+          if (up ? step <= scale + 0.01 : step >= scale - 0.01) continue;
+          if (next < 0 || (up ? step < SIZES[next].scale : step > SIZES[next].scale)) next = i;
+        }
+        if (next < 0) return { title, now: '', why: 'limit' };
+      }
+      if (next < 0) return { title, now: '', why: 'fixed' };
+      value[1] = next;
+      value[3] = 0;
+      now = SIZES[next].name.toLowerCase();
+    }
+    this.finish.set(key, value);
+    this.coat(piece, value);
+    this.selected = piece;
+    this.publishSelected();
+    this.save();
+    return { title, now, why: '' };
   }
 
   /** How a piece is finished: what the wearer chose, or the paint it comes in. */

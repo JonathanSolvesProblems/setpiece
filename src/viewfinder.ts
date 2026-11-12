@@ -390,6 +390,38 @@ export class ViewfinderSystem extends createSystem({
   }
 
   /** Something changed that the pose of a piece does not show: draw the monitor again. */
+  /** The camera whose picture is on the monitor. */
+  liveCamera(): Entity | undefined {
+    return this.cameraEntity();
+  }
+
+  /** Where the live lens is and which way it looks, in the room. */
+  lensPose(position: Vector3, direction: Vector3): void {
+    this.lensCamera.getWorldPosition(position);
+    this.lensCamera.getWorldDirection(direction);
+  }
+
+  /**
+   * What it takes to put a point in the room on the live lens's line of sight: how far the rig
+   * has to turn, and the tilt its head has to hold. Both are worked from the head's pivot, which
+   * sits on the rig's own axis, so neither depends on how the head is tilted now. Written into
+   * `out` as [turn, tilt], in radians; false when there is no camera to aim.
+   */
+  aimAt(point: Vector3, out: [number, number]): boolean {
+    const head = this.cameraHead;
+    if (head == null) return false;
+    head.updateWorldMatrix(true, true);
+    head.getWorldPosition(this.a);
+    this.lensCamera.getWorldDirection(this.b);
+    const run = Math.hypot(point.x - this.a.x, point.z - this.a.z);
+    const far = Math.hypot(run, point.y - this.a.y);
+    // The lens rides a little above the pivot, so its line of sight runs that much above the pivot's.
+    const lift = this.lensCamera.position.y * head.getWorldScale(this.c).y;
+    out[0] = Math.atan2(point.x - this.a.x, point.z - this.a.z) - Math.atan2(this.b.x, this.b.z);
+    out[1] = Math.atan2(point.y - this.a.y, run) - (far > Math.abs(lift) ? Math.asin(lift / far) : 0);
+    return true;
+  }
+
   refresh(): void {
     this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
   }

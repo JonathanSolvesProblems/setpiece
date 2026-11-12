@@ -16,10 +16,11 @@ import { assetByLabel, ASSETS, assetTitle, PAINTS, searchAssets, SHELF_SLOTS, SH
 import type { Shelf } from './catalog.js';
 import { CAMERAS, LENSES, Rig, SENSORS } from './camera-formats.js';
 import { StageStatus } from './placement.js';
-import { understand, wordsToHear } from './scene-request.js';
+import { wordsToHear } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
 import { SetPiece, StageAnchor } from './set-components.js';
 import { SCENES } from './scenes.js';
+import { hear } from './spoken.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
@@ -106,6 +107,10 @@ type Globals = {
   briefSkip: Signal<number>;
 };
 const TABS = ['shoot', 'camera', 'assets', 'briefs', 'stage'] as const;
+/** With Keep listening on, how long after one sentence is acted on before the microphone opens for the next. */
+const RELISTEN_MS = 350;
+/** In a chain there is thinking between sentences: the listening waits this long for the next one. */
+const CHAIN_QUIET_MS = 20000;
 /** The tally's red: the record button wears it while a take is being recorded. */
 const TALLY_RED = '#e0352b';
 const CHALK = '#f6f7ef';
@@ -372,6 +377,23 @@ export class ControlsSystem extends createSystem({
         thinking: 'One moment',
         error: 'Say a scene',
       };
+      // Keep listening: after each sentence the microphone opens again by itself, so a whole setup
+      // can be said after one pinch. A quiet spell ends it, and so does the button.
+      const keepButton = panel.getElementById<UIKit.Text>('btn-keep-listening');
+      panel.getElementById('voice-field')?.setProperties({ display: 'flex' });
+      let keep = loadJson<{ keep?: boolean }>(StoreKey.Settings)?.keep === true;
+      let chained = false;
+      let halted = false;
+      let again: ReturnType<typeof setTimeout> | null = null;
+      const showKeep = (): void => {
+        keepButton?.setProperties({ text: keep ? 'Keep listening: on' : 'Keep listening: off', borderColor: keep ? OPTIC_YELLOW : CHALK_HAZE });
+      };
+      showKeep();
+      wire('btn-keep-listening', () => {
+        keep = !keep;
+        saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), keep });
+        showKeep();
+      });
       // The first press says what it will cost; the listener is 40 MB, kept after that.
       let warned = loadJson<{ voice?: boolean }>(StoreKey.Settings)?.voice === true;
       wire('btn-voice', () => {
@@ -380,7 +402,15 @@ export class ControlsSystem extends createSystem({
           tell('A 40 MB download, once. It stays on the headset, and what you say stays too. Press again to go ahead.');
           return;
         }
-        saveJson(StoreKey.Settings, { squirm: g.squirmOn.peek(), voice: true });
+        // Pressed between two sentences of a chain: that ends the chain.
+        if (again != null) {
+          clearTimeout(again);
+          again = null;
+          chained = false;
+          tell('Listening stopped.');
+          return;
+        }
+        saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), squirm: g.squirmOn.peek(), voice: true });
         voice ??= new Voice({
           words: wordsToHear(),
           onState: (state, detail) => {
@@ -390,23 +420,50 @@ export class ControlsSystem extends createSystem({
               backgroundColor: state === 'listening' ? OPTIC_YELLOW : undefined,
               color: state === 'listening' ? CLOTH : CHALK,
             });
-            if (state === 'loading') tell('Waking the listener.');
-            if (state === 'listening') tell('Say what should be on the set, then stop talking.');
-            if (state === 'error') tell(detail ?? 'The microphone did not start.');
+            if (state === 'loading' && !chained) tell('Waking the listener.');
+            if (state === 'listening') {
+              tell(chained ? 'Still listening. Say the next thing, or stay quiet to stop.' : 'Say a scene, or a control: snap, eighty five, record, paint it red.');
+            }
+            if (state === 'error') {
+              chained = false;
+              tell(detail ?? 'The microphone did not start.');
+            }
           },
           onProgress: (fraction) =>
             tell(fraction < 1 ? `Fetching the listener, ${Math.round(fraction * 100)}%. This happens once.` : 'Waking the listener.'),
           onText: (text, final) => {
             if (text !== '') tell(`Heard: ${text}`);
             if (!final) return;
-            if (text === '') tell('Heard nothing. Press it and try again.');
-            else g.sceneRequest.value = understand(text);
+            if (text === '') {
+              tell(chained ? 'Quiet, so the listening stopped. Press Say a scene to start again.' : 'Heard nothing. Press it and try again.');
+              chained = false;
+              return;
+            }
+            hear(this.world, text);
+            if (!keep || halted) {
+              chained = false;
+              return;
+            }
+            chained = true;
+            again = setTimeout(() => {
+              again = null;
+              if (!busy && this.world.visibilityState.peek() === VisibilityState.Visible) void voice?.start(CHAIN_QUIET_MS);
+              else chained = false;
+            }, RELISTEN_MS);
           },
         });
-        if (busy) voice.stop();
-        else void voice.start();
+        halted = busy;
+        if (busy) {
+          voice.stop();
+        } else {
+          chained = false;
+          void voice.start();
+        }
       });
       this.cleanupFuncs.push(
+        () => {
+          if (again != null) clearTimeout(again);
+        },
         () => voice?.dispose(),
         // Out of the session or behind a system menu, the microphone closes.
         this.world.visibilityState.subscribe((state) => {

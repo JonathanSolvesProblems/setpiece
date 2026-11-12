@@ -359,6 +359,10 @@
       <div class="label short">ACTORS</div>
       <div id="btn-squirm" class="word">Squirm when held: on</div>
     </div>
+    <div id="voice-field" class="field" style="display: none">
+      <div class="label short">VOICE</div>
+      <div id="btn-keep-listening" class="word">Keep listening: off</div>
+    </div>
     <div class="field">
       <div class="label short">LEAVE</div>
       <div id="exit-button" class="word">Exit to browser</div>

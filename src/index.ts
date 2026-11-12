@@ -16,7 +16,7 @@ import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } fro
 import { LifeSizeSystem } from './life-size.js';
 import { TakeState, TakeSystem } from './take.js';
 import { ReactionsSystem } from './reactions.js';
-import { understand } from './scene-request.js';
+import { hear } from './spoken.js';
 import type { Spoken } from './scene-request.js';
 import { SquirmSystem } from './squirm.js';
 import { loadJson, StoreKey } from './store.js';
@@ -385,8 +385,6 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     world,
     viewfinder: world.getSystem(ViewfinderSystem),
     // The same thing the voice button does, from typed words.
-    say: (text: string) => {
-      (globals.sceneRequest as Signal<Spoken | null>).value = understand(String(text));
-    },
+    say: (text: string) => hear(world, String(text)),
   };
 }).catch(setFailed);

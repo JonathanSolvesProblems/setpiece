@@ -130,6 +130,8 @@ export class Voice {
   private disposed = false;
   /** Goes up whenever a start is abandoned, so work still in flight for it knows to drop out. */
   private run = 0;
+  /** How long this request waits for the first word before giving up. */
+  private quietMs = NO_SPEECH_MS;
 
   private worker: Worker | null = null;
   private loaded: Promise<void> | null = null;
@@ -184,8 +186,9 @@ export class Voice {
    * The microphone is open from the moment it is allowed, so what is said
    * while the model is still loading is kept and heard once it is ready.
    */
-  async start(): Promise<void> {
+  async start(quietMs: number = NO_SPEECH_MS): Promise<void> {
     if (this.disposed || this.state === 'loading' || this.state === 'listening' || this.state === 'thinking') return;
+    this.quietMs = quietMs;
     if (!Voice.supported()) {
       this.fail('This browser cannot listen: it has no microphone access here.');
       return;
@@ -401,7 +404,7 @@ export class Voice {
     if (this.state !== 'listening') return;
     for (const samples of this.kept) this.send(samples);
     this.kept.length = 0;
-    this.quietTimer = window.setTimeout(() => this.finish(), NO_SPEECH_MS);
+    this.quietTimer = window.setTimeout(() => this.finish(), this.quietMs);
     this.limitTimer = window.setTimeout(() => this.stop(), MAX_LISTEN_MS);
   }
 
@@ -468,7 +471,7 @@ export class Voice {
       // A pause with no words in it. If words were on their way and came to
       // nothing, no timer is running any more: start one, so the request ends.
       if (this.graceTimer === 0 && this.quietTimer === 0) {
-        this.quietTimer = window.setTimeout(() => this.finish(), this.heard === '' ? NO_SPEECH_MS : GRACE_MS);
+        this.quietTimer = window.setTimeout(() => this.finish(), this.heard === '' ? this.quietMs : GRACE_MS);
       }
       return;
     }
