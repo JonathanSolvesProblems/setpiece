@@ -1,5 +1,5 @@
 {
- "what": "Two probes of the voice on a Meta Quest 3S in the Quest Browser, both attached over the Chrome DevTools Protocol to the Setpiece tab (tmp/q-voice-probe.py, tmp/q-voice.js and tmp/q-mic.py in the working tree). First, the recogniser worker and voice model the app ships (Vosk compiled to WebAssembly, vosk-model-small-en-us-0.15) were fed four recorded sentences, with the 742-entry word list the app listens with. The sound was a Windows synthetic voice (Microsoft David Desktop, 16 kHz mono) sent to the worker in the same tenth-of-a-second pieces the app sends, as fast as the worker would take them. Second, the app's own Say a scene button was pressed by the probe and the panel watched for 15 s with nobody speaking. Together they show that the recogniser loads and keeps up on the headset's processor, and that the page can open the headset's microphone and listen. They do not show a real voice through that microphone: nobody spoke, and no immersive session was running (the headset was idle with its display asleep).",
+ "what": "Two probes of the voice on a Meta Quest 3S in the Quest Browser, both attached over the Chrome DevTools Protocol to the Setpiece tab (tmp/q-voice-probe.py, tmp/q-voice.js and tmp/q-mic.py in the working tree). First, the recogniser worker and voice model the app ships (Vosk compiled to WebAssembly, vosk-model-small-en-us-0.15) were fed four recorded sentences, with the 742-entry word list the app listens with. The sound was a Windows synthetic voice (Microsoft David Desktop, 16 kHz mono) sent to the worker in the same tenth-of-a-second pieces the app sends, as fast as the worker would take them. Second, the app's own Say a scene button was pressed by the probe and the panel watched for 15 s with nobody speaking. Third, later the same day on build 93ad62d, the sixteen control sentences were fed to the recogniser the same way, each in two synthetic voices, with the 829-entry word list that build listens with, and each transcript was given to the app's own reader (src/spoken-commands.ts, by tmp/read-heard.mjs). Together they show that the recogniser loads and keeps up on the headset's processor, and that the page can open the headset's microphone and listen. They do not show a real voice through that microphone: nobody spoke, and no immersive session was running (the headset was idle with its display asleep).",
  "date": "2026-11-12",
  "build": "7a50ef5",
  "headset": "Meta Quest 3S (adb ro.product.model), 3 processor cores reported to the page",
@@ -63,5 +63,152 @@
   ],
   "shows": "the permission, the microphone opening, the audio thread starting, the model loading and the no-speech limit, in the Quest Browser",
   "does_not_show": "words heard from a person through the headset's microphone"
+ },
+ "control_sentences_fed_to_the_recogniser_on_the_headset": {
+  "build": "93ad62d",
+  "word_list_entries": 829,
+  "voices": [
+   "Microsoft David Desktop",
+   "Microsoft Zira Desktop"
+  ],
+  "sentences": 16,
+  "clips": 32,
+  "read_as_the_control_that_was_said": 32,
+  "share_of_real_time": {
+   "fastest": 0.195,
+   "slowest": 0.288
+  },
+  "model_load_ms": 1794,
+  "written": [
+   {
+    "said": "snap",
+    "control": "snap",
+    "heard": [
+     "snap",
+     "snap"
+    ]
+   },
+   {
+    "said": "eighty five",
+    "control": "lens",
+    "heard": [
+     "eighty five",
+     "eighty five"
+    ]
+   },
+   {
+    "said": "one thirty five",
+    "control": "lens",
+    "heard": [
+     "one thirty five",
+     "one thirty five"
+    ]
+   },
+   {
+    "said": "lens eighteen",
+    "control": "lens",
+    "heard": [
+     "lens eighteen",
+     "lens eighteen"
+    ]
+   },
+   {
+    "said": "record",
+    "control": "record",
+    "heard": [
+     "record",
+     "record"
+    ]
+   },
+   {
+    "said": "stop",
+    "control": "stop",
+    "heard": [
+     "stop",
+     "stop"
+    ]
+   },
+   {
+    "said": "play it back",
+    "control": "play",
+    "heard": [
+     "play back",
+     "play back"
+    ]
+   },
+   {
+    "said": "camera on the dragon",
+    "control": "aim",
+    "heard": [
+     "camera on the dragon",
+     "camera on dragon"
+    ]
+   },
+   {
+    "said": "closer",
+    "control": "step",
+    "heard": [
+     "closer",
+     "closer"
+    ]
+   },
+   {
+    "said": "camera higher",
+    "control": "step",
+    "heard": [
+     "camera higher",
+     "camera higher"
+    ]
+   },
+   {
+    "said": "paint the car red",
+    "control": "paint",
+    "heard": [
+     "paint the car red",
+     "paint car red"
+    ]
+   },
+   {
+    "said": "make it bigger",
+    "control": "size",
+    "heard": [
+     "make bigger",
+     "make it bigger"
+    ]
+   },
+   {
+    "said": "drone",
+    "control": "rig",
+    "heard": [
+     "drone",
+     "drone"
+    ]
+   },
+   {
+    "said": "camera b",
+    "control": "cut",
+    "heard": [
+     "camera bee",
+     "camera bee"
+    ]
+   },
+   {
+    "said": "remove it",
+    "control": "remove",
+    "heard": [
+     "remove it",
+     "remove it"
+    ]
+   },
+   {
+    "said": "wider",
+    "control": "lensStep",
+    "heard": [
+     "wider",
+     "wider"
+    ]
+   }
+  ],
+  "does_not_show": "a person's voice, the headset's microphone, or the controls being worked inside an immersive session"
  }
 }
