@@ -50,6 +50,10 @@
   {
    "build": "ee2c915",
    "mb": 2.57
+  },
+  {
+   "build": "93ad62d",
+   "mb": 2.59
   }
  ],
  "note": "The main script shrank by removing an icon library the panel never drew; the panel type is generated ahead of time (tools/bake-fonts.mjs) instead of on every load."
