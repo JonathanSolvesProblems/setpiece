@@ -40,6 +40,7 @@ export type Command =
   | { do: 'paint'; labels: string[] | null; all: boolean; colour: string }
   | { do: 'size'; labels: string[] | null; all: boolean; size: SizeAsked }
   | { do: 'remove' }
+  | { do: 'undo' }
   | { do: 'byHand' };
 
 /** Words that carry no instruction of their own. */
@@ -115,6 +116,9 @@ const SIZES: Record<string, SizeAsked> = {
 const SIZE_FILLER = new Set(['bit', 'much', 'more', 'lot', 'way', 'even', 'slightly']);
 const WHOLE_SIZES = new Set(['normal size', 'original size', 'regular size']);
 
+/** Taking the last change back, as it is said. "Bring it back" after a piece was struck is this too. */
+const UNDO = new Set(['undo', 'undo that', 'undo it', 'undo this', 'put it back', 'put that back', 'bring it back', 'bring that back', 'take that back']);
+const POLITE = new Set(['please', 'now', 'okay', 'ok', 'just', 'um', 'uh', 'and', 'then', 'can', 'you', 'could']);
 const REMOVE_IT = /^(remove|delete|erase|lose|scrap|ditch|get rid of|take away|take out) (it|that|this)( one)?$|^take (it|that|this) (away|out|off)$/;
 const BY_HAND = new Set(['move', 'slide', 'push', 'pull', 'rotate', 'spin', 'turn', 'flip', 'drag', 'shift', 'nudge']);
 /** Verbs that may lead up to "the camera" in an aim: "point the camera at the car". */
@@ -150,6 +154,7 @@ export function commandIn(words: string[], named: Named[]): Command | null {
   const except = (...sets: Set<string>[]): string[] => core.filter((word) => !sets.some((set) => set.has(word)));
 
   if (pieces.length === 0) {
+    if (UNDO.has(words.filter((word) => !POLITE.has(word)).join(' '))) return { do: 'undo' };
     // Snap: the one word, or "take the frame".
     if ((core.includes('snap') || core.includes('snapshot')) && core.every((word) => SNAP_WORDS.has(word))) return { do: 'snap' };
     if (TAKE_A_FRAME.test(rest)) return { do: 'snap' };
@@ -302,7 +307,7 @@ export function commandWords(): string[] {
   const take = (phrases: Iterable<string>): void => {
     for (const phrase of phrases) for (const word of phrase.split(' ')) if (/^[a-z]+$/.test(word) && !NOT_LISTENED_FOR.has(word)) words.add(word);
   };
-  take(['snap', 'take', 'frame', 'picture', 'photo', 'shot', 'camera', 'cut', 'tripod', 'drone', 'hundred', 'size']);
+  take(['snap', 'take', 'frame', 'picture', 'photo', 'shot', 'camera', 'cut', 'tripod', 'drone', 'hundred', 'size', 'undo']);
   take(['up', 'down', 'in', 'out', 'little', 'it', 'bring', 'move', 'raise', 'first', 'second', 'other', 'two', 'one']);
   take(['remove', 'delete', 'erase', 'lose', 'scrap', 'ditch', 'get rid of', 'take away', 'take out', 'off']);
   take(Object.keys(LENS_NAMES));

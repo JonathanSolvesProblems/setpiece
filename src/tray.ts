@@ -16,6 +16,7 @@ import { AIM } from './scene-stagings.js';
 import type { Spoken } from './scene-request.js';
 import type { SizeAsked } from './spoken-commands.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
+import { TakeSystem } from './take.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { withGrain } from './wood-grain.js';
 
@@ -329,9 +330,15 @@ export class TraySystem extends createSystem({
     g.layoutChanged.value = g.layoutChanged.peek() + 1;
   }
 
-  /** A whole set cannot change under a hand or under a take. Says why not, and returns false. */
+  /**
+   * A whole set cannot change under a hand. Under a take it can: whoever asks for a set wants the set,
+   * so a take that is recording or playing is stopped first. (On the headset a take nobody meant to
+   * record was looping, and a spoken set was refused with a line the wearer never saw.)
+   */
   private readyToRebuild(): boolean {
     const g = this.globals as Globals;
+    // Asked directly: this runs inside a signal's effect, where a signal set here is only acted on afterwards.
+    if (g.takeState.peek() !== 'idle') this.world.getSystem(TakeSystem)?.halt();
     if (g.takeState.peek() !== 'idle') {
       g.coachNote.value = 'STOP THE TAKE FIRST | A take is running. Stop it, then change the set.';
       return false;
@@ -428,6 +435,8 @@ export class TraySystem extends createSystem({
       this.takeAim();
       return;
     }
+    // A take belongs to the set it was shot on: a set started over starts without it.
+    if (request.clear && g.takeLength.peek() > 0) g.takeClear.value = g.takeClear.peek() + 1;
     const next = request.clear ? new Set<string>() : new Set(this.on);
     // Starting over clears the dressing, not the camera department.
     if (request.clear) for (const label of this.on) if (assetByLabel(label)?.shelf === 'Kit') next.add(label);
@@ -726,8 +735,8 @@ export class TraySystem extends createSystem({
       if (asset.paint !== true) return;
       value[0] = pick;
     } else if (field === 1) {
-      value[1] = (value[1] + 1) % SIZES.length;
-      // The Size button goes back to its own steps from whatever two hands made of it.
+      // From a size two hands made, the first press is the way back to the piece's own size; after that it steps.
+      value[1] = (value[3] ?? 0) > 0 ? 0 : (value[1] + 1) % SIZES.length;
       value[3] = 0;
     } else {
       const count = asset.styles?.length ?? 0;

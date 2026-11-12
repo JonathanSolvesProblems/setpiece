@@ -172,7 +172,7 @@ const SIDES: Side[] = ['left', 'right'];
 type Carry = { piece: Entity; by: 'pinch' | 'fist' | 'pad'; offset: Vector3; at: Vector3; lost: number; opening: number };
 type Drop = { piece: Entity; speed: number; floor: number; roll?: number };
 /** A second hand on a held piece: which hand, how far apart the two were when it closed, and the size then. */
-type Stretch = { side: Side; piece: Entity; from: number; scale: number; offset: Vector3; opening: number; lost: number; told: number };
+type Stretch = { side: Side; piece: Entity; from: number; scale: number; most: number; offset: Vector3; opening: number; lost: number; told: number };
 type Globals = {
   newBoardRequested: Signal<number>;
   coachTarget: Signal<string>;
@@ -184,10 +184,21 @@ type Globals = {
   layoutChanged: Signal<number>;
   sizedByHand: Signal<{ label: string; scale: number } | null>;
 };
-/** A second hand pinching a held piece sizes it: how near that hand must be, and how small and big a piece goes. */
+/**
+ * A second hand closing on a held piece sizes it: how near that hand must be, and how small and big
+ * a piece goes. On the headset a truck went to 191% in three seconds and stayed there, bigger than the
+ * slate, so the stretch is gentle and bounded now. Hands that start close together count as
+ * STRETCH_SPAN apart, so a few centimetres do not double a piece; no piece is stretched longer than
+ * STRETCH_LONGEST; and the size settles on the kit's own sizes when it comes near one, which makes
+ * "back to its own size" easy to find.
+ */
 const STRETCH_REACH = 0.07;
-const STRETCH_MIN = 0.4;
-const STRETCH_MAX = 3;
+const STRETCH_MIN = 0.5;
+const STRETCH_MAX = 2.2;
+const STRETCH_SPAN = 0.2;
+const STRETCH_LONGEST = 0.9;
+const STRETCH_STOPS = [0.7, 1, 1.5, 2.2];
+const STRETCH_SNAP = 0.06;
 /** A flown camera stays where it is let go, between these heights. */
 const DRONE_MIN_HEIGHT = 0.2;
 const DRONE_MAX_HEIGHT = 1.1;
@@ -488,9 +499,13 @@ export class PiecesSystem extends createSystem({
     if (live && held != null && this.stretch == null && this.guard <= 0 && !held.piece.hasComponent(ShotCamera) && this.reachesFor(held.piece, pinchAt)) {
       this.near[side] = -1;
       this.setRayAside(side, true);
-      if (pad?.getSelectStart() === true || (!byHand && pad?.getButtonDown(InputComponent.Squeeze) === true)) {
+      if (pad?.getSelectStart() === true || (byHand && reading.fistStart) || (!byHand && pad?.getButtonDown(InputComponent.Squeeze) === true)) {
         const scale = held.piece.object3D!.scale.x;
-        this.stretch = { side, piece: held.piece, from: Math.max(0.02, held.at.distanceTo(pinchAt)), scale, offset: held.offset.clone(), opening: 0, lost: 0, told: 0 };
+        // No piece is stretched longer than a slate and a half, whatever the kit's sizes allow.
+        const shape = this.bounds[this.dressed.indexOf(held.piece)];
+        const longest = shape == null ? 0 : Math.max(shape.max.x - shape.min.x, shape.max.y - shape.min.y, shape.max.z - shape.min.z);
+        const most = Math.max(1, Math.min(STRETCH_MAX, longest > 0 ? STRETCH_LONGEST / longest : STRETCH_MAX));
+        this.stretch = { side, piece: held.piece, from: Math.max(0.02, held.at.distanceTo(pinchAt)), scale, most, offset: held.offset.clone(), opening: 0, lost: 0, told: 0 };
       }
       return;
     }
@@ -506,8 +521,11 @@ export class PiecesSystem extends createSystem({
       index = this.nearestTo(fistAt, reach);
       fromFist = index >= 0;
     }
-    // A big or giant piece reaches a long way, and the button that shrinks it must stay in reach.
-    if (index >= 0 && byHand && this.dressed[index].object3D!.scale.x > OVERSIZE && this.pointsAtPanel(side)) index = -1;
+    // A big or giant piece reaches a long way, and the button that shrinks it must stay in reach: a hand
+    // that is only near such a piece and points at the panel is for the panel. A hand with its fingers
+    // on the piece itself is for the piece. (On the headset a truck at 191% lay between the wearer and
+    // the panel, and every pinch meant for it pressed whatever the ray crossed: a paint, Record, a camera.)
+    if (index >= 0 && byHand && this.dressed[index].object3D!.scale.x > OVERSIZE && this.nearestGap > 0 && this.pointsAtPanel(side)) index = -1;
     this.near[side] = index;
     this.setRayAside(side, index >= 0);
     if (index < 0 || this.guard > 0) return;
@@ -532,6 +550,8 @@ export class PiecesSystem extends createSystem({
     object.worldToLocal(this.local.copy(point));
     const gap = this.bounds[index].distanceToPoint(this.local) * object.scale.x;
     if (gap > STRETCH_REACH) return false;
+    // Fingers on the carried piece itself are for it, whatever else stands inside its shape.
+    if (gap <= 0) return true;
     return this.nearestTo(point, REACH) < 0 || gap <= this.nearestGap;
   }
 
@@ -561,16 +581,23 @@ export class PiecesSystem extends createSystem({
     }
     this.setRayAside(side, true);
     if (!live) return;
-    const scale = Math.max(STRETCH_MIN, Math.min(STRETCH_MAX, (stretch.scale * first.at.distanceTo(point)) / stretch.from));
+    // The same pull of the hands is the same change in size, however close together they began.
+    const span = Math.max(STRETCH_SPAN, stretch.from);
+    let scale = stretch.scale * (1 + (first.at.distanceTo(point) - stretch.from) / span);
+    scale = Math.max(Math.min(STRETCH_MIN, stretch.scale), Math.min(Math.max(stretch.most, stretch.scale), scale));
+    for (let i = 0; i < STRETCH_STOPS.length; i++) {
+      if (Math.abs(scale - STRETCH_STOPS[i]) <= STRETCH_SNAP * STRETCH_STOPS[i]) scale = STRETCH_STOPS[i];
+    }
     object.scale.setScalar(scale);
     // The spot the first hand took stays under its fingers as the piece grows.
     first.offset.copy(stretch.offset).multiplyScalar(scale / stretch.scale);
     this.world.getSystem(ViewfinderSystem)?.refresh();
-    const tenth = Math.round(scale * 10);
-    if (tenth !== stretch.told) {
-      stretch.told = tenth;
+    const step = Math.round(scale * 20);
+    if (step !== stretch.told) {
+      stretch.told = step;
       const title = assetTitle(String(stretch.piece.getValue(SetPiece, 'label'))).toUpperCase();
-      (this.globals as Globals).coachNote.value = `${title} AT ${tenth * 10} % | Hands apart to grow it, together to shrink it. Let go to keep it.`;
+      const size = scale === 1 ? 'ITS OWN SIZE' : `${step * 5} %`;
+      (this.globals as Globals).coachNote.value = `${title} AT ${size} | Hands apart to grow it, together to shrink it. Let go to keep it.`;
     }
   }
 
@@ -757,7 +784,7 @@ export class PiecesSystem extends createSystem({
     this.probe.copy(this.nose).multiplyScalar(way).applyQuaternion(this.turnBack.copy(body.quaternion).invert());
     if (this.world.getSystem(SquirmSystem)?.knock(actor, this.probe.x, this.probe.z) === true) {
       const who = assetTitle(String(actor.getValue(SetPiece, 'label'))).toUpperCase();
-      (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick them up to stand them again.`;
+      (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick them up to stand them, or press Undo.`;
     }
   }
 

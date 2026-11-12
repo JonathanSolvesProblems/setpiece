@@ -18,6 +18,7 @@ import type { Spoken } from './scene-request.js';
 import type { Command } from './spoken-commands.js';
 import { TakeState } from './take.js';
 import { TraySystem } from './tray.js';
+import { ViewfinderSystem } from './viewfinder.js';
 
 type Globals = {
   coachNote: Signal<string>;
@@ -150,8 +151,10 @@ function obey(world: World, g: Globals, command: Command): string {
       if (label === '') return 'NOTHING PICKED | Touch a piece first, or name it: remove the dragon.';
       if (g.takeState.peek() !== TakeState.Idle) return TAKE_IS_RUNNING;
       bump(g.removeSelected);
-      return `${assetTitle(label).toUpperCase()} IS OFF THE SET | Say its name to bring it back.`;
+      return `${assetTitle(label).toUpperCase()} IS OFF THE SET | Say undo to bring it back.`;
     }
+    case 'undo':
+      return world.getSystem(ViewfinderSystem)?.undo() ?? '';
     case 'byHand':
       return 'MOVING IS BY HAND | Words add, remove, paint and size a piece, aim the camera, change the lens and snap.';
   }

@@ -23,7 +23,7 @@ const WETS: Record<string, number> = { Rain: 0.3, Water: 0.14 };
 const BURNS = ['Fire', 'Embers'];
 const WET_RATE = 1.6;
 
-type Mover = { piece: Entity; box: Box3; last: Vector3; seen: boolean };
+type Mover = { piece: Entity; box: Box3; last: Vector3; seen: boolean; vehicle: boolean };
 type Fire = { piece: Entity; material: ShaderMaterial; wet: number; told: boolean };
 /**
  * An animal a vehicle can tip over: its shape, half its width, how far over it is and which way.
@@ -39,6 +39,14 @@ const OUTLINE_STEP = 0.03;
 const OUTLINE_MOST = 16;
 const UP = new Vector3(0, 1, 0);
 const NOSE = new Vector3(0, 0, 1);
+/**
+ * A vehicle knocks someone down when it is driven at them: going the way it points, or straight
+ * back, within about 35 degrees. Slid sideways or carried across the set it does not. On the
+ * headset a truck being moved out of the way put two actors and a horse on the floor.
+ */
+const DRIVEN = 0.82;
+/** And whatever moves has to be heading for them, not past them or away. */
+const HEADED = 0.3;
 type Globals = {
   coachNote: Signal<string>;
   takeState: Signal<string>;
@@ -90,7 +98,9 @@ export class ReactionsSystem extends createSystem({
       const role = piece.getValue(SetPiece, 'role');
       const object = piece.object3D!;
       if (role === SetRole.Actor) this.actors.push(piece);
-      if (assetByLabel(label)?.mover === true) this.movers.push({ piece, box: localBounds(object), last: new Vector3(), seen: false });
+      if (assetByLabel(label)?.mover === true) {
+        this.movers.push({ piece, box: localBounds(object), last: new Vector3(), seen: false, vehicle: assetByLabel(label)?.shelf === 'Vehicles' });
+      }
       if (WETS[label] != null) this.waters.push({ piece, reach: WETS[label] });
       if (ANIMALS.has(assetByLabel(label)?.spareOf ?? label)) {
         const box = localBounds(object);
@@ -142,12 +152,18 @@ export class ReactionsSystem extends createSystem({
       }
       const travelled = Math.hypot(this.velocity.x, this.velocity.z);
       if (travelled > JUMP || travelled / delta < KNOCK_SPEED) continue;
+      if (mover.vehicle) {
+        this.forward.copy(NOSE).applyQuaternion(object.quaternion);
+        const flat = Math.hypot(this.forward.x, this.forward.z);
+        if (flat < 1e-4 || Math.abs(this.velocity.x * this.forward.x + this.velocity.z * this.forward.z) < DRIVEN * travelled * flat) continue;
+      }
       const reach = ACTOR_REACH / object.scale.x;
       for (let a = 0; a < this.actors.length; a++) {
         const actor = this.actors[a];
         const body = actor.object3D!;
         if (!body.visible || body.parent !== object.parent || actor.hasComponent(Held)) continue;
         if (this.squirm?.isDown(actor)) continue;
+        if (!this.headedFor(object, body, travelled)) continue;
         // Where the actor stands, as the vehicle sees it.
         object.worldToLocal(body.getWorldPosition(this.at));
         if (mover.box.distanceToPoint(this.at) > reach) continue;
@@ -155,7 +171,7 @@ export class ReactionsSystem extends createSystem({
         this.local.set(this.velocity.x, 0, this.velocity.z).applyQuaternion(this.turn.copy(body.quaternion).invert());
         if (this.squirm?.knock(actor, this.local.x, this.local.z)) {
           const who = assetTitle(String(actor.getValue(SetPiece, 'label'))).toUpperCase();
-          (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick them up to stand them again.`;
+          (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick them up to stand them, or press Undo.`;
         }
       }
       const animalReach = ANIMAL_REACH / object.scale.x;
@@ -163,10 +179,21 @@ export class ReactionsSystem extends createSystem({
         const animal = this.animals[n];
         const body = animal.piece.object3D!;
         if (animal.down || animal.piece === mover.piece || !body.visible || body.parent !== object.parent || animal.piece.hasComponent(Held)) continue;
+        if (!this.headedFor(object, body, travelled)) continue;
         if (!this.touches(mover, object, animal, body, animalReach)) continue;
         this.lay(animal, this.velocity.x, this.velocity.z);
       }
     }
+  }
+
+  /** Whether what moved this frame (this.velocity, over `travelled`) is heading for this body, not past it or away. */
+  private headedFor(object: Object3D, body: Object3D, travelled: number): boolean {
+    const x = body.position.x - object.position.x;
+    const z = body.position.z - object.position.z;
+    const far = Math.hypot(x, z);
+    // Standing in the same spot: there is no "towards" to speak of, and it is certainly in the way.
+    if (far < 1e-4) return true;
+    return this.velocity.x * x + this.velocity.z * z >= HEADED * travelled * far;
   }
 
   /**
@@ -192,7 +219,7 @@ export class ReactionsSystem extends createSystem({
     animal.side = this.local.x >= 0 ? -1 : 1;
     animal.down = true;
     const who = assetTitle(String(animal.piece.getValue(SetPiece, 'label'))).toUpperCase();
-    (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick it up to stand it again.`;
+    (this.globals as Globals).coachNote.value = `${who} IS DOWN | Pick it up to stand it, or press Undo.`;
   }
 
   /**

@@ -42,7 +42,7 @@ import type { Dress } from './tray.js';
 import { BRIEFS } from './briefs.js';
 import type { Measure, PieceInFrame } from './briefs.js';
 import { CAMERAS, SENSORS } from './camera-formats.js';
-import { CAMERA_TILT_LIMIT, SetPiece, SetRole, ShotCamera } from './set-components.js';
+import { CAMERA_TILT_LIMIT, Held, SetPiece, SetRole, ShotCamera } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
 /** One miniature metre on the stage is ten real metres on set. */
@@ -159,6 +159,12 @@ type Globals = {
 type SavedBriefs = { index: number; printed: string[] };
 /** While an effect runs, the monitor is redrawn on one frame in this many. */
 const EFFECT_LENS_EVERY = 3;
+/**
+ * Undo goes back through the set as it stood at each quiet moment. The set is looked at this often
+ * (seconds), a state has to hold from one look to the next to count, and this many are kept.
+ */
+const HISTORY_EVERY = 0.5;
+const HISTORY_MOST = 24;
 /** What a pointer event on the card carries that is used here. */
 type CardEvent = { point?: Vector3; stopPropagation?: () => void };
 type CardTarget = { addEventListener(type: string, listener: (event: CardEvent) => void): void };
@@ -240,6 +246,10 @@ export class ViewfinderSystem extends createSystem({
   private liveFrames = LIVE_AT_START;
   private lastSignature = Number.NaN;
   private shadowTick = false;
+  /** The set at each quiet moment, oldest first, for Undo; and what was seen at the last look, waiting to hold. */
+  private history: { setup: Setup; key: string }[] = [];
+  private historyClock = 0;
+  private historyPending = '';
   private effectTick = 0;
   /** The briefs met so far, by title. */
   private printed: string[] = [];
@@ -574,6 +584,19 @@ export class ViewfinderSystem extends createSystem({
     const setup = shot.setup;
     const g = this.globals as Globals;
     if (setup == null || g.takeState.peek() !== 'idle') return false;
+    this.restore(setup);
+    this.recalledIndex = shot.index;
+    this.recalledSignature = Number.NaN;
+    this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
+    this.drawBoard();
+    g.coachNote.value = `BACK TO FRAME ${shot.index} | Pieces, camera and lens are as they were.`;
+    g.setupRecalled.value = g.setupRecalled.peek() + 1;
+    return true;
+  }
+
+  /** Puts the set as a setup has it: what is on it and how it is dressed, every piece on its mark, the camera and its lens. */
+  private restore(setup: Setup): void {
+    const g = this.globals as Globals;
     if (setup.rig) g.cameraRig.value = setup.rig;
     if (setup.on) g.trayRestore.value = setup.on;
     if (setup.dress) g.trayDressRestore.value = setup.dress;
@@ -590,13 +613,48 @@ export class ViewfinderSystem extends createSystem({
     live?.setValue(ShotCamera, 'aimed', setup.aimed);
     if (Number.isFinite(setup.lensMm)) g.lensMm.value = setup.lensMm;
     if (setup.sensor != null) g.sensorIndex.value = setup.sensor;
-    this.recalledIndex = shot.index;
-    this.recalledSignature = Number.NaN;
+  }
+
+  /**
+   * Looks at the set at a quiet moment and keeps it for Undo, if it has changed and has held still
+   * since the last look. Quiet is no take running and nothing in a hand. This allocates, which the
+   * per-frame code here never does: it runs twice a second, not every frame.
+   */
+  private remember(cam: Entity): void {
+    if ((this.globals as Globals).takeState.peek() !== 'idle') return;
+    const pieces = this.pieceList();
+    for (let i = 0; i < pieces.length; i++) if (pieces[i].hasComponent(Held)) return;
+    const setup = this.readSetup(cam);
+    const key = JSON.stringify(setup);
+    const held = key === this.historyPending;
+    this.historyPending = key;
+    if (!held || this.history[this.history.length - 1]?.key === key) return;
+    this.history.push({ setup, key });
+    if (this.history.length > HISTORY_MOST) this.history.shift();
+  }
+
+  /**
+   * Puts the set back as it stood before the last change: every piece on its mark, painted and sized
+   * as it was, the camera and its lens too. Asked again it goes further back. Returns the line for
+   * the call sheet. It does not touch the board: a frame that was snapped stays snapped.
+   */
+  undo(): string {
+    const g = this.globals as Globals;
+    const cam = this.cameraEntity();
+    if (cam?.object3D == null) return '';
+    if (g.takeState.peek() !== 'idle') return 'A TAKE IS RUNNING | Stop it first, then undo.';
+    const pieces = this.pieceList();
+    for (let i = 0; i < pieces.length; i++) if (pieces[i].hasComponent(Held)) return 'LET GO FIRST | Put down what you are holding, then undo.';
+    const now = JSON.stringify(this.readSetup(cam));
+    // The newest one kept is usually the set as it stands; the one wanted is the one before it.
+    while (this.history.length > 1 && this.history[this.history.length - 1].key === now) this.history.pop();
+    const back = this.history[this.history.length - 1];
+    if (back == null || back.key === now) return 'NOTHING TO UNDO | The set is as it was when you sat down.';
+    this.restore(back.setup);
+    this.historyPending = back.key;
     this.liveFrames = Math.max(this.liveFrames, LIVE_AFTER_CHANGE);
-    this.drawBoard();
-    g.coachNote.value = `BACK TO FRAME ${shot.index} | Pieces, camera and lens are as they were.`;
     g.setupRecalled.value = g.setupRecalled.peek() + 1;
-    return true;
+    return 'UNDONE | The set is as it was before your last change. Again goes further back.';
   }
 
   private readSetup(cam: Entity): Setup {
@@ -957,9 +1015,14 @@ export class ViewfinderSystem extends createSystem({
     this.cameraEntity()?.setValue(ShotCamera, 'lensMm', mm);
   }
 
-  update(_delta: number, time: number): void {
+  update(delta: number, time: number): void {
     const cam = this.cameraEntity();
     if (cam?.object3D == null || !this.ensureMonitor()) return;
+    this.historyClock += delta;
+    if (this.historyClock >= HISTORY_EVERY) {
+      this.historyClock = 0;
+      this.remember(cam);
+    }
     // A camera that is not live still shows the tilt a hand gave it.
     for (let i = 0; i < this.rigs.length; i++) {
       if (this.rigs[i] !== cam && this.rigs[i].getValue(ShotCamera, 'aimed')) this.rigHeads[i].rotation.x = this.rigs[i].getValue(ShotCamera, 'tilt') ?? 0;

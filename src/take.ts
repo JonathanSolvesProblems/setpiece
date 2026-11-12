@@ -160,6 +160,16 @@ export class TakeSystem extends createSystem({
     );
   }
 
+  /**
+   * Stops whatever the take is doing, at once: a pass that is recording ends (and is kept if a
+   * piece was carried in it), and a take that is playing stops. For whoever needs the set to be
+   * still before changing it.
+   */
+  halt(): void {
+    if (this.state === TakeState.Recording) this.stopRecording();
+    if (this.state === TakeState.Playing) this.stopPlaying();
+  }
+
   update(delta: number): void {
     if (!this.ensureTracks()) return;
     if (this.state === TakeState.Recording) this.recordPass(delta);

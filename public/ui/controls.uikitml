@@ -228,6 +228,10 @@
   </div>
   <div id="btn-snap" class="primary">Snap frame</div>
   <div id="btn-back" class="primary" style="display: none">Back to the table</div>
+  <div class="field">
+    <div class="line muted">A slip? Take it back.</div>
+    <div id="btn-undo" class="word">Undo</div>
+  </div>
   <div class="tabs">
     <div id="tab-shoot" class="tab">Shoot</div>
     <div id="tab-camera" class="tab">Camera</div>

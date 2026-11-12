@@ -21,6 +21,7 @@ import type { Spoken } from './scene-request.js';
 import { SetPiece, StageAnchor } from './set-components.js';
 import { SCENES } from './scenes.js';
 import { hear } from './spoken.js';
+import { ViewfinderSystem } from './viewfinder.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
@@ -98,6 +99,7 @@ type Globals = {
   squirmOn: Signal<boolean>;
   cameraOn: Signal<string>;
   sceneRequest: Signal<Spoken | null>;
+  coachNote: Signal<string>;
   sceneStart: Signal<number>;
   castLine: Signal<string>;
   sensorIndex: Signal<number>;
@@ -109,6 +111,8 @@ type Globals = {
 const TABS = ['shoot', 'camera', 'assets', 'briefs', 'stage'] as const;
 /** With Keep listening on, how long after one sentence is acted on before the microphone opens for the next. */
 const RELISTEN_MS = 350;
+/** Panel presses closer together than this are taken for one slip. */
+const PRESS_GAP_MS = 320;
 /** In a chain there is thinking between sentences: the listening waits this long for the next one. */
 const CHAIN_QUIET_MS = 20000;
 /** The tally's red: the record button wears it while a take is being recorded. */
@@ -116,6 +120,18 @@ const TALLY_RED = '#e0352b';
 const CHALK = '#f6f7ef';
 /** Rays prefer the higher order, whatever is nearer. Nothing else on the set is above the board's 5. */
 const PANEL_ORDER = 10;
+/**
+ * The panel is some 280 small meshes, and each hand's ray and each hand's fingertip tries every one
+ * of them on every frame. On the headset, with both hands tracked, the input pass cost 2 to 3 ms a
+ * frame and the session ran at 72 to 82 frames a second, against 87 to 90 with the hands out of view.
+ * Timed in the emulator, half of that pass was the panel. So the panel is closed to the pointers
+ * unless a hand points within this much of it or a fingertip is that close, and it stays open this
+ * long (seconds) after the last time one did, so a press that began on it ends on it.
+ */
+const PANEL_GATE_MARGIN = 0.12;
+const PANEL_GATE_HOLD = 0.4;
+const SIDES = ['left', 'right'] as const;
+type Gated = Object3D & { intersectChildren?: boolean };
 /** While the call sheet asks for a frame, Snap frame flashes this many times a second. */
 const SNAP_FLASH_RATE = 1.6;
 
@@ -132,6 +148,12 @@ export class ControlsSystem extends createSystem({
   private panelTurn = new Quaternion().setFromAxisAngle(UP, PANEL_YAW);
   private snapButton: { setProperties(properties: Record<string, unknown>): void } | null = null;
   private snapLit = false;
+  private gateOpen = true;
+  private gateOpenUntil = 0;
+  private gateAt = new Vector3();
+  private gateFrom = new Vector3();
+  private gateWay = new Vector3();
+  private gateTo = new Vector3();
 
   /**
    * In the headset the panel travels with the set, so it is beside the slate
@@ -142,6 +164,7 @@ export class ControlsSystem extends createSystem({
     if (this.world.visibilityState.peek() === VisibilityState.NonImmersive) return;
     if ((this.globals as Globals).lifeSize.peek()) {
       this.walkWithWearer(delta);
+      if (this.panelObject != null) this.gatePanel(this.panelObject, time);
       return;
     }
     const lit =
@@ -165,6 +188,34 @@ export class ControlsSystem extends createSystem({
     setWorldQuaternion(panel, this.panelQuaternion);
     // The set is out of sight for the first moment of a session; so is its panel.
     panel.visible = stageObject.visible;
+    this.gatePanel(panel, time);
+  }
+
+  /** Opens the panel to the hand pointers while a hand points at it or reaches for it, and closes it otherwise. */
+  private gatePanel(panel: Object3D, time: number): void {
+    const size = this.panelRoot?.size?.value;
+    const reach = (size == null ? 0.3 : Math.hypot(size[0], size[1]) * PANEL_UNIT * 0.5) + PANEL_GATE_MARGIN;
+    panel.getWorldPosition(this.gateAt);
+    let wanted = false;
+    for (let i = 0; i < SIDES.length && !wanted; i++) {
+      const side = SIDES[i];
+      const ray = this.player.raySpaces[side];
+      ray.getWorldPosition(this.gateFrom);
+      // A target ray points down its own -Z.
+      ray.getWorldDirection(this.gateWay).negate();
+      this.gateTo.copy(this.gateAt).sub(this.gateFrom);
+      const along = this.gateTo.dot(this.gateWay);
+      // How far the middle of the panel is from the line the hand points along; behind the hand, from the hand itself.
+      const off = along <= 0 ? this.gateTo.length() : Math.sqrt(Math.max(0, this.gateTo.lengthSq() - along * along));
+      if (off <= reach) wanted = true;
+      this.player.indexTipSpaces[side].getWorldPosition(this.gateFrom);
+      if (this.gateFrom.distanceTo(this.gateAt) <= reach + PANEL_GATE_MARGIN) wanted = true;
+    }
+    if (wanted) this.gateOpenUntil = time + PANEL_GATE_HOLD;
+    const open = time <= this.gateOpenUntil;
+    if (open === this.gateOpen) return;
+    this.gateOpen = open;
+    (panel as Gated).intersectChildren = open;
   }
 
   private panelRoot: { size?: { value?: number[] | undefined } } | null = null;
@@ -218,11 +269,20 @@ export class ControlsSystem extends createSystem({
       }),
     );
 
+    // Two presses a moment apart are one slip of the hand, not two wishes: the second is let go.
+    // (On the headset one pinch that crossed the panel painted a truck, pressed Record and added a camera.)
+    let lastPress = -PRESS_GAP_MS;
+    const meant = (): boolean => {
+      const now = performance.now();
+      if (now - lastPress < PRESS_GAP_MS) return false;
+      lastPress = now;
+      return true;
+    };
     for (const mm of LENSES) {
       const button = panel.getElementById(`lens-${mm}`);
       if (button == null) continue;
       const pick = () => {
-        g.lensMm.value = mm;
+        if (meant()) g.lensMm.value = mm;
       };
       button.addEventListener('click', pick);
       this.cleanupFuncs.push(() => button.removeEventListener('click', pick));
@@ -249,7 +309,7 @@ export class ControlsSystem extends createSystem({
     );
     const resetStage = panel.getElementById('btn-reset-stage');
     const requestReset = () => {
-      g.resetStageRequested.value = g.resetStageRequested.value + 1;
+      if (meant()) g.resetStageRequested.value = g.resetStageRequested.value + 1;
     };
     resetStage?.addEventListener('click', requestReset);
     this.cleanupFuncs.push(() => resetStage?.removeEventListener('click', requestReset));
@@ -257,7 +317,7 @@ export class ControlsSystem extends createSystem({
     // Offered only while the set floats and the headset can scan the room for a table.
     const findTable = panel.getElementById('btn-find-table');
     const requestScan = () => {
-      g.roomScanRequested.value = g.roomScanRequested.value + 1;
+      if (meant()) g.roomScanRequested.value = g.roomScanRequested.value + 1;
     };
     findTable?.addEventListener('click', requestScan);
     this.cleanupFuncs.push(
@@ -269,7 +329,7 @@ export class ControlsSystem extends createSystem({
 
     const newBoard = panel.getElementById('btn-new-board');
     const requestNewBoard = () => {
-      g.newBoardRequested.value = g.newBoardRequested.value + 1;
+      if (meant()) g.newBoardRequested.value = g.newBoardRequested.value + 1;
     };
     newBoard?.addEventListener('click', requestNewBoard);
     this.cleanupFuncs.push(() => newBoard?.removeEventListener('click', requestNewBoard));
@@ -277,9 +337,17 @@ export class ControlsSystem extends createSystem({
     // Tabs keep a panel this size on the table: one page shows, Snap frame is always there.
     const wire = (id: string, run: () => void): void => {
       const element = panel.getElementById(id);
-      element?.addEventListener('click', run);
-      this.cleanupFuncs.push(() => element?.removeEventListener('click', run));
+      const press = (): void => {
+        if (meant()) run();
+      };
+      element?.addEventListener('click', press);
+      this.cleanupFuncs.push(() => element?.removeEventListener('click', press));
     };
+    // Undo is on every tab: the set goes back to how it stood before the last change.
+    wire('btn-undo', () => {
+      const note = this.world.getSystem(ViewfinderSystem)?.undo() ?? '';
+      if (note !== '') g.coachNote.value = note;
+    });
     let openTab: string = 'shoot';
     // What the piece last touched can be given follows the wearer to every tab; the Assets tab shows it always.
     const showPieceBar = (): void => {
@@ -439,7 +507,14 @@ export class ControlsSystem extends createSystem({
               chained = false;
               return;
             }
+            // What came of it is said here too, on the panel, where the hand that pressed is looking.
+            const before = g.coachNote.peek();
             hear(this.world, text);
+            const after = g.coachNote.peek();
+            if (after !== '' && after !== before) {
+              const [title, words] = after.split(' | ');
+              tell(`Heard: ${text}. ${title.charAt(0)}${title.slice(1).toLowerCase()}${words ? `: ${words}` : ''}`);
+            }
             if (!keep || halted) {
               chained = false;
               return;
@@ -659,10 +734,10 @@ export class ControlsSystem extends createSystem({
     const record = panel.getElementById<UIKit.Text>('btn-record');
     const play = panel.getElementById<UIKit.Text>('btn-play');
     const requestRecord = () => {
-      g.recordRequested.value = g.recordRequested.value + 1;
+      if (meant()) g.recordRequested.value = g.recordRequested.value + 1;
     };
     const requestPlay = () => {
-      g.playRequested.value = g.playRequested.value + 1;
+      if (meant()) g.playRequested.value = g.playRequested.value + 1;
     };
     record?.addEventListener('click', requestRecord);
     play?.addEventListener('click', requestPlay);
@@ -692,7 +767,7 @@ export class ControlsSystem extends createSystem({
     const snap = panel.getElementById('btn-snap');
     this.snapButton = snap ?? null;
     const requestSnap = () => {
-      g.snapRequested.value = g.snapRequested.value + 1;
+      if (meant()) g.snapRequested.value = g.snapRequested.value + 1;
     };
     snap?.addEventListener('click', requestSnap);
     this.cleanupFuncs.push(() => snap?.removeEventListener('click', requestSnap));

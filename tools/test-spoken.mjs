@@ -132,8 +132,11 @@ const CASES = [
   ['lower the camera', { do: 'step', step: 'lower' }],
   ['camera down', { do: 'step', step: 'lower' }],
   ['bring the camera in', { do: 'step', step: 'closer' }], // review
-  ['bring it back', null], // review: "it" is a piece, not the camera
-  ['put it back', null], // review
+  ['bring it back', { do: 'undo' }], // review: "it" is a piece, not the camera; since Undo, this takes the last change back
+  ['put it back', { do: 'undo' }], // review
+  ['undo', { do: 'undo' }],
+  ['okay undo that', { do: 'undo' }],
+  ['undo the dragon', null],
   ['bring it closer', null], // review
   ['move it back', { do: 'byHand' }],
   ['up', null],

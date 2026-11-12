@@ -641,6 +641,9 @@ export function parseRequest(text: string, vocab: Vocab): Request {
   return request;
 }
 
+/** Determiners a recogniser is not told to listen for: said rarely here, and easily heard where a piece was named. */
+const RARELY_SAID = new Set(['our', 'any', 'your', 'my', 'these', 'those', 'each']);
+
 /**
  * Every word and phrase parseRequest can make use of with this vocabulary, for
  * a recogniser that listens for a fixed list. It includes the things the
@@ -665,7 +668,9 @@ export function speechWords(vocab: Vocab): string[] {
   take(Object.keys(COUNTS));
   take(Object.keys(COLOURS));
   take(Object.keys(SIZES));
-  take(DETERMINERS);
+  // The reader knows all the determiners; the recogniser is told only the common ones. On the headset
+  // "a car and a red dragon" was written down as "our any red dragon": two listed words that name nothing.
+  take([...DETERMINERS].filter((word) => !RARELY_SAID.has(word)));
   take(PASS_THROUGH);
   take(ADD_WORDS);
   take(REMOVE_WORDS);
