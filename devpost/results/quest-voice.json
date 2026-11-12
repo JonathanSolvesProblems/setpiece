@@ -40,7 +40,9 @@
   "sentences": 4,
   "naming_words_heard": "every piece, colour, count and verb in all 4; the article 'a' or 'the' was dropped 4 times, which changes nothing in what is built",
   "slowest_share_of_real_time": 0.254,
-  "errors": 0
+  "errors": 0,
+  "read_the_same_as_what_was_said": 4,
+  "read_note": "Each transcript was given to the app's own scene reader beside the sentence as said (tmp/t-understand.mjs): the same blocking, pieces, colours, counts and removals came out of both, for all 4."
  },
  "same_probe_on_a_desktop": {
   "browser": "Chromium 148, headless, 20 cores",

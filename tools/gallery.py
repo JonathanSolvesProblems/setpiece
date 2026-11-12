@@ -17,11 +17,19 @@ from playwright.async_api import async_playwright
 ROOT = Path(__file__).resolve().parents[1]
 LIVE = 'https://setpiece.jonathansolvesproblems.com/'
 OUT = ROOT / 'devpost' / 'gallery'
-FONTS = (ROOT / 'public' / 'ui' / 'fonts').as_uri()
+
+
+def font_uri(name: str) -> str:
+    """A face from the app's own fonts, carried inside the slide: a composed page may not load a file from disk."""
+    return 'data:font/ttf;base64,' + base64.b64encode((ROOT / 'public' / 'ui' / 'fonts' / name).read_bytes()).decode()
+
+
 W, H = 1500, 1000
 
 fps = json.loads((ROOT / 'devpost/results/quest-frame-rate.json').read_text(encoding='utf-8'))
 voice = json.loads((ROOT / 'devpost/results/voice-recognition.json').read_text(encoding='utf-8'))
+quest_voice = json.loads((ROOT / 'devpost/results/quest-voice.json').read_text(encoding='utf-8'))
+quest_controls = quest_voice['control_sentences_fed_to_the_recogniser_on_the_headset']
 load = json.loads((ROOT / 'devpost/results/load-and-size.json').read_text(encoding='utf-8'))
 checks = (ROOT / 'devpost/checks/last-run.md').read_text(encoding='utf-8')
 catalog = (ROOT / 'src/catalog.ts').read_text(encoding='utf-8')
@@ -34,6 +42,9 @@ N = {
     'fps_under60': sum(1 for v in all_fps if v < 60),
     'voice_heard': voice['heard_the_beat'],
     'voice_runs': voice['standoff_runs'],
+    # Recorded sentences fed to the recogniser inside the headset's browser: how many, and how many were read as what was said.
+    'quest_voice_clips': quest_voice['summary']['sentences'] + quest_controls['clips'],
+    'quest_voice_read': quest_voice['summary']['read_the_same_as_what_was_said'] + quest_controls['read_as_the_control_that_was_said'],
     'bundle_mb': load['main_script_mb'][-1]['mb'],
     'bundle_before_mb': load['main_script_mb'][0]['mb'],
     'quest_first_s': load['quest_3s'][0]['seconds_to_set_ready'],
@@ -55,8 +66,8 @@ SLIDES = [
          caption='Put your fingers on a piece and pinch, or close a fist around it. The pointing ray steps aside when a hand is near a piece.'),
     dict(slug='say', badge=LIVE_BADGE, headline='Say the scene', picture=('live', 'standoff'),
          caption='"A Mexican standoff after a car chase": three actors on marks, each aiming at the next, two crashed cars behind. All of it movable.'),
-    dict(slug='heard', badge='Result · devpost/results/voice-recognition.json', headline='What the recogniser wrote down', picture=('result', 'voice'),
-         caption='Synthetic voices into the page\u2019s own recogniser, on a desktop. {voice_heard} of {voice_runs} standoff lines came through. The headset microphone is next.'),
+    dict(slug='heard', badge='Result · devpost/results/quest-voice.json', headline='What the headset wrote down', picture=('result', 'voice'),
+         caption='{quest_voice_read} of {quest_voice_clips} recorded sentences read as what was said, inside the Quest Browser, in about a quarter of real time. A real voice is next.'),
     dict(slug='board', badge=LIVE_BADGE, headline='Six setups, each with its numbers', picture=('live', 'board'),
          caption='Each frame on the board is stamped with its lens, camera height, distance and every actor’s eyeline, measured where the pieces stood.'),
     dict(slug='lenses', badge=LIVE_BADGE, headline='Six lenses, 18 to 135 mm', picture=('live', 'lenses'),
@@ -82,24 +93,24 @@ SLIDES = [
 ]
 
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{{font-family:Stencil;src:url("{fonts}/BigShouldersStencil-Black.ttf")}}
-@font-face{{font-family:Shoulders;src:url("{fonts}/BigShoulders-Bold.ttf")}}
-@font-face{{font-family:Grotesk;src:url("{fonts}/SchibstedGrotesk-Medium.ttf")}}
+@font-face{{font-family:SetStencil;src:url("{stencil}") format("truetype")}}
+@font-face{{font-family:SetShoulders;src:url("{shoulders}") format("truetype")}}
+@font-face{{font-family:SetGrotesk;src:url("{grotesk}") format("truetype")}}
 html,body{{margin:0;width:{w}px;height:{h}px;background:#1b1411;color:#f6f7ef;overflow:hidden}}
 .slide{{position:relative;width:{w}px;height:{h}px;padding:56px 72px;box-sizing:border-box;display:flex;flex-direction:column}}
-.badge{{font-family:Shoulders;font-size:26px;letter-spacing:.06em;text-transform:uppercase;color:#c7c7b7;display:flex;align-items:center;gap:16px}}
+.badge{{font-family:SetShoulders;font-size:26px;letter-spacing:.06em;text-transform:uppercase;color:#c7c7b7;display:flex;align-items:center;gap:16px}}
 .badge::before{{content:"";width:14px;height:14px;background:#d6e13c}}
-h1{{font-family:Stencil;font-size:88px;line-height:.92;margin:14px 0 26px;letter-spacing:-.005em}}
+h1{{font-family:SetStencil;font-size:88px;line-height:.92;margin:14px 0 26px;letter-spacing:.005em;text-transform:uppercase}}
 .pic{{flex:1;min-height:0;border:2px solid #5a4b3d;background:#2a211c;display:flex;align-items:center;justify-content:center;overflow:hidden}}
 .pic img{{width:100%;height:100%;object-fit:contain;display:block}}
-.caption{{font-family:Grotesk;font-size:30px;line-height:1.3;color:#f6f7ef;margin-top:24px}}
-.result{{width:100%;height:100%;padding:28px 36px;box-sizing:border-box;font-family:Grotesk;font-size:28px;line-height:1.35;color:#f6f7ef}}
+.caption{{font-family:SetGrotesk;font-size:30px;line-height:1.3;color:#f6f7ef;margin-top:24px}}
+.result{{width:100%;height:100%;padding:28px 36px;box-sizing:border-box;font-family:SetGrotesk;font-size:28px;line-height:1.35;color:#f6f7ef}}
 .result table{{border-collapse:collapse;width:100%}}
 .result td,.result th{{text-align:left;padding:8px 14px;border-bottom:1px solid #5a4b3d;vertical-align:top}}
-.result th{{font-family:Shoulders;font-size:24px;letter-spacing:.05em;text-transform:uppercase;color:#c7c7b7}}
-.big{{font-family:Stencil;font-size:150px;line-height:1;color:#d6e13c;margin:10px 0 0}}
+.result th{{font-family:SetShoulders;font-size:24px;letter-spacing:.05em;text-transform:uppercase;color:#c7c7b7}}
+.big{{font-family:SetStencil;font-size:150px;line-height:1;color:#d6e13c;margin:10px 0 0}}
 .muted{{color:#c7c7b7}} .yes{{color:#d6e13c}} .pair{{display:flex;gap:16px;height:100%}} .pair img{{flex:1;min-width:0;object-fit:contain}}
-.unit{{font-family:Shoulders;font-size:40px;color:#c7c7b7;margin-left:14px}}
+.unit{{font-family:SetShoulders;font-size:40px;color:#c7c7b7;margin-left:14px}}
 </style></head><body><div class="slide"><div class="badge">{badge}</div><h1>{headline}</h1><div class="pic">{body}</div><div class="caption">{caption}</div></div></body></html>"""
 
 
@@ -115,15 +126,13 @@ def result_body(kind: str) -> str:
                 f'<p class="muted">Quest 3S, Quest Browser, hands tracked, the live site, the wearer using it normally. One second of frame timestamps about once a minute.</p>'
                 f'<table><tr><th>Session</th><th>Samples</th><th>Lowest</th><th>Median</th><th>Highest</th><th>Under 60</th></tr>{rows}</table></div>')
     if kind == 'voice':
-        seen = set()
-        rows = []
-        for r in voice['runs']:
-            if r['said'] in seen or 'standoff' not in r['said']:
-                continue
-            seen.add(r['said'])
-            rows.append(f"<tr><td>{r['said']}</td><td class='yes'>{r['heard']}</td></tr>")
-        return (f'<div class="result"><p class="muted">Said by a Windows voice through a fake microphone into the page’s own recogniser. The right column is what it wrote down.</p>'
-                f'<table><tr><th>Said</th><th>Heard</th></tr>{"".join(rows[:5])}</table></div>')
+        # Two sets asked for in words, then five of the panel's controls: what went in, and what the headset wrote.
+        pairs = [(s['said'], s['heard']) for s in quest_voice['sentences'][:2]]
+        wanted = ['eighty five', 'camera on the dragon', 'paint the car red', 'play it back', 'snap']
+        pairs += [(c['said'], c['heard'][0]) for said in wanted for c in quest_controls['written'] if c['said'] == said]
+        rows = ''.join(f"<tr><td>{said}</td><td class='yes'>{heard}</td></tr>" for said, heard in pairs)
+        return (f'<div class="result"><p class="muted">Recorded sentences fed to the recogniser the app ships, inside the Quest Browser on a Quest 3S. No microphone was open and nobody spoke. The right column is what it wrote down.</p>'
+                f'<table><tr><th>Said</th><th>Written on the headset</th></tr>{rows}</table></div>')
     if kind == 'checks':
         lines = [l for l in checks.splitlines() if l.startswith('| ') and not l.startswith('| Check') and not l.startswith('|---')]
         rows = ''.join(f"<tr><td>{l.split('|')[1].strip()}</td><td class='{'yes' if 'pass' in l.split('|')[2] else ''}'>{l.split('|')[2].strip()}</td></tr>" for l in lines[:14])
@@ -395,7 +404,10 @@ async def main():
             n = len(s['caption'].format(**N))
             print(f'{i:02d} {s["slug"]:8} {n}{"  OVER 140" if n > 140 else ""}')
         return
-    only = set(sys.argv[1:])
+    # --recompose lays the slides out again from the live captures already in tmp/gallery, without driving the site.
+    recompose = '--recompose' in sys.argv
+    only = {arg for arg in sys.argv[1:] if not arg.startswith('--')}
+    faces = dict(stencil=font_uri('BigShouldersStencil-Black.ttf'), shoulders=font_uri('BigShoulders-Bold.ttf'), grotesk=font_uri('SchibstedGrotesk-Medium.ttf'))
     OUT.mkdir(parents=True, exist_ok=True)
     scratch = ROOT / 'tmp' / 'gallery'
     scratch.mkdir(parents=True, exist_ok=True)
@@ -416,14 +428,18 @@ async def main():
             if isinstance(pic, str):
                 body = f'<img src="{data_uri((ROOT / "devpost" / pic).resolve())}">'
             elif pic[0] == 'live':
-                body = f'<img src="{data_uri(await live_capture(browser, pic[1], scratch))}">'
+                kept = scratch / f'live-{pic[1]}.png'
+                body = f'<img src="{data_uri(kept if recompose and kept.exists() else await live_capture(browser, pic[1], scratch))}">'
             else:
                 body = result_body(pic[1])
-            html = TEMPLATE.format(fonts=FONTS, w=W, h=H, badge=s['badge'], headline=headline, body=body, caption=caption)
+            html = TEMPLATE.format(**faces, w=W, h=H, badge=s['badge'], headline=headline, body=body, caption=caption)
             page = await plain.new_page(viewport={'width': W, 'height': H}, device_scale_factor=1)
             await page.set_content(html)
             await page.wait_for_timeout(400)
             await page.evaluate('document.fonts.ready')
+            # A slide in a fallback face is not the app's slide: stop instead of saving it.
+            missing = await page.evaluate("['SetStencil', 'SetShoulders', 'SetGrotesk'].filter((face) => !document.fonts.check('30px ' + face))")
+            assert not missing, f'slide {n}: these faces did not load: {missing}'
             await page.screenshot(path=str(OUT / f'{n}-{s["slug"]}.png'))
             await page.close()
             print(f'{n} {s["slug"]}  caption {len(caption)}')
