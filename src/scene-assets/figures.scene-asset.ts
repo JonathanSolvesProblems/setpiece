@@ -4,13 +4,17 @@
  * floor is the finished image. The creature is what it is on a real set: a
  * tennis ball on a stand, raised to the creature's eye height.
  * Origins at floor contact, figures face -Z. Named parts: Base, Post, Pelvis,
- * Torso, Chest, Neck, Head, LegL/LegR, ArmL/ArmR; EyelineBall, Stand.
+ * Torso, Neck, Head, Hair, and for each side LegUpper, Knee, Shoulder, ArmUpper, Hand;
+ * EyelineBall, Stand. Sixteen meshes a figure: each is a draw call on the headset.
  */
 import {
   BoxGeometry,
+  BufferAttribute,
+  BufferGeometry,
   CapsuleGeometry,
   CylinderGeometry,
   Group,
+  Matrix4,
   Mesh,
   MeshStandardMaterial,
   Quaternion,
@@ -38,6 +42,42 @@ function limb(a: Vector3, b: Vector3, r: number, material: MeshStandardMaterial,
   mesh.position.copy(a).add(b).multiplyScalar(0.5);
   mesh.quaternion.copy(new Quaternion().setFromUnitVectors(UP, dir.normalize()));
   return mesh;
+}
+
+/**
+ * Bakes other parts into this one, in its own frame, so the lot is drawn as one mesh. The part keeps
+ * its name, its position and its material; position, normal and the grain's texture coordinates come along.
+ * Only for parts in the same wood that never move apart: a forearm into its upper arm, a foot into its knee.
+ */
+function absorb(into: Mesh, ...others: Mesh[]): Mesh {
+  const flat = (geometry: BufferGeometry): BufferGeometry => (geometry.index ? geometry.toNonIndexed() : geometry.clone());
+  into.updateMatrix();
+  const inverse = new Matrix4().copy(into.matrix).invert();
+  const parts = [flat(into.geometry)];
+  for (const other of others) {
+    other.updateMatrix();
+    parts.push(flat(other.geometry).applyMatrix4(new Matrix4().multiplyMatrices(inverse, other.matrix)));
+  }
+  let count = 0;
+  for (const part of parts) count += part.getAttribute('position').count;
+  const position = new Float32Array(count * 3);
+  const normal = new Float32Array(count * 3);
+  const uv = new Float32Array(count * 2);
+  let at = 0;
+  for (const part of parts) {
+    position.set(part.getAttribute('position').array as Float32Array, at * 3);
+    normal.set(part.getAttribute('normal').array as Float32Array, at * 3);
+    uv.set(part.getAttribute('uv').array as Float32Array, at * 2);
+    at += part.getAttribute('position').count;
+  }
+  const merged = new BufferGeometry();
+  merged.setAttribute('position', new BufferAttribute(position, 3));
+  merged.setAttribute('normal', new BufferAttribute(normal, 3));
+  merged.setAttribute('uv', new BufferAttribute(uv, 2));
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  into.geometry = merged;
+  return into;
 }
 
 function ball(at: Vector3, r: number, material: MeshStandardMaterial, name: string): Mesh {
@@ -99,7 +139,8 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
   const neck = ball(new Vector3(0, 0.86 * h, 0), 0.045 * h, woodDark, 'Neck');
   const head = ball(new Vector3(0, 0.925 * h, 0), 0.075 * h, woodLight, 'Head');
   head.scale.set(0.95, 1.1, 1);
-  g.add(base, post, pelvis, torso, chest, neck, head);
+  // The chest is carved into the torso: one piece of wood, one coat.
+  g.add(base, post, pelvis, absorb(torso, chest), neck, head);
   for (const side of [-1, 1]) {
     const tag = side < 0 ? 'L' : 'R';
     const stepping = stance.step === tag;
@@ -112,18 +153,18 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       knee = new Vector3(side * 0.075 * h, fore ? 0.36 * h : 0.26 * h, fore ? 0.17 * h : -0.08 * h);
       ankle = new Vector3(side * 0.075 * h, fore ? 0.14 * h : 0.2 * h, fore ? 0.14 * h : -0.26 * h);
     }
+    const foot = ball(
+      stance.running
+        ? ankle.clone().add(new Vector3(0, -0.015 * h, 0.03 * h))
+        : new Vector3(side * 0.075 * h, 0.035 * h, (stepping ? 0.11 : 0.02) * h),
+      0.04 * h,
+      woodDark,
+      `Foot${tag}`,
+    );
+    // A leg swings as one from the hip: thigh and shin are one mesh, knee and foot another.
     g.add(
-      limb(hip, knee, 0.05 * h, wood, `Leg${tag}Upper`),
-      ball(knee, 0.052 * h, woodDark, `Knee${tag}`),
-      limb(knee, ankle, 0.042 * h, wood, `Leg${tag}Lower`),
-      ball(
-        stance.running
-          ? ankle.clone().add(new Vector3(0, -0.015 * h, 0.03 * h))
-          : new Vector3(side * 0.075 * h, 0.035 * h, (stepping ? 0.11 : 0.02) * h),
-        0.04 * h,
-        woodDark,
-        `Foot${tag}`,
-      ),
+      absorb(limb(hip, knee, 0.05 * h, wood, `Leg${tag}Upper`), limb(knee, ankle, 0.042 * h, wood, `Leg${tag}Lower`)),
+      absorb(ball(knee, 0.052 * h, woodDark, `Knee${tag}`), foot),
     );
     const shoulder = new Vector3(side * 0.16 * h, 0.8 * h, 0);
     let elbow = new Vector3(side * 0.19 * h, 0.62 * h, -0.01 * h);
@@ -146,11 +187,10 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       elbow = new Vector3(side * 0.2 * h, 0.66 * h, fore ? 0.1 * h : -0.12 * h);
       wrist = new Vector3(side * 0.16 * h, fore ? 0.74 * h : 0.6 * h, fore ? 0.22 * h : -0.06 * h);
     }
+    // An arm swings as one from the shoulder: both lengths are one mesh, shoulder and elbow another.
     g.add(
-      ball(shoulder, 0.05 * h, woodDark, `Shoulder${tag}`),
-      limb(shoulder, elbow, 0.04 * h, wood, `Arm${tag}Upper`),
-      ball(elbow, 0.042 * h, woodDark, `Elbow${tag}`),
-      limb(elbow, wrist, 0.035 * h, wood, `Arm${tag}Lower`),
+      absorb(ball(shoulder, 0.05 * h, woodDark, `Shoulder${tag}`), ball(elbow, 0.042 * h, woodDark, `Elbow${tag}`)),
+      absorb(limb(shoulder, elbow, 0.04 * h, wood, `Arm${tag}Upper`), limb(elbow, wrist, 0.035 * h, wood, `Arm${tag}Lower`)),
       ball(wrist, 0.04 * h, woodLight, `Hand${tag}`),
     );
     if (stance.aiming === tag) g.add(propPistol(wrist, tag));
