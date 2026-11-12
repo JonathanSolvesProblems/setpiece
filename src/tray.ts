@@ -240,7 +240,8 @@ export class TraySystem extends createSystem({
       const value = this.cast.get(this.key(piece));
       if (value && piece.getValue(SetPiece, 'role') === SetRole.Actor) this.dress(piece, value);
       const finish = this.finishOf(this.key(piece));
-      if (finish[0] !== 0 || finish[1] !== 0 || finish[2] !== 0) this.coat(piece, finish);
+      if (finish[0] !== 0 || finish[1] !== 0 || finish[2] !== 0 || (finish[3] ?? 0) > 0) this.coat(piece, finish);
+      this.closeHidden(piece);
     }
     const g = this.globals as Globals;
     if (saved != null && Number.isInteger(saved.sensor) && SENSORS[saved.sensor]) g.sensorIndex.value = saved.sensor;
@@ -280,6 +281,16 @@ export class TraySystem extends createSystem({
       }
       part.updateMatrix();
       part.matrixAutoUpdate = false;
+    });
+  }
+
+  /**
+   * The poses and fittings that are not showing are closed to the pointers from the start. Pressing
+   * Pose or the fitting button keeps this up to date; a piece nobody has changed yet needs it too.
+   */
+  private closeHidden(piece: Entity): void {
+    piece.object3D!.traverse((part) => {
+      if (/^(Pose|Style)\d$/.test(part.name)) (part as Walked).intersectChildren = part.visible;
     });
   }
 
@@ -436,7 +447,11 @@ export class TraySystem extends createSystem({
       const paint = item.colour == null ? -1 : PAINTS.findIndex((p) => p.name.toLowerCase() === item.colour);
       const size = item.size == null ? -1 : SIZES.findIndex((s) => s.name.toLowerCase() === item.size);
       if (paint >= 0 && asset.paint === true) finish[0] = paint;
-      if (size >= 0) finish[1] = size;
+      if (size >= 0) {
+        finish[1] = size;
+        // A size asked for in words stands over whatever two hands made of the piece.
+        finish[3] = 0;
+      }
       if ((paint >= 0 && asset.paint === true) || size >= 0) {
         for (const name of [item.label, ...spares]) {
           this.finish.set(name, [...finish]);
@@ -607,7 +622,8 @@ export class TraySystem extends createSystem({
 
   private resize(label: string, scale: number): void {
     const piece = this.managed.find((entity) => this.key(entity) === label);
-    if (piece == null || assetByLabel(label) == null) return;
+    // Taken off the set while it was being stretched: there is nothing to size, and nothing to select.
+    if (piece == null || assetByLabel(label) == null || !this.on.has(label)) return;
     const value: Finish = [...this.finishOf(label)];
     value[3] = Math.round(scale * 100) / 100;
     this.finish.set(label, value);

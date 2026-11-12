@@ -40,6 +40,7 @@ import { assetByLabel, assetTitle } from './catalog.js';
 import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
 import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
+import { ReactionsSystem } from './reactions.js';
 import { CAMERA_TILT_LIMIT, Cue, Held, SetPiece, SetRole, ShotCamera, SoundCue } from './set-components.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { SquirmSystem } from './squirm.js';
@@ -214,6 +215,10 @@ export class PiecesSystem extends createSystem({
   /** Where the actor in a rolling vehicle's path stands: ahead of its leading end, and out from its side. */
   private aheadFwd = 0;
   private aheadLat = 0;
+  /** The piece that stopped the last roll step, by index; -1 when it was the slate's edge or nothing. */
+  private blockedBy = -1;
+  /** How far the last point given to nearestTo was from the piece it found, in metres. */
+  private nearestGap = 0;
   private rings: Mesh[] = [];
   private turns: HandTurn[] = [];
   /** Grabs that began inside the guard window and were let go at once. */
@@ -427,6 +432,7 @@ export class PiecesSystem extends createSystem({
       if (score < bestScore) {
         bestScore = score;
         best = i;
+        this.nearestGap = gap * object.scale.x;
       }
     }
     return best;
@@ -467,7 +473,7 @@ export class PiecesSystem extends createSystem({
       return;
     }
     const held = this.carrying[side === 'left' ? 'right' : 'left'];
-    if (live && held != null && this.stretch == null && this.guard <= 0 && !held.piece.hasComponent(ShotCamera) && this.onPiece(held.piece, pinchAt, STRETCH_REACH)) {
+    if (live && held != null && this.stretch == null && this.guard <= 0 && !held.piece.hasComponent(ShotCamera) && this.reachesFor(held.piece, pinchAt)) {
       this.near[side] = -1;
       this.setRayAside(side, true);
       if (pad?.getSelectStart() === true || (!byHand && pad?.getButtonDown(InputComponent.Squeeze) === true)) {
@@ -502,13 +508,19 @@ export class PiecesSystem extends createSystem({
     this.take(side, this.dressed[index], by, by === 'pinch' && fromFist ? pinchAt : point);
   }
 
-  /** Whether this point is on the piece, within reach of its shape, in metres. */
-  private onPiece(piece: Entity, point: Vector3, reach: number): boolean {
+  /**
+   * Whether the free hand is reaching for the piece the other hand carries, to stretch it. It is
+   * when it is within reach of that piece and no other piece is nearer: a neighbour standing
+   * beside the carried one can still be picked up.
+   */
+  private reachesFor(piece: Entity, point: Vector3): boolean {
     const index = this.dressed.indexOf(piece);
     const object = piece.object3D;
     if (index < 0 || object == null) return false;
     object.worldToLocal(this.local.copy(point));
-    return this.bounds[index].distanceToPoint(this.local) * object.scale.x <= reach;
+    const gap = this.bounds[index].distanceToPoint(this.local) * object.scale.x;
+    if (gap > STRETCH_REACH) return false;
+    return this.nearestTo(point, REACH) < 0 || gap <= this.nearestGap;
   }
 
   /**
@@ -698,6 +710,10 @@ export class PiecesSystem extends createSystem({
       // The leading end of the vehicle, a step ahead, is what meets the edge or a wall.
       let blocked = this.leadingEndBlocked(run.index, object, localBoundsDepth(this.bounds[run.index], object) + length, way);
       let move = blocked ? 0 : length;
+      // A horse or a wolf in the way stops it like any solid piece, and goes over if it was still going fast enough.
+      if (blocked && this.blockedBy >= 0 && Math.abs(run.speed) >= KNOCK_SPEED) {
+        this.world.getSystem(ReactionsSystem)?.tipOver(this.dressed[this.blockedBy], this.nose.x * way, this.nose.z * way);
+      }
       // An actor in the way stops it, and goes down if it was still going fast enough. It
       // stops just inside the knock-down rule's reach, so a take plays the contact back, and
       // the roll knocks them itself, since a long frame can jump past the moment of contact.
@@ -741,6 +757,7 @@ export class PiecesSystem extends createSystem({
     const box = this.bounds[self];
     const halfWidth = (box == null ? 0.05 : Math.max(Math.abs(box.min.x), Math.abs(box.max.x))) * object.scale.x;
     this.side.set(this.nose.z, 0, -this.nose.x);
+    this.blockedBy = -1;
     for (let k = -ROLL_PROBES; k <= ROLL_PROBES; k++) {
       this.probe.copy(object.position).addScaledVector(this.nose, way * reach).addScaledVector(this.side, (k / ROLL_PROBES) * halfWidth);
       if (Math.abs(this.probe.x) > SLATE_HALF_X || Math.abs(this.probe.z) > SLATE_HALF_Z || this.blockedAt(this.probe, self)) return true;
@@ -790,7 +807,10 @@ export class PiecesSystem extends createSystem({
       const scale = other.scale.x || 1;
       this.point.copy(point).sub(other.position).applyQuaternion(this.turnBack.copy(other.quaternion).invert());
       this.point.divideScalar(scale);
-      if (box.distanceToPoint(this.point) * scale <= ROLL_MARGIN) return true;
+      if (box.distanceToPoint(this.point) * scale <= ROLL_MARGIN) {
+        this.blockedBy = j;
+        return true;
+      }
     }
     return false;
   }

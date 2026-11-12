@@ -1,0 +1,67 @@
+{
+ "what": "Two probes of the voice on a Meta Quest 3S in the Quest Browser, both attached over the Chrome DevTools Protocol to the Setpiece tab (tmp/q-voice-probe.py, tmp/q-voice.js and tmp/q-mic.py in the working tree). First, the recogniser worker and voice model the app ships (Vosk compiled to WebAssembly, vosk-model-small-en-us-0.15) were fed four recorded sentences, with the 742-entry word list the app listens with. The sound was a Windows synthetic voice (Microsoft David Desktop, 16 kHz mono) sent to the worker in the same tenth-of-a-second pieces the app sends, as fast as the worker would take them. Second, the app's own Say a scene button was pressed by the probe and the panel watched for 15 s with nobody speaking. Together they show that the recogniser loads and keeps up on the headset's processor, and that the page can open the headset's microphone and listen. They do not show a real voice through that microphone: nobody spoke, and no immersive session was running (the headset was idle with its display asleep).",
+ "date": "2026-11-12",
+ "build": "7a50ef5",
+ "headset": "Meta Quest 3S (adb ro.product.model), 3 processor cores reported to the page",
+ "browser": "OculusBrowser/154.1.0.32.54 Chrome/154.0.8037.126",
+ "model_load_ms": 1860,
+ "model_load_note": "From the browser's cache: one progress event. The first download of the 41.1 MB model is not in this figure.",
+ "sentences": [
+  {
+   "said": "a mexican standoff after a car chase",
+   "heard": "a mexican stand off after a car chase",
+   "sound_seconds": 3.75,
+   "decode_ms": 954,
+   "share_of_real_time": 0.254
+  },
+  {
+   "said": "new scene with a red car and a dragon",
+   "heard": "new scene with a red car and dragon",
+   "sound_seconds": 3.4,
+   "decode_ms": 763,
+   "share_of_real_time": 0.225
+  },
+  {
+   "said": "two actors and a blue truck",
+   "heard": "two actors and blue truck",
+   "sound_seconds": 2.93,
+   "decode_ms": 634,
+   "share_of_real_time": 0.216
+  },
+  {
+   "said": "remove the dragon and add a horse",
+   "heard": "remove dragon and add horse",
+   "sound_seconds": 3.14,
+   "decode_ms": 726,
+   "share_of_real_time": 0.231
+  }
+ ],
+ "summary": {
+  "sentences": 4,
+  "naming_words_heard": "every piece, colour, count and verb in all 4; the article 'a' or 'the' was dropped 4 times, which changes nothing in what is built",
+  "slowest_share_of_real_time": 0.254,
+  "errors": 0
+ },
+ "same_probe_on_a_desktop": {
+  "browser": "Chromium 148, headless, 20 cores",
+  "heard": "the same four transcripts, word for word",
+  "share_of_real_time": [
+   0.271,
+   0.268,
+   0.228,
+   0.217
+  ]
+ },
+ "say_a_scene_pressed_on_the_headset": {
+  "microphone_permission": "granted",
+  "listening_after_press_ms": 2077,
+  "then": "8.0 s with no speech, after which the panel read \"Heard nothing. Press it and try again.\" and the button went back to \"Say a scene\"",
+  "panel_lines_in_order": [
+   "Waking the listener.",
+   "Say what should be on the set, then stop talking.",
+   "Heard nothing. Press it and try again."
+  ],
+  "shows": "the permission, the microphone opening, the audio thread starting, the model loading and the no-speech limit, in the Quest Browser",
+  "does_not_show": "words heard from a person through the headset's microphone"
+ }
+}
