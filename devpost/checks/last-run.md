@@ -1,6 +1,6 @@
 # Live site checks
 
-Run on 2026-11-12 14:37 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 93ad62d-20261112T1437.
+Run on 2026-11-12 16:14 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 8d57cfb-20261112T1613.
 
 **35 of 35 passed.**
 
@@ -12,9 +12,9 @@ Run on 2026-11-12 14:37 UTC against https://setpiece.jonathansolvesproblems.com/
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
-| the app script is named in the page | pass | assets/index-ea4H_X_i.js |
+| the app script is named in the page | pass | assets/index-BjQut5Zk.js |
 | version.json is served | pass | 200 |
-| version.json names a build | pass | 93ad62d-20261112T1437 |
+| version.json names a build | pass | 8d57cfb-20261112T1613 |
 | the app script is served | pass | 200, 2.59 MB |
 | the app script is under 3 MB | pass | 2.59 MB |
 | the served script carries the same build as version.json | pass |  |
