@@ -11,7 +11,7 @@ Setpiece
 ## Tagline
 
 ```
-Block a VFX shot on your kitchen table with your hands and leave with the storyboard. No controllers needed, median 90 fps on a Quest 3S.
+Block a VFX shot on your kitchen table with your hands and leave with the storyboard. No controllers, never under 60 fps on a Quest 3S.
 ```
 
 ## Track
@@ -41,9 +41,9 @@ Record a take and carry an actor across the set: they walk it back to you. Say "
 
 You leave with a board image, a shot list and a short animatic. Every number on the board is measured from where the pieces stood. No number on it is estimated. Voice runs inside the page, so what you say stays on the headset.
 
-How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage, hit testing lands the set where you point with no room scan needed, and hands do everything. The set is 51 pieces and 10 starting scenes, built in code as plain maquettes you paint yourself. On a Quest 3S it ran at a median of 90 frames a second in normal use, never under 60 (46 samples, 5 and 6 November). [X, the number on the submitted build.]
+How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage, hit testing lands the set where you point with no room scan needed, and hands do everything. The set is 51 pieces and 10 starting scenes, built in code as plain maquettes you paint yourself. On a Quest 3S it ran at a median of 89.9 frames a second in normal use, never under 60 (48 samples over three days); a six-piece set with both hands tracked ran at 73 to 82 on 12 November. [X, the number on the submitted build.]
 
-Not yet proven on the headset: the set returning to the same spot after a relaunch, voice through the headset's microphone, and the frame rate during a take. [X, update after the next headset session.]
+Not yet proven on the headset: the set returning to the same spot after a relaunch, and a spoken sentence understood in full (the one said so far lost a word). [X, update after the next headset session.]
 
 [X, measured: one unbroken take, headset on to a six-frame board, in minutes.]
 

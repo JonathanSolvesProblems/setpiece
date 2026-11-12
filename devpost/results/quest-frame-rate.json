@@ -20,6 +20,15 @@
    "median": 89.9,
    "max": 90.0,
    "under60": 0
+  },
+  {
+   "date": "2026-11-12",
+   "build": "commit 3de589d",
+   "samples": 2,
+   "min": 69.4,
+   "median": 80.1,
+   "max": 80.1,
+   "under60": 0
   }
  ],
  "samples": [
@@ -298,7 +307,19 @@
    "time": "19:34:42",
    "fps": 89.7,
    "build": "commit 59b2ceb"
+  },
+  {
+   "date": "2026-11-12",
+   "time": "15:15:52",
+   "fps": 69.4,
+   "build": "commit 3de589d"
+  },
+  {
+   "date": "2026-11-12",
+   "time": "15:16:15",
+   "fps": 80.1,
+   "build": "commit 3de589d"
   }
  ],
- "deduplicated": "13 samples taken under 15 s after the one before were dropped: on 6 November two copies of the logger ran at once for part of the evening."
+ "deduplicated": "13 samples taken under 15 s after the one before were dropped: on 6 November two copies of the logger ran at once for part of the evening. On 12 November the logger sampled every 11 s for two and a half minutes: the same rule left two of four samples with hands tracked, and two taken with the hands out of view (89.2 and 89.1) are left out because this file is about hands-tracked use. That session had a six-piece set with a truck stretched to 191%."
 }

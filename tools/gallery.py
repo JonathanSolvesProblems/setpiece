@@ -43,6 +43,8 @@ N = {
     'fps_min': min(all_fps),
     'fps_samples': len(all_fps),
     'fps_under60': sum(1 for v in all_fps if v < 60),
+    # The days the samples were taken on, as "5, 6 and 12 Nov", read from the summary so a new session re-words the caption.
+    'fps_days': (lambda d: (', '.join(d[:-1]) + ' and ' + d[-1]) if len(d) > 1 else d[0])([str(int(row['date'][-2:])) for row in fps['summary']]),
     # The heavier set of 11 Nov, both hands tracked: before the fix, and after it once that is measured.
     'heavy_fps': f"{round(min(heavy['frames_per_second']))} to {round(max(heavy['frames_per_second']))}",
     'heavy_then': ('before a fix still to be re-measured' if heavy_after is None
@@ -90,7 +92,7 @@ SLIDES = [
     dict(slug='back', badge=QUEST, headline='It keeps your set and your board', picture='captures/quest-car-bicycle.jpg',
          caption='After a reload in the headset the panel lists what came back: the set, the pieces and the board. Same spot after a relaunch: next to prove.'),
     dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json and quest-frame-time.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
-         caption='{fps_samples} one-second samples, 5 and 6 Nov: median {fps_median}, lowest {fps_min}. A heavier set on 11 Nov ran at {heavy_fps}, {heavy_then}.'),
+         caption='{fps_samples} one-second samples, {fps_days} Nov: median {fps_median}, lowest {fps_min}. A heavier set on 11 Nov ran at {heavy_fps}, {heavy_then}.'),
     dict(slug='load', badge=LIVE_BADGE, headline='The wait is a call sheet', picture=('live', 'loading'),
          caption='Main script {bundle_mb} MB, down from {bundle_before_mb}. On the Quest: a set in {quest_first_s} s on a first visit, {quest_reload_s} s on a reload.'),
     dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
@@ -118,6 +120,7 @@ h1{{font-family:SetStencil;font-size:88px;line-height:.92;margin:14px 0 26px;let
 .big{{font-family:SetStencil;font-size:150px;line-height:1;color:#d6e13c;margin:10px 0 0}}
 .muted{{color:#c7c7b7}} .yes{{color:#d6e13c}} .pair{{display:flex;gap:16px;height:100%}} .pair img{{flex:1;min-width:0;object-fit:contain}}
 .unit{{font-family:SetShoulders;font-size:40px;color:#c7c7b7;margin-left:14px}}
+.result.rows5 .big{{font-size:112px;margin:0}} .result.rows5 p{{margin:14px 0 16px}}
 </style></head><body><div class="slide"><div class="badge">{badge}</div><h1>{headline}</h1><div class="pic">{body}</div><div class="caption">{caption}</div></div></body></html>"""
 
 
@@ -136,7 +139,7 @@ def result_body(kind: str) -> str:
             both = run['frames_per_second']
             rows += (f"<tr><td>{run['date']}, {len(run['on_the_set'])} pieces, both hands, {label}</td><td>{len(both)}</td>"
                      f"<td>{min(both)}</td><td></td><td>{max(both)}</td><td>{sum(1 for v in both if v < 60)}</td></tr>")
-        return (f'<div class="result"><div class="big">{N["fps_median"]}<span class="unit">fps, median of {N["fps_samples"]} samples</span></div>'
+        return (f'<div class="result rows5"><div class="big">{N["fps_median"]}<span class="unit">fps, median of {N["fps_samples"]} samples</span></div>'
                 f'<p class="muted">Quest 3S, Quest Browser, hands tracked, the live site, the wearer using it normally. One second of frame timestamps about once a minute.</p>'
                 f'<table><tr><th>Session</th><th>Samples</th><th>Lowest</th><th>Median</th><th>Highest</th><th>Under 60</th></tr>{rows}</table></div>')
     if kind == 'voice':

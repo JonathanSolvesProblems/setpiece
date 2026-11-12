@@ -213,5 +213,16 @@
   ],
   "does_not_show": "a person's voice, the headset's microphone, or the controls being worked inside an immersive session",
   "note": "Run twice on 12 November. The first run used the word list of build 93ad62d; the reader of spoken controls was then made stricter after a review and its word list changed, and this is the second run, with the list and the reader of build 8d57cfb. Both runs wrote all 32 clips so that each was read as the control that was said."
+ },
+ "a_person_speaking_in_a_session": {
+  "date": "2026-11-12",
+  "build": "3de589d",
+  "said_as_the_wearer_remembers_it": "the scene with a car and a red dragon, and can you reset the scene with that new scene",
+  "written_by_the_recogniser": "[unk] our any red dragon [unk] reset a scene with this new scene",
+  "what_came_of_it": "Nothing was built. A take was playing in a loop (a recording begun by a stray pinch on the panel half a minute earlier), and a set request under a take was refused with a line on the call sheet that the wearer did not see.",
+  "shows": "the microphone, the audio thread and the recogniser work end to end inside an immersive session on the headset, with a person speaking",
+  "also_shows": "the car was lost: \"a car and a\" was written as \"our any\", two listed determiners that name nothing",
+  "changed_because_of_it": "The recogniser is no longer told \"our\", \"any\", \"your\", \"my\", \"these\", \"those\" and \"each\". A set asked for while a take plays or records now stops the take and is built. What came of a sentence is written on the panel under the button as well as on the call sheet.",
+  "one_sentence": true
  }
 }

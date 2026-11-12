@@ -3,10 +3,25 @@
  "before": {
   "date": "2026-11-11",
   "build": "5f1bca4",
-  "on_the_set": ["A", "B", "Creature", "C", "Horse", "Truck"],
+  "on_the_set": [
+   "A",
+   "B",
+   "Creature",
+   "C",
+   "Horse",
+   "Truck"
+  ],
   "hands_tracked": 2,
-  "frames_per_second": [66.4, 68.2],
-  "frame_ms": { "median": 15.0, "p95": 17.1, "worst": 18.1, "over_23_ms": 0 },
+  "frames_per_second": [
+   66.4,
+   68.2
+  ],
+  "frame_ms": {
+   "median": 15.0,
+   "p95": 17.1,
+   "worst": 18.1,
+   "over_23_ms": 0
+  },
   "javascript_ms_per_frame": 12.8,
   "of_which": {
    "main_view_ms": 5.1,
@@ -22,5 +37,61 @@
    "With both hands out of view the same set ran at 90."
   ]
  },
- "after": null
+ "after": {
+  "date": "2026-11-12",
+  "build": "3de589d",
+  "on_the_set": [
+   "A",
+   "B",
+   "Creature",
+   "C",
+   "Horse",
+   "Truck"
+  ],
+  "note": "Six three-second readings 20 s apart in a session of two and a half minutes. The same six pieces as before; from the second reading on the truck had been stretched to 191% by hand, and in the last two a second camera was on the set.",
+  "hands_tracked": 2,
+  "frames_per_second": [
+   79.3,
+   74.3,
+   77.7,
+   72.7,
+   78.3,
+   81.7
+  ],
+  "javascript_ms_per_frame": {
+   "median": 8.5,
+   "lowest": 7.8,
+   "highest": 9.2,
+   "p95_highest": 12.4
+  },
+  "of_which": {
+   "main_view_ms": 3.7,
+   "main_view_draw_calls": [
+    99,
+    110
+   ],
+   "input_pass_ms": {
+    "readings": 5,
+    "lowest": 2.184,
+    "highest": 3.264
+   }
+  },
+  "hands_out_of_view": {
+   "readings": 6,
+   "frames_per_second": [
+    87.3,
+    88.3,
+    89.7,
+    89.7,
+    89.3,
+    90
+   ],
+   "javascript_ms_per_frame": 6.7
+  },
+  "found": [
+   "Better, not 90: 73 to 82 frames a second with both hands tracked against 66 to 68, and 7.8 to 9.2 ms of JavaScript a frame against 12.8.",
+   "The input pass (hand rays and fingertip pointers) still cost 2.2 to 3.3 ms a frame in five of the six readings with hands tracked, and a quarter of a millisecond with the hands out of view.",
+   "Timed afterwards in the emulator, half of that pass is the panel: some 280 small meshes that each hand's ray and each fingertip try on every frame. The next build closes the panel to the pointers unless a hand points at it or reaches for it (3.3 ms to 1.7 ms a frame in the emulator). That is not yet measured on the headset."
+  ]
+ }
 }

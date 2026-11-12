@@ -71,7 +71,7 @@ After a reload in the headset the panel lists what came back: the set, the piece
 ## 12 fps
 
 ```
-46 one-second samples, 5 and 6 Nov: median 90.0, lowest 65.5. A heavier set on 11 Nov ran at 66 to 68, before a fix still to be re-measured.
+48 one-second samples, 5, 6 and 12 Nov: median 89.9, lowest 65.5. A heavier set on 11 Nov ran at 66 to 68, 73 to 82 after the fix.
 ```
 
 ## 13 load
