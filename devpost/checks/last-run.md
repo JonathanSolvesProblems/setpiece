@@ -1,20 +1,20 @@
 # Live site checks
 
-Run on 2026-11-12 00:41 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 7a50ef5-20261112T0041.
+Run on 2026-11-12 13:05 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 85de8be-20261112T1305.
 
 **35 of 35 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 300 ms |
+| the page answers over HTTPS | pass | 200, 287 ms |
 | it is Setpiece | pass |  |
 | search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
-| the app script is named in the page | pass | assets/index-C_3S6TGe.js |
+| the app script is named in the page | pass | assets/index-BsFQxI9T.js |
 | version.json is served | pass | 200 |
-| version.json names a build | pass | 7a50ef5-20261112T0041 |
+| version.json names a build | pass | 85de8be-20261112T1305 |
 | the app script is served | pass | 200, 2.58 MB |
 | the app script is under 3 MB | pass | 2.58 MB |
 | the served script carries the same build as version.json | pass |  |
