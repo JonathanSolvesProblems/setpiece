@@ -13,9 +13,11 @@ import { directorSystem } from '../src/director-prompt.js';
 declare const process: { env: Record<string, string | undefined> };
 
 const MODEL = process.env.DIRECTOR_MODEL || 'claude-opus-5-5';
+/** Setpiece's own key, from its own spend-limited workspace; the general one only if that is not set. */
+const KEY = (): string | undefined => process.env.SETPIECE_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
 const EFFORT = (process.env.DIRECTOR_EFFORT || 'low') as 'low' | 'medium' | 'high';
 /** Room for a full set with a few new pieces in it. */
-const MAX_TOKENS = 8000;
+const MAX_TOKENS = 6000;
 /** The longest sentence and set description taken in, in characters. */
 const LONGEST_SAID = 400;
 const LONGEST_SET = 6000;
@@ -27,26 +29,34 @@ const LOOK = `This picture is what the shot camera sees now, through its lens. L
 - If the frame already works, set camera.keep to true and list no things.
 - fresh is false. remove is empty.
 - In says, name what you changed in the frame in a few words, or say the frame holds.`;
-/** Per visitor: this many plans in this many minutes. A spend limit on the key is the real cap. */
+/**
+ * Per visitor: this many plans in this many minutes; and across everyone this server instance answers, this
+ * many a minute. Neither is a wall: an Origin header can be written by anything that is not a browser. The cap
+ * that holds is the spend limit on the key's own workspace.
+ */
 const PER_VISITOR = 30;
 const WINDOW_MS = 10 * 60 * 1000;
-const ALLOWED = [
-  /^https:\/\/setpiece\.jonathansolvesproblems\.com$/,
-  /^https:\/\/setpiece(-[a-z0-9-]+)?\.vercel\.app$/,
-  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
-  /^https:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
-];
+const PER_MINUTE = 40;
+/** The site's own addresses. A development server on this machine or the home network is allowed only off production. */
+const SITE = new Set(['https://setpiece.jonathansolvesproblems.com', 'https://setpiece-xr.vercel.app', 'https://setpiece-kohl.vercel.app']);
+const DEVELOPMENT = [/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/, /^https:\/\/192\.168\.\d+\.\d+(:\d+)?$/];
+const allowed = (origin: string): boolean =>
+  SITE.has(origin) || (process.env.VERCEL_ENV !== 'production' && DEVELOPMENT.some((pattern) => pattern.test(origin)));
 
 const seen = new Map<string, number[]>();
+const everyone: number[] = [];
 
 function tooMany(visitor: string): boolean {
   const now = Date.now();
+  while (everyone.length > 0 && now - everyone[0] > 60_000) everyone.shift();
+  if (everyone.length >= PER_MINUTE) return true;
   const times = (seen.get(visitor) ?? []).filter((at) => now - at < WINDOW_MS);
   if (times.length >= PER_VISITOR) {
     seen.set(visitor, times);
     return true;
   }
   times.push(now);
+  everyone.push(now);
   seen.set(visitor, times);
   if (seen.size > 5000) seen.clear();
   return false;
@@ -79,16 +89,24 @@ function question(asked: Asked): string | null {
 
 /** Whether the set designer can be asked here: the headset asks once, and uses the library's reader if not. */
 export function GET(): Response {
-  return new Response(JSON.stringify({ ready: Boolean(process.env.ANTHROPIC_API_KEY) }), {
+  return new Response(JSON.stringify({ ready: Boolean(KEY()) }), {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 }
 
 export async function POST(request: Request): Promise<Response> {
   const origin = request.headers.get('origin') ?? '';
-  if (!ALLOWED.some((pattern) => pattern.test(origin))) return refuse(403, 'This set designer only works inside Setpiece.');
-  if (!process.env.ANTHROPIC_API_KEY) return refuse(503, 'The set designer has no key on this server.');
-  const visitor = (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'local';
+  if (!allowed(origin)) return refuse(403, 'This set designer only works inside Setpiece.');
+  // JSON only: from another site's page, a browser has to ask first, and is told no.
+  if (!(request.headers.get('content-type') ?? '').startsWith('application/json')) return refuse(415, 'The request could not be read.');
+  const apiKey = KEY();
+  if (!apiKey) return refuse(503, 'The set designer has no key on this server.');
+  // Vercel writes the visitor's address itself; a header the caller sent is only used off Vercel.
+  const visitor =
+    request.headers.get('x-vercel-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() ||
+    'local';
   if (tooMany(visitor)) return refuse(429, 'That is a lot of sets in a few minutes. Give it a moment.');
   let asked: Asked;
   try {
@@ -96,6 +114,7 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return refuse(400, 'The request could not be read.');
   }
+  if (asked == null || typeof asked !== 'object' || Array.isArray(asked)) return refuse(400, 'The request could not be read.');
   const text = question(asked);
   if (text == null) return refuse(400, 'Nothing was said.');
   // Shown the camera's picture, the designer looks through the lens and keeps or fixes the frame.
@@ -110,7 +129,7 @@ export async function POST(request: Request): Promise<Response> {
 ${LOOK}` },
         ];
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey });
   const started = Date.now();
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({

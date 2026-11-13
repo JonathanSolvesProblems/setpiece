@@ -77,7 +77,9 @@ export function hear(world: World, text: string, library = false): void {
     }
     g.lastSpoken.value = text;
     if (forDesigner.length === 0) return;
-    void director.ask(forDesigner.join(', then ')).then(() => {
+    void director.ask(forDesigner.join(', then ')).then((outcome) => {
+      // A newer sentence took over: what was said after this one's set is not done to someone else's.
+      if (outcome === 'superseded') return;
       for (const command of later) {
         const note = obey(world, g, command);
         if (note !== '') g.coachNote.value = note;

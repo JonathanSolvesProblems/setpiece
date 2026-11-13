@@ -195,7 +195,8 @@ export function cleanThing(raw: unknown): Thing | null {
     z: clamp(finite(t.z, 0), -REACH_Z, REACH_Z),
     y: clamp(finite(t.y, 0), 0, HIGHEST),
     yaw: finite(t.yaw, 0),
-    size: clamp(finite(t.size, 1), 0.3, 3),
+    // 0 keeps the size the piece has; anything else is its size, from small to giant and a little past.
+    size: finite(t.size, 1) <= 0 ? 0 : clamp(finite(t.size, 1), 0.3, 3),
     paint: PAINT_NAMES.includes(paint) ? paint : '',
     fitting: text(t.fitting, 20),
     pose: (POSES as readonly string[]).includes(pose) ? pose : '',
@@ -309,18 +310,23 @@ export class PlanReader {
     this.valueStart = -1;
     this.inThings = false;
     if (key === 'things' || raw === '') return;
+    let value: unknown;
     try {
-      this.onValue(key, JSON.parse(raw));
+      value = JSON.parse(raw);
     } catch {
       // A value that does not parse is left out; the reply as a whole is read again at the end.
+      return;
     }
+    this.onValue(key, value);
   }
 
   private emitThing(raw: string): void {
+    let thing: unknown;
     try {
-      this.onThing(JSON.parse(raw));
+      thing = JSON.parse(raw);
     } catch {
-      // As above.
+      return;
     }
+    this.onThing(thing);
   }
 }

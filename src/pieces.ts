@@ -306,8 +306,6 @@ export class PiecesSystem extends createSystem({
         this.chosenLabel = label;
         this.chosenStale = true;
       }),
-      // A flown camera has no legs; landed again, it stands on the full tripod.
-      g.cameraRig.subscribe(() => this.world.getSystem(ViewfinderSystem)?.setLegs(1)),
       this.queries.grabbed.subscribe('qualify', (piece) => {
         if (this.isStage(piece)) return;
         // A hand already has it: the other hand's ray does not get to pull on it as well.
@@ -1349,7 +1347,10 @@ export class PiecesSystem extends createSystem({
         saveJson(StoreKey.Camera, {
           tilt: piece.getValue(ShotCamera, 'tilt') ?? 0,
           aimed: piece.getValue(ShotCamera, 'aimed') === true,
-          legs: this.world.getSystem(ViewfinderSystem)?.legs() ?? 1,
+          legs:
+            this.world.getSystem(ViewfinderSystem)?.liveCamera() === piece
+              ? (this.world.getSystem(ViewfinderSystem)?.legs() ?? 1)
+              : (loadJson<{ legs?: number }>(StoreKey.Camera)?.legs ?? 1),
         });
       }
     }

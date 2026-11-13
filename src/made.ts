@@ -67,7 +67,9 @@ export class MadeSystem extends createSystem({
     if (body?.material instanceof MeshStandardMaterial) withGrain(body.material);
     const saved = loadJson<Saved>(StoreKey.Made);
     for (const def of Array.isArray(saved?.defs) ? saved.defs : []) {
-      if (typeof def?.id === 'string' && typeof def.name === 'string' && Array.isArray(def.parts)) this.defs.set(def.id, def);
+      if (typeof def?.id !== 'string' || typeof def.name !== 'string' || !Array.isArray(def.parts)) continue;
+      if (!def.parts.every((part: unknown) => typeof part === 'string')) continue;
+      this.defs.set(def.id, def);
     }
     for (const [label, id] of Object.entries(saved?.slots ?? {})) if (isMade(label) && this.defs.has(id)) this.fill(label, id, false);
   }
@@ -105,6 +107,11 @@ export class MadeSystem extends createSystem({
       out.push([label, def]);
     }
     return out.slice(0, 8);
+  }
+
+  /** The piece in this place made again, as a new piece: a new colour or shape, in the same place on the set. */
+  refill(label: string, def: MadeDef): void {
+    if (isMade(label)) this.fill(label, def.id);
   }
 
   /** A new made piece from its parts. Returns null when none of the parts could be read. */

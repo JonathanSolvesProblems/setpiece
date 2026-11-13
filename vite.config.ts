@@ -32,6 +32,12 @@ export default defineConfig(({ command }) => ({
       name: 'setpiece-director-dev',
       apply: 'serve',
       configureServer(server) {
+        // The project's own key, kept in .env.local (never committed): SETPIECE_ANTHROPIC_KEY=...
+        try {
+          process.loadEnvFile('.env.local');
+        } catch {
+          // No file: the designer uses whatever key the shell has, or answers that it has none.
+        }
         server.middlewares.use('/api/director', async (req, res) => {
           try {
             const handlers = (await server.ssrLoadModule('/api/director.ts')) as {

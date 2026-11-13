@@ -48,6 +48,9 @@ const LOOK_AFTER_MS = 700;
 /** A server that said it has no key is asked again after this long. */
 const RECHECK_MS = 60000;
 
+/** What came of a request: a set went up, the library's reader built instead, or a newer request took over. */
+export type Outcome = 'built' | 'library' | 'superseded';
+
 const one = (n: number): string => String(Math.round(n * 10) / 10);
 const paintIndex = (name: string): number => PAINTS.findIndex((paint) => paint.name.toLowerCase() === name);
 
@@ -107,16 +110,18 @@ export class DirectorSystem extends createSystem({
   update(delta: number): void {
     for (let i = 0; i < this.drops; ) {
       const object = this.dropObjects[i]!;
-      this.dropT[i] += delta / DROP_SECONDS;
+      // A hand took it on the way down: it is the hand's now.
+      if (this.dropEntities[i]!.hasComponent(Held)) this.dropT[i] = 1;
+      else this.dropT[i] += delta / DROP_SECONDS;
       const t = Math.min(1, this.dropT[i]);
       const left = 1 - t;
-      object.position.y = this.dropY[i] + DROP * left * left * left;
+      if (!this.dropEntities[i]!.hasComponent(Held)) object.position.y = this.dropY[i] + DROP * left * left * left;
       if (t < 1) {
         i++;
         continue;
       }
       const entity = this.dropEntities[i]!;
-      this.world.getSystem(PiecesSystem)?.landed(entity);
+      if (!entity.hasComponent(Held)) this.world.getSystem(PiecesSystem)?.landed(entity);
       // The last one takes this one's place in the list.
       const last = --this.drops;
       this.dropObjects[i] = this.dropObjects[last];
@@ -142,10 +147,10 @@ export class DirectorSystem extends createSystem({
   }
 
   /**
-   * Asks the designer for a set from these words, and builds it as it arrives. Resolves true when a plan
-   * came back and went up, false when the words went to the library's reader instead.
+   * Asks the designer for a set from these words, and builds it as it arrives. Says what came of it: a set
+   * went up, the words went to the library's reader instead, or a newer request took over.
    */
-  async ask(said: string, heard: string[] = []): Promise<boolean> {
+  async ask(said: string, heard: string[] = []): Promise<Outcome> {
     this.lookFor = '';
     this.lookAt = 0;
     return this.request(said, { said, heard, set: this.describe() }, false);
@@ -166,7 +171,7 @@ export class DirectorSystem extends createSystem({
     await this.request(said, { said, set: this.describe(), image }, true);
   }
 
-  private async request(said: string, body: Record<string, unknown>, looking: boolean): Promise<boolean> {
+  private async request(said: string, body: Record<string, unknown>, looking: boolean): Promise<Outcome> {
     const g = this.globals as unknown as Globals;
     this.asking?.abort();
     const asking = new AbortController();
@@ -187,6 +192,8 @@ export class DirectorSystem extends createSystem({
         signal: asking.signal,
       });
       if (response.body == null) throw new Error('no reply');
+      // This server will not answer this page (no key, or not this site): the library's reader is used from now on.
+      if (response.status === 403 || response.status === 503) this.status = 'off';
       const reader = new PlanReader(
         (key, value) => build.value(key, value),
         (thing) => build.thing(thing, (entity, object, y) => this.drop(entity, object, y)),
@@ -214,35 +221,44 @@ export class DirectorSystem extends createSystem({
             failed = event.m ?? 'The set designer could not be reached.';
           } else if (event.t === 'end' && event.stop === 'refusal') {
             failed = 'The set designer would not build that one.';
+          } else if (event.t === 'end' && event.stop === 'max_tokens') {
+            failed = 'The set designer ran out of room; part of the set is up. Ask for less at once.';
           }
         }
       }
-      if (asking !== this.asking) return true;
+      if (asking !== this.asking) {
+        if (build.begun) this.world.getSystem(TraySystem)?.planEnd(build.fresh);
+        return 'superseded';
+      }
       // The set could not change (a hand is on a piece): the call sheet already says so.
-      if (build.refused) return true;
+      // Nothing went up, so what was said after it waits for the wearer to say it again.
+      if (build.refused) return 'superseded';
       // Whatever arrived in pieces is checked against the whole reply once it is all in.
       build.finish(reader.whole);
       if (!build.begun) {
-        if (looking) return true;
+        if (looking) return 'built';
         this.status = failed !== '' && /no key|cannot sign in/.test(failed) ? 'off' : this.status;
         this.fallback(said, failed || 'The set designer sent nothing back.');
-        return false;
+        return 'library';
       }
       this.pendingCamera = build.camera;
       this.pendingCameraLabels = build.labels;
       // A new set, or a new frame, is looked at once it stands; a look is not looked at again.
       if (!looking && build.camera != null && !build.camera.keep) this.lookFor = said;
       build.end(failed);
-      return true;
+      return 'built';
     } catch {
-      if (asking !== this.asking) return true;
+      if (asking !== this.asking) {
+        if (build.begun) this.world.getSystem(TraySystem)?.planEnd(build.fresh);
+        return 'superseded';
+      }
       if (build.begun) {
         build.end(looking ? '' : 'The set designer stopped partway; what arrived is on the set.');
-        return true;
+        return 'built';
       }
-      if (looking) return true;
+      if (looking) return 'built';
       this.fallback(said, asking.signal.aborted ? 'The set designer took too long.' : 'The set designer could not be reached.');
-      return false;
+      return 'library';
     } finally {
       window.clearTimeout(timer);
       window.clearTimeout(whole);
@@ -364,6 +380,8 @@ class PlanBuild {
   /** The plan's own ids for what it put down ("new:tower", "copy:tower", "Car"), each to the label it went up as. */
   labels = new Map<string, string>();
   private placed = new Set<string>();
+  /** What stood on the set before the plan began: a made piece there is not built over, and a copy there is not borrowed. */
+  private before = new Set<string>();
   private removed: string[] = [];
   private things = 0;
   private skipped = 0;
@@ -392,6 +410,7 @@ class PlanBuild {
   private begin(fresh: boolean): void {
     if (this.begun || this.refused) return;
     const tray = this.world.getSystem(TraySystem);
+    if (tray != null) for (const label of tray.onSet()) this.before.add(label);
     if (tray == null || !tray.planBegin(fresh)) {
       this.refused = true;
       return;
@@ -428,23 +447,43 @@ class PlanBuild {
   private labelFor(thing: Thing): string | null {
     const made = this.world.getSystem(MadeSystem);
     const id = thing.id;
+    // Places not to build into: those this plan has used, and made pieces that stood on the set before it.
+    const taken = new Set(this.placed);
+    for (const label of this.before) if (isMade(label)) taken.add(label);
     if (id.startsWith('new:') || id.startsWith('copy:')) {
       if (made == null) return null;
       const key = id.slice(id.indexOf(':') + 1);
-      let def = this.keys.get(key) ?? (isMade(key) ? made.defIn(key) : null);
-      if (def == null && thing.parts.length > 0) def = made.define(thing.name || key, thing.parts);
-      if (def == null && thing.name !== '') def = made.find(thing.name);
+      let def: MadeDef | null = null;
+      // Parts written out are always what is built (the same parts again are the same piece); a made place is
+      // read as it is now, never from memory; a key from an earlier reply stands for what it made then.
+      if (thing.parts.length > 0) def = made.define(thing.name || key, thing.parts);
+      else if (isMade(key)) def = made.defIn(key);
+      else def = this.keys.get(key) ?? (thing.name !== '' ? made.find(thing.name) : null);
       if (def == null) return null;
-      this.keys.set(key, def);
-      return made.place(def, this.placed);
+      if (!isMade(key)) this.keys.set(key, def);
+      // Another of a made piece that is off the set goes back into its own place.
+      if (isMade(key) && !taken.has(key) && !this.placed.has(key) && made.defIn(key) === def) return key;
+      return made.place(def, taken);
     }
     const asset = assetByLabel(id);
     if (asset == null || asset.shelf === 'Kit') return null;
-    if (asset.shelf === 'Made') return id;
-    // A label already put down by this plan: a free copy of the same piece instead.
+    if (asset.shelf === 'Made') {
+      if (made == null) return null;
+      // A made place asked for with parts is that piece made again (a new colour, a new shape) in the same place.
+      if (thing.parts.length > 0) {
+        const def = made.define(thing.name || made.defIn(id)?.name || 'New piece', thing.parts);
+        if (def == null) return null;
+        made.refill(id, def);
+        return id;
+      }
+      // An empty place is nothing to put on the set.
+      return made.defIn(id) == null ? null : id;
+    }
+    // A label already put down by this plan: a free copy of the same piece instead, never one already standing.
     if (!this.placed.has(id)) return id;
     const base = asset.spareOf ?? id;
-    return [base, ...sparesOf(base)].find((label) => !this.placed.has(label)) ?? null;
+    const standing = this.fresh ? new Set<string>() : this.before;
+    return [base, ...sparesOf(base)].find((label) => !this.placed.has(label) && !standing.has(label)) ?? null;
   }
 
   /** The finish and dress a thing asks for, keeping what it does not mention. */
@@ -454,11 +493,12 @@ class PlanBuild {
     const finish: Finish = [...now.finish] as Finish;
     const paint = thing.paint === '' ? -1 : paintIndex(thing.paint);
     if (paint >= 0 && asset?.paint === true) finish[0] = paint;
+    // Size 0 keeps the size the piece has; otherwise a kit size when it is near one, else a size of its own.
     const stop = SIZES.findIndex((size) => Math.abs(size.scale - thing.size) <= 0.05 * size.scale);
-    if (stop >= 0) {
+    if (thing.size > 0 && stop >= 0) {
       finish[1] = stop;
       finish[3] = 0;
-    } else {
+    } else if (thing.size > 0) {
       finish[1] = 0;
       finish[3] = thing.size;
     }
@@ -476,7 +516,7 @@ class PlanBuild {
     return { finish, cast };
   }
 
-  /** The reply is all in: if pieces were lost on the way, the whole reply puts them up. */
+  /** The reply is all in: what was not read on the way (the words, the camera, whether the set was fresh) is read from the whole. */
   finish(whole: string): void {
     let plan: Record<string, unknown> | null = null;
     try {

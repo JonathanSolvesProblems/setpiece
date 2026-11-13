@@ -40,6 +40,8 @@ const MARK_OUTER = 0.032;
 const FALLS = -0.12;
 const NEAREST = 0.4;
 const FARTHEST = 25;
+/** A spot nearer the wearer's feet than this is not somewhere to walk to. */
+const AHEAD = 0.8;
 const SIDES = ['left', 'right'] as const;
 type Side = (typeof SIDES)[number];
 const OPTIC_YELLOW = 0xd6e13c;
@@ -109,19 +111,26 @@ export class LifeSizeSystem extends createSystem({
     const mark = this.ensureMark(object);
     object.getWorldPosition(this.floor);
     const controls = this.world.getSystem(ControlsSystem);
+    this.player.head.getWorldPosition(this.head);
     this.aimed = null;
-    for (let i = 0; i < SIDES.length && this.aimed == null; i++) {
-      const side = SIDES[i];
-      if (controls?.panelWanted(side) === true) continue;
-      const ray = this.player.raySpaces[side];
-      ray.getWorldPosition(this.from);
-      // A target ray points down its own -Z.
-      ray.getWorldDirection(this.way).negate();
-      if (this.way.y > FALLS) continue;
-      const t = (this.floor.y - this.from.y) / this.way.y;
-      if (t < NEAREST || t > FARTHEST) continue;
-      this.hit.copy(this.from).addScaledVector(this.way, t);
-      this.aimed = side;
+    // The hand that pinches is the one that walks; before a pinch, the right hand's aim shows, then the left's.
+    // A hand hanging at the side points at the wearer's own feet, and that is not a place to go.
+    for (let pass = 0; pass < 2 && this.aimed == null; pass++) {
+      for (let i = SIDES.length - 1; i >= 0 && this.aimed == null; i--) {
+        const side = SIDES[i];
+        if (pass === 0 && this.input.xr.gamepads[side]?.getSelectStart() !== true && this.armed !== side) continue;
+        if (controls?.panelWanted(side) === true) continue;
+        const ray = this.player.raySpaces[side];
+        ray.getWorldPosition(this.from);
+        // A target ray points down its own -Z.
+        ray.getWorldDirection(this.way).negate();
+        if (this.way.y > FALLS) continue;
+        const t = (this.floor.y - this.from.y) / this.way.y;
+        if (t < NEAREST || t > FARTHEST) continue;
+        this.hit.copy(this.from).addScaledVector(this.way, t);
+        if (Math.hypot(this.hit.x - this.head.x, this.hit.z - this.head.z) < AHEAD) continue;
+        this.aimed = side;
+      }
     }
     if (this.aimed == null) {
       mark.visible = false;
@@ -214,8 +223,12 @@ export class LifeSizeSystem extends createSystem({
     return 'BACK ON THE TABLE | Everything is where you left it.';
   }
 
+  private stageEntity: Entity | undefined;
+
   private stage(): Entity | undefined {
-    return this.queries.stages.entities.values().next().value as Entity | undefined;
+    // The stage is one entity for the life of the app; found once, not every frame.
+    this.stageEntity ??= this.queries.stages.entities.values().next().value as Entity | undefined;
+    return this.stageEntity;
   }
 
   private enter(): void {

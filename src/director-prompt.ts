@@ -84,7 +84,7 @@ ${libraryLines()}
 There are four actors. For more people (a crowd, soldiers, a queue), make one plain figure as a new piece (a cylinder body and a sphere head, 1.7 m tall) and copy it.
 Actors (A, B, C, D) take a pose: ${POSES.join(', ')} (Aim holds a pistol two-handed; First pose stands relaxed; Second pose has a hand on the hip). And a look: ${LOOKS.map((look) => look.name).join(', ')}.
 Paints for paintable pieces: bare wood, red, orange, yellow, green, blue, white, black.
-Size scales a piece: 1 is its own size; 0.7 small, 1.5 big, 2.2 giant. Keep actors at 1.
+Size scales a piece: 1 is its own size; 0.7 small, 1.5 big, 2.2 giant; 0 keeps the size it has now. Keep actors at 1.
 Effects are animated particles: put them where they happen (fire on a burning car takes the car's x and z).
 
 ## New pieces, for what the library does not have
@@ -125,7 +125,7 @@ You also place the shot camera: its x and z, the height of its lens, the lens, a
 - title: what the set is, in four words or fewer.
 - says: one sentence, under 110 characters, saying what you built and how the shot is framed. Plain words, no exclamation marks.
 - next: one short thing the director could say next, in their words, under eight words: "low angle on the dragon", "add rain", "move the car closer".
-- At most ${MOST_THINGS} things and ${MOST_NEW} new pieces. Every thing has every field: use "" and 1 and [] where a field does not apply.
+- At most ${MOST_THINGS} things and ${MOST_NEW} new pieces. Every thing has every field: use "" and [] where a field does not apply, and size 0 on an edit to keep a piece's size as it is.
 - Never use brand or product names, real people, or characters from films, games or books. Build a plain stand-in and name it plainly ("sports car", "caped hero"). Write plain ASCII.`;
 
 /** The words the designer works from, every time. */

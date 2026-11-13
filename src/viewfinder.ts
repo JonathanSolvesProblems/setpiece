@@ -144,6 +144,8 @@ type SavedBoard = { taken: number; shots: Shot[] };
 
 type Globals = {
   lensMm: Signal<number>;
+  /** The set designer is building: what stands is not yet a set anybody made. */
+  designing?: Signal<boolean>;
   snapRequested: Signal<number>;
   eyelineText: Signal<string[]>;
   shotList: Signal<string[]>;
@@ -643,8 +645,8 @@ export class ViewfinderSystem extends createSystem({
     const g = this.globals as Globals;
     // The made pieces take their shapes first, so the pieces that come on are the right ones.
     if (setup.made != null) this.madeState?.apply(setup.made);
-    this.setLegs(setup.legs ?? 1);
     if (setup.rig) g.cameraRig.value = setup.rig;
+    this.setLegs(setup.legs ?? 1);
     if (setup.on) g.trayRestore.value = setup.on;
     if (setup.dress) g.trayDressRestore.value = setup.dress;
     for (const piece of this.queries.pieces.entities) {
@@ -669,6 +671,8 @@ export class ViewfinderSystem extends createSystem({
    */
   private remember(cam: Entity): void {
     if ((this.globals as Globals).takeState.peek() !== 'idle') return;
+    // Halfway through a plan from the set designer the set is not one anybody made: it is not kept.
+    if ((this.globals as Globals).designing?.peek() === true) return;
     const pieces = this.pieceList();
     for (let i = 0; i < pieces.length; i++) if (pieces[i].hasComponent(Held)) return;
     const setup = this.readSetup(cam);

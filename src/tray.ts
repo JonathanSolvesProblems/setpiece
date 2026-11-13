@@ -875,6 +875,8 @@ export class TraySystem extends createSystem({
         }
       }
       if (!first) continue;
+      // A flown camera has no legs to shorten.
+      if (drone) this.world.getSystem(ViewfinderSystem)?.setLegs(1);
       if (drone) object.position.y = Math.max(object.position.y, DRONE_START);
       else object.position.y = Math.min(object.position.y, TRIPOD_MAX);
     }
@@ -900,6 +902,8 @@ export class TraySystem extends createSystem({
    */
   planBegin(fresh: boolean): boolean {
     if (!this.ready || !this.readyToRebuild()) return false;
+    // The set as it stood before the plan is kept for Undo now, while the plan is not; see ViewfinderSystem.remember.
+    this.world.getSystem(ViewfinderSystem)?.rememberNow();
     if (!fresh) return true;
     const g = this.globals as Globals;
     if (g.takeLength.peek() > 0) g.takeClear.value = g.takeClear.peek() + 1;
