@@ -11,7 +11,7 @@ Setpiece
 ## Tagline
 
 ```
-Block a VFX shot on your kitchen table with your hands and leave with the storyboard. No controllers, never under 60 fps on a Quest 3S.
+Say the shot and a 1:10 film set builds itself on your table, piece by piece. Block it by hand; never under 60 fps on a Quest 3S.
 ```
 
 ## Track
@@ -31,19 +31,17 @@ New Experience
 ```
 I wanted to be a VFX filmmaker before I switched to computer science. The short I'm least embarrassed by has a creature added weeks after the shoot. On the day there was nothing for the actor to look at and nothing to frame against.
 
-On a real creature shoot the stand-in is a tennis ball on a stand, raised to the creature's eye height, and getting actors to look where you need them to is a known problem on set. Setpiece puts that ball, the actors and the camera on your kitchen table a week before the shoot.
+Setpiece is the table I needed a week before that shoot. It is for an indie director or a VFX supervisor in prep: a board for each scene, built in the days before the shoot and opened again on the day.
 
-It is for an indie director or a VFX supervisor in prep: a board for each scene, built up over the days before the shoot and opened again on the day. Here the table sets the scale, your hands move the stand-ins, and the eyeline is in the room with you.
+You sit down, point at your kitchen table and pinch. A 1:10 film set lands on it, in your real room. Then you say the shot: "a night chase, a red car racing past a burning truck, two actors running at camera, a dragon on a rooftop". A set designer reads the sentence and the set as it stands, and the pieces drop onto the table one by one as it writes them: posed, painted, at true scale, with the camera stood, aimed and given a lens for the shot. What the library does not have, it makes from simple wooden shapes: a rooftop, a castle gate, a cafe table. Then it looks through the camera it placed, and fixes the frame if the subject is cut off. From a desktop the first piece lands a median of 1.8 s after the request.
 
-You sit down, point at the table and pinch. A 1:10 set lands on it, in your real room. You pick up wooden stand-ins with your fingers, put the ball where the creature will be, pick a lens from 18 to 135 mm and look through the camera. Snap, and the frame goes on a storyboard with its lens, camera height, distance and eyelines written on it.
+Then it's yours. Pick up any piece with your fingers. Say what to change: "make the dragon bigger", "add rain", "low angle on the dragon". Pick a lens from 18 to 135 mm, look through the camera, snap: the frame goes on a storyboard with its lens, camera height, distance and eyelines written on it. Step inside and the set grows to full size around you; point at the floor and pinch to walk it. Record a take and carry an actor across the set, and they walk it back to you.
 
-Record a take and carry an actor across the set: they walk it back to you. Say "a Mexican standoff after a car chase" and three actors take their marks, each aiming at the next, with two crashed cars behind them. The panel's controls answer to words too: "eighty five", "camera on the dragon", "snap". Push a car and let go and it drives on; push it hard and an actor in its way goes down.
+You leave with a board image, a shot list and a short animatic. Every number on the board is measured from where the pieces stood. Your voice is turned into text on the headset; only the words go to the designer. If it can't be reached, a reader built into the app builds what it can from the library's 51 pieces, and nothing else depends on it.
 
-You leave with a board image, a shot list and a short animatic. Every number on the board is measured from where the pieces stood. No number on it is estimated. Voice runs inside the page, so what you say stays on the headset.
+How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage, hit testing lands the set where you point with no room scan, and hands do everything. The designer is a small server function that gives Claude the library's catalog and a strict reply format; the headset reads the reply as it streams and puts each piece down as soon as its line is complete. On a Quest 3S the app ran at a median of 89.9 frames a second in normal use, never under 60 (48 samples over three days). [X, the number on the submitted build.]
 
-How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage, hit testing lands the set where you point with no room scan needed, and hands do everything. The set is 51 pieces and 10 starting scenes, built in code as plain maquettes you paint yourself. On a Quest 3S it ran at a median of 89.9 frames a second in normal use, never under 60 (48 samples over three days); a six-piece set with both hands tracked ran at 73 to 82 on 12 November. [X, the number on the submitted build.]
-
-Not yet proven on the headset: the set returning to the same spot after a relaunch, and a spoken sentence understood in full (the one said so far lost a word). [X, update after the next headset session.]
+Not yet proven on the headset: the designer's time there, a real voice heard with no word list, and the set returning to the same spot after a relaunch. [X, update after the next headset session.]
 
 [X, measured: one unbroken take, headset on to a six-frame board, in minutes.]
 
@@ -55,7 +53,7 @@ Not yet proven on the headset: the set returning to the same spot after a relaun
 ```
 Everything is done with hands. Reach out and pinch a piece, or close your fist on it, and it comes with you. Point and pinch for anything further away. A pinch held on the striped edge moves the whole set. Twisting your wrist turns what you're holding, and tilts the camera. I measured my own hand to set where a fist starts, because the first version only worked if you pointed in a straight line and pinched, and my hand kept trying to just grab the thing. Held actors squirm a little in your fingers, and you can turn that off.
 
-Nobody has to learn what to do with a tiny wooden actor. You pick it up.
+Nobody has to learn what to do with a tiny wooden actor. You pick it up. And nobody has to learn a menu to build a set: you say it, and then you pick it up. At full size, you point at the floor and pinch to walk the set without standing up.
 ```
 
 ## Target launch date
