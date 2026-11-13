@@ -16,6 +16,8 @@ const MODEL = process.env.DIRECTOR_MODEL || 'claude-opus-5-5';
 /** Setpiece's own key, from its own spend-limited workspace; the general one only if that is not set. */
 const KEY = (): string | undefined => process.env.SETPIECE_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
 const EFFORT = (process.env.DIRECTOR_EFFORT || 'low') as 'low' | 'medium' | 'high';
+/** Fast mode: the same model, written up to 2.5 times faster, at twice the price. On unless turned off. */
+const FAST = process.env.DIRECTOR_SPEED !== 'standard';
 /** Room for a full set with a few new pieces in it. */
 const MAX_TOKENS = 6000;
 /** The longest sentence and set description taken in, in characters. */
@@ -140,6 +142,7 @@ ${LOOK}` },
         const stream = client.beta.messages.stream({
           model: MODEL,
           max_tokens: MAX_TOKENS,
+          ...(FAST ? { speed: 'fast' as const } : {}),
           // A refused request is run again on the model the API picks for that kind of refusal.
           betas: ['server-side-fallback-2026-07-01'],
           fallbacks: 'default',

@@ -84,7 +84,7 @@ ${libraryLines()}
 There are four actors. For more people (a crowd, soldiers, a queue), make one plain figure as a new piece (a cylinder body and a sphere head, 1.7 m tall) and copy it.
 Actors (A, B, C, D) take a pose: ${POSES.join(', ')} (Aim holds a pistol two-handed; First pose stands relaxed; Second pose has a hand on the hip). And a look: ${LOOKS.map((look) => look.name).join(', ')}.
 Paints for paintable pieces: bare wood, red, orange, yellow, green, blue, white, black.
-Size scales a piece: 1 is its own size; 0.7 small, 1.5 big, 2.2 giant; 0 keeps the size it has now. Keep actors at 1.
+Size scales a piece: 1 is its own size; 0.7 small, 1.5 big, 2.2 giant; 0 keeps the size it has now. Keep everything at size 1 so the shot reads at true scale (previs is for judging what fits in a frame): change a size only when the director asks, or when a thing is meant to be out of scale (a giant dragon). When the stage is too small for everything, show less of the place, never shrink it. Actors are always 1.
 Effects are animated particles: put them where they happen (fire on a burning car takes the car's x and z).
 
 ## New pieces, for what the library does not have
@@ -112,6 +112,7 @@ You also place the shot camera: its x and z, the height of its lens, the lens, a
 - Height is the lens above the ground, from 0.5 to 11: 0.5 to 0.8 is a low angle on baby legs looking up (heroic, menacing); 1.6 is eye level; 4 to 11 is a high or aerial angle looking down (above 5.7 the camera flies on a drone).
 - Stand the camera inside the stage (x -3 to 3, z -2 to 2.4), at least a metre from what it looks at, usually in front of the action looking back into the set. Use look_at with the id of the subject; when the subject is a place rather than a piece, leave look_at empty and give look_x, look_y, look_z.
 - Choose the frame a good director of photography would: what is the shot about, who must be seen, what the lens does to the space.
+- Eye level (1.5 to 1.7) with a 35 or 50 is the ordinary frame. Go wide (18, 24) for big action and establishing shots, long (85, 135) for faces and for stacking a background, low for a hero or a threat, high for a reveal or for scale. Do not reach for the same frame every time; when the director names a shot, give exactly that.
 - On an edit that does not ask about the shot, set keep to true and the camera stays as it is.
 
 ## Reading the request
