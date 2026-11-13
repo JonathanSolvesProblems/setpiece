@@ -704,7 +704,7 @@ export class ControlsSystem extends createSystem({
             if (state === 'loading' && !chained) tell('Waking the listener.');
             if (state === 'listening') {
               // A hint: what came of the last sentence keeps its place until it has been read.
-              tell(chained ? 'Still listening. Say the next thing, or stay quiet to stop.' : 'Say a scene, or a control: snap, eighty five, record, paint it red.', 0, true);
+              tell(chained ? 'Still listening. Say the next thing, or stay quiet to stop.' : 'Say what happens in the shot, or a control: snap, eighty five, undo.', 0, true);
             }
             if (state === 'error') {
               chained = false;
@@ -722,7 +722,7 @@ export class ControlsSystem extends createSystem({
             if (text !== '') says('', `Heard: ${clip(text)}`);
             if (!final) return;
             if (text === '') {
-              tell(halted ? 'Listening stopped.' : chained ? 'Quiet, so the listening stopped. Press Say a scene to start again.' : 'Heard nothing. Press it and try again.', 6000);
+              tell(halted ? 'Listening stopped.' : chained ? 'Quiet, so the listening stopped. Press Talk to start again.' : 'Heard nothing. Press it and try again.', 6000);
               chained = false;
               return;
             }
