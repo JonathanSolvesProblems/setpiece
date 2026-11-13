@@ -57,6 +57,15 @@ const fps = frames.samples.map((sample) => sample.fps).sort((a, b) => a - b);
 const median = fps[Math.floor(fps.length / 2)];
 // The tagline claims only what every headset sample supports: the light sessions, and the heavier set before and after its fix.
 const frameTime = JSON.parse(read('devpost/results/quest-frame-time.json'));
+// The set designer's grades, before and after the set dresser, as the README quotes them.
+const graded = JSON.parse(read('devpost/results/designer-eval.json')).summary;
+expect(
+  `README quotes the designer's grades: ${graded.nothingFlaggedAsWritten} of ${graded.sentences} as written, ${graded.nothingFlaggedAfterSetDresser} after the set dresser`,
+  readme.includes(`given ${graded.sentences} sentences`) &&
+    readme.includes(`${graded.nothingFlaggedAsWritten} of those ${graded.sentences} sets had nothing to flag`) &&
+    readme.includes(`and ${graded.nothingFlaggedAfterSetDresser} after the set dresser`),
+);
+
 // The set designer's speed, as the README quotes it, against the run that measured it.
 const designer = JSON.parse(read('devpost/results/designer-latency.json')).summary;
 const seconds = (ms) => (ms / 1000).toFixed(1);
@@ -82,6 +91,14 @@ for (const retired of ['ray-and-pinch distance grab', 'lands where you carry it 
 // Effects are never to be sold as simulations; the README has to say what they are.
 expect('README says effects are not simulations', /not simulations/.test(readme));
 expect('app says effects are not simulations', /not simulations/.test(read('public/ui/controls.uikitml')));
+
+// A panel element id used twice is found by getElementById as the first one only, so the second button does
+// nothing (the Assets shelf's page button lost its press to the panel's More toggle on Nov 13).
+for (const file of readdirSync(new URL('../public/ui/', import.meta.url)).filter((name) => name.endsWith('.uikitml'))) {
+  const ids = [...read(`public/ui/${file}`).matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  const twice = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+  expect(`public/ui/${file} uses each element id once${twice.length > 0 ? ` (twice: ${twice.join(', ')})` : ''}`, twice.length === 0);
+}
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} claim(s) no longer match the code.`);

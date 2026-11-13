@@ -73,7 +73,7 @@ const frame = (report: unknown): string =>
 
 /** What the shot was framed on: a look keeps the shot about that, and only moves the camera to show it better. */
 const subjectLine = (subject: unknown): string =>
-  typeof subject === 'string' && subject.trim() !== '' ? `The shot is framed on ${subject.trim().slice(0, 40)}. Keep it the subject.\n\n` : '';
+  typeof subject === 'string' && subject.trim() !== '' ? `The shot is framed on ${subject.replace(/\s+/g, ' ').trim().slice(0, 40)}. Keep it the subject.\n\n` : '';
 
 const refuse = (status: number, message: string): Response =>
   new Response(JSON.stringify({ t: 'error', m: message }) + '\n', { status, headers: { 'content-type': 'application/x-ndjson' } });

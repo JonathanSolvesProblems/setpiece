@@ -30,7 +30,10 @@ import { SetPiece, SetRole, StageAnchor } from './set-components.js';
 const GLIDE = 4;
 /** The page's camera never comes closer to the set than its own frame, nor further back than this. */
 const FURTHEST = 3.2;
-type Globals = { setsBuilt: Signal<number>; layoutChanged: Signal<number>; trayOn: Signal<string[]> };
+type Globals = { setsBuilt: Signal<number>; trayOn: Signal<string[]>; designing: Signal<boolean> };
+
+/** Pieces are still dropping when a set is declared built; the view waits this long before it frames them. */
+const SETTLE_MS = 600;
 
 /** Table-eye height, close, looking across the set at the monitor and the figures. */
 const WIDE: [number, number, number] = [0.05, 0.93, 0.15];
@@ -106,6 +109,8 @@ export class PreviewCameraSystem extends createSystem({
   private look = new Vector3();
   private gliding = false;
   private refit = false;
+  /** When the view frames the set again, once what is dropping has landed; 0 for no time set. */
+  private refitAt = 0;
   private bounds = new Box3();
   private part = new Box3();
   private way = new Vector3();
@@ -123,10 +128,15 @@ export class PreviewCameraSystem extends createSystem({
       this.world.visibilityState.subscribe((state) => {
         const visible = state === VisibilityState.NonImmersive;
         for (const mesh of this.room ?? []) mesh.visible = visible;
+        // Back from the headset: the page frames the set as it now stands.
+        if (visible) this.refit = true;
       }),
-      // A set built from words, or moved about, is framed again.
+      // A set built from words is framed again once it has landed, and so is a set a look through the lens moved.
       g.setsBuilt.subscribe(() => {
-        this.refit = true;
+        this.refitAt = performance.now() + SETTLE_MS;
+      }),
+      g.designing.subscribe((busy) => {
+        if (!busy) this.refitAt = performance.now() + SETTLE_MS;
       }),
       g.trayOn.subscribe(() => {
         this.refit = true;
@@ -140,6 +150,10 @@ export class PreviewCameraSystem extends createSystem({
     const aspect = this.camera.aspect;
     if (Math.abs(aspect - this.lastAspect) >= 0.01) {
       this.lastAspect = aspect;
+      this.refit = true;
+    }
+    if (this.refitAt > 0 && performance.now() >= this.refitAt) {
+      this.refitAt = 0;
       this.refit = true;
     }
     if (this.refit) {

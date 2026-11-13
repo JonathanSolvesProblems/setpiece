@@ -251,11 +251,21 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     if (title === 'STAGE' || /^\d OF \d/.test(title)) return;
     askNote.textContent = title === '' ? words : `${title.charAt(0)}${title.slice(1).toLowerCase()}. ${words}`;
   });
+  // Shots to try, for a visitor who has not thought of one yet: the shot goes in the box and is built.
+  const tries = [...document.querySelectorAll<HTMLButtonElement>('.try')];
+  for (const button of tries) {
+    button.addEventListener('click', () => {
+      if (askText == null || ask == null || (globals.designing as Signal<boolean>).peek()) return;
+      askText.value = button.textContent?.trim() ?? '';
+      ask.requestSubmit();
+    });
+  }
   (globals.designing as Signal<boolean>).subscribe((busy) => {
     if (askGo != null) {
       askGo.disabled = busy;
       askGo.textContent = busy ? 'Designing' : 'Build it';
     }
+    for (const button of tries) button.disabled = busy;
   });
 
   document.getElementById('page-snap')?.addEventListener('click', () => {

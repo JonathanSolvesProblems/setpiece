@@ -17,6 +17,8 @@ import {
   Entity,
   Group,
   Float32BufferAttribute,
+  Matrix4,
+  Ray,
   Line,
   LineBasicMaterial,
   Mesh,
@@ -770,7 +772,24 @@ export class ViewfinderSystem extends createSystem({
     const lensAt = lens.getWorldPosition(new Vector3());
     const box = new Box3();
     const corner = new Vector3();
-    const seen: { label: string; title: string; x0: number; x1: number; y0: number; y1: number; far: number; cut: string[]; inside: boolean; past: boolean }[] = [];
+    const near = lens.near;
+    // The box's corners in the lens's own space.
+    const view = Array.from({ length: 8 }, () => new Vector3());
+    const seen: {
+      label: string;
+      title: string;
+      x0: number;
+      x1: number;
+      y0: number;
+      y1: number;
+      far: number;
+      cut: string[];
+      inside: boolean;
+      past: boolean;
+      shape: Box3;
+      toPiece: Matrix4;
+      samples: Vector3[];
+    }[] = [];
     for (const piece of this.queries.pieces.entities) {
       const object = piece.object3D;
       const role = piece.getValue(SetPiece, 'role');
@@ -783,17 +802,29 @@ export class ViewfinderSystem extends createSystem({
       let y0 = Infinity;
       let y1 = -Infinity;
       let behind = 0;
+      const take = (point: Vector3): void => {
+        point.applyMatrix4(lens.projectionMatrix);
+        x0 = Math.min(x0, point.x);
+        x1 = Math.max(x1, point.x);
+        y0 = Math.min(y0, point.y);
+        y1 = Math.max(y1, point.y);
+      };
       for (let i = 0; i < 8; i++) {
-        corner.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).applyMatrix4(object.matrixWorld);
-        const at = this.inFrame(corner, this.c);
-        if (at == null) {
-          behind++;
-          continue;
+        view[i].set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).applyMatrix4(object.matrixWorld).applyMatrix4(lens.matrixWorldInverse);
+        if (view[i].z > -near) behind++;
+      }
+      // What is in front of the lens: the corners there, and where the box's edges cross the near plane, so a
+      // piece the camera stands beside is measured by all it covers, not only by its corners ahead.
+      for (let i = 0; i < 8; i++) {
+        if (view[i].z <= -near) take(corner.copy(view[i]));
+        for (const bit of [1, 2, 4]) {
+          if (i & bit) continue;
+          const a = view[i];
+          const b = view[i | bit];
+          if (a.z > -near === b.z > -near) continue;
+          const t = (-near - a.z) / (b.z - a.z);
+          take(corner.copy(a).lerp(b, t));
         }
-        x0 = Math.min(x0, at.x);
-        x1 = Math.max(x1, at.x);
-        y0 = Math.min(y0, at.y);
-        y1 = Math.max(y1, at.y);
       }
       // Wholly behind the lens, or outside the frame on one side.
       if (behind === 8 || x1 < -1 || x0 > 1 || y1 < -1 || y0 > 1) continue;
@@ -808,28 +839,68 @@ export class ViewfinderSystem extends createSystem({
       const label = String(piece.getValue(SetPiece, 'label'));
       const middle = box.getCenter(corner).applyMatrix4(object.matrixWorld);
       const scale = object.parent?.getWorldScale(new Vector3()).x ?? 1;
-      seen.push({ label, title: assetByLabel(label)?.title ?? label, x0: Math.max(-1, x0), x1: Math.min(1, x1), y0: Math.max(-1, y0), y1: Math.min(1, y1), far: middle.distanceTo(lensAt) / scale / 0.1, cut, inside, past });
+      // Lines of sight go to the middle of the piece and to points halfway from it to each corner.
+      const centre = box.getCenter(new Vector3());
+      const samples = [centre.clone().applyMatrix4(object.matrixWorld)];
+      for (let i = 0; i < 8; i++) {
+        samples.push(
+          new Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).lerp(centre, 0.5).applyMatrix4(object.matrixWorld),
+        );
+      }
+      seen.push({
+        label,
+        title: assetByLabel(label)?.title ?? label,
+        x0: Math.max(-1, x0),
+        x1: Math.min(1, x1),
+        y0: Math.max(-1, y0),
+        y1: Math.min(1, y1),
+        far: middle.distanceTo(lensAt) / scale / 0.1,
+        cut,
+        inside,
+        past,
+        shape: box.clone(),
+        toPiece: object.matrixWorld.clone().invert(),
+        samples,
+      });
     }
     if (seen.length === 0) return 'Nothing on the set is in the frame.';
     const where = (x: number, y: number): string =>
       `${y > 0.33 ? 'top' : y < -0.33 ? 'bottom' : 'middle'} ${x > 0.33 ? 'right' : x < -0.33 ? 'left' : 'centre'}`;
     seen.sort((p, q) => (q.x1 - q.x0) * (q.y1 - q.y0) - (p.x1 - p.x0) * (p.y1 - p.y0));
+    const sight = new Ray();
+    const sightFrom = new Vector3();
+    const sightTo = new Vector3();
+    const sightHit = new Vector3();
     const lines = seen.map((p) => {
       const share = Math.round(((p.x1 - p.x0) * (p.y1 - p.y0) * 100) / 4);
-      // A nearer piece whose outline covers a third or more of this one's is in front of it.
-      const covering = seen
-        .filter((q) => q !== p && q.far < p.far)
-        .filter((q) => {
-          const w = Math.max(0, Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0));
-          const h = Math.max(0, Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0));
-          return w * h >= 0.33 * (p.x1 - p.x0) * (p.y1 - p.y0);
-        })
-        .map((q) => q.label);
+      // Partly hidden behind another piece: a third or more of the lines of sight to this one pass through that
+      // one first. A point inside the other (a rider's legs in the horse, the foot of a box on a table) is not
+      // hidden behind it, so it is not counted. A piece the lens stands inside is said on its own line.
+      const wholly: string[] = [];
+      const partly: string[] = [];
+      for (const q of seen) {
+        if (q === p || q.inside) continue;
+        let blocked = 0;
+        let counted = 0;
+        for (const sample of p.samples) {
+          sightFrom.copy(lensAt).applyMatrix4(q.toPiece);
+          sightTo.copy(sample).applyMatrix4(q.toPiece);
+          if (q.shape.containsPoint(sightTo)) continue;
+          counted++;
+          const length = sightTo.distanceTo(sightFrom);
+          if (length < 1e-6) continue;
+          sight.set(sightFrom, sightTo.sub(sightFrom).divideScalar(length));
+          if (sight.intersectBox(q.shape, sightHit) != null && sightHit.distanceTo(sightFrom) < length) blocked++;
+        }
+        if (counted > 0 && blocked === counted) wholly.push(q.label);
+        else if (counted > 0 && blocked * 3 >= counted) partly.push(q.label);
+      }
       const words = [`${p.label} (${p.title}): ${share}% of the frame, ${where((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2)}, ${p.far.toFixed(1)} m from the lens`];
       if (p.inside) words.push('the lens is inside it');
       else if (p.past) words.push('it reaches past the camera, beside it');
       if (p.cut.length > 0) words.push(`cut off at the ${p.cut.join(' and ')}`);
-      if (covering.length > 0) words.push(`partly hidden behind ${covering.join(', ')}`);
+      if (wholly.length > 0) words.push(`hidden behind ${wholly.join(', ')}`);
+      if (partly.length > 0) words.push(`partly hidden behind ${partly.join(', ')}`);
       return `- ${words.join('; ')}`;
     });
     return lines.join('\n');

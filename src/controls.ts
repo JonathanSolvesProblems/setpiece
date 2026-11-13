@@ -859,7 +859,7 @@ export class ControlsSystem extends createSystem({
       page = 0;
       showShelf();
     });
-    wire('btn-more', () => {
+    wire('btn-shelf-more', () => {
       page += 1;
       showShelf();
     });

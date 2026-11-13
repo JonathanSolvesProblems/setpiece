@@ -82,6 +82,8 @@ SLIDES = [
          caption='Asked for a castle gate, it built the gate and two towers from simple wooden shapes, then two guards and a horse, low and wide.'),
     dict(slug='look', badge=LIVE_BADGE, headline='It checks its own frame', picture=('live', 'look'),
          caption="It is shown the camera's picture and what each piece covers. A truck in the way, a dragon cut off: it moves the camera and looks again."),
+    dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
+         caption="The designer's own plan stood two actors inside a car parked side-on, off the slate. Code stepped them out and the car back on."),
     dict(slug='speed', badge='Result · devpost/results/designer-latency.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
          caption='{designer_sentences} fresh sets from a desktop: the first piece a median {designer_first_s} s after asking, the whole set {designer_whole_s} s. Headset time is next.'),
     dict(slug='pinch', badge=QUEST, headline='Reach in and pick it up', picture='captures/quest-hands-card.jpg',
@@ -343,6 +345,75 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
                 draw.text((1360, y), words[i:i + 62], font=face, fill=(246, 247, 239))
                 y += 46
             sheet.save(png)
+    elif recipe == 'dresser':
+        from PIL import Image, ImageDraw, ImageFont
+        runs = json.loads((ROOT / 'devpost/results/designer-eval.json').read_text(encoding='utf-8'))['runs']
+        run = next(r for r in runs if r['said'] == 'zombies attacking a gas station')
+        # The plan streams as the server streams it; the reply's end waits for globalThis.__release, and a look
+        # through the lens keeps the frame, so nothing here asks the model.
+        await page.evaluate('''(plan) => {
+          const real = window.fetch;
+          const enc = new TextEncoder();
+          window.fetch = async (url, init) => {
+            if (!(String(url).includes('/api/director') && init?.method === 'POST')) return real(url, init);
+            const body = JSON.parse(init.body);
+            const reply = body.image ? { ...plan, fresh: false, remove: [], things: [], camera: { ...plan.camera, keep: true } } : plan;
+            const text = JSON.stringify(reply);
+            const stream = new ReadableStream({ async start(c) {
+              for (let i = 0; i < text.length; i += 48) {
+                c.enqueue(enc.encode(JSON.stringify({ t: 'd', s: text.slice(i, i + 48) }) + '\\n'));
+                await new Promise((d) => setTimeout(d, 20));
+              }
+              if (!body.image) { globalThis.__held = true; await new Promise((go) => { globalThis.__release = go; }); }
+              c.enqueue(enc.encode(JSON.stringify({ t: 'end', stop: 'end_turn', ms: 1 }) + '\\n'));
+              c.close();
+            } });
+            return new Response(stream, { headers: { 'content-type': 'application/x-ndjson' } });
+          };
+        }''', run['plan'])
+        await page.fill('#page-ask-text', run['said'])
+        await click('#page-ask-go')
+        await page.wait_for_function('globalThis.__held === true', timeout=30000)
+        # Every piece has landed; the page's view frames them and is then held still for both pictures.
+        hold = '''async () => {
+          const view = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.fit === 'function' && typeof s.ensureRoom === 'function');
+          view.fit();
+          await new Promise((d) => setTimeout(d, 2500));
+          globalThis.__view = { p: view.camera.position.toArray(), q: view.camera.quaternion.toArray() };
+        }'''
+        keep = '''() => {
+          const view = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.fit === 'function' && typeof s.ensureRoom === 'function');
+          view.refit = false; view.refitAt = 0; view.gliding = false;
+          view.camera.position.fromArray(globalThis.__view.p);
+          view.camera.quaternion.fromArray(globalThis.__view.q);
+        }'''
+        await page.wait_for_timeout(800)
+        await page.evaluate(hold)
+        before = png.with_name('live-dresser-before.png')
+        await stage_png(page, before)
+        await page.evaluate('globalThis.__release()')
+        await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === false', timeout=30000)
+        for _ in range(12):
+            await page.evaluate(keep)
+            await page.wait_for_timeout(250)
+        after = png.with_name('live-dresser-after.png')
+        await stage_png(page, after)
+        left = Image.open(before).convert('RGB')
+        right = Image.open(after).convert('RGB')
+        k = 1280 / left.width
+        size = (1280, int(left.height * k))
+        sheet = Image.new('RGB', (2640, size[1] + 260), (27, 20, 17))
+        sheet.paste(left.resize(size), (0, 0))
+        sheet.paste(right.resize(size), (1360, 0))
+        draw = ImageDraw.Draw(sheet)
+        face = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'SchibstedGrotesk-Medium.ttf'), 34)
+        label = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'BigShoulders-Bold.ttf'), 40)
+        y = size[1] + 30
+        draw.text((0, y), 'AS THE DESIGNER WROTE IT', font=label, fill=(214, 225, 60))
+        draw.text((1360, y), 'AFTER THE SET DRESSER', font=label, fill=(214, 225, 60))
+        draw.text((0, y + 64), 'Two actors inside the car, the car off the slate', font=face, fill=(199, 199, 183))
+        draw.text((1360, y + 64), 'Stepped out, and the car back on the slate', font=face, fill=(246, 247, 239))
+        sheet.save(png)
     elif recipe == 'standoff':
         await say('a mexican standoff after a car chase')
         await page.wait_for_timeout(1500)

@@ -6,6 +6,8 @@
  * only what it was asked to. Calls the real model, about 7 cents a sentence.
  *
  *   node tools/eval-designer.mjs [index ...]     writes tmp/director/eval.json
+ *   node tools/eval-designer.mjs --regrade [--publish]
+ *       grades the saved plans again without asking the model; --publish writes devpost/results/designer-eval.json
  */
 import { build } from 'esbuild';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -17,18 +19,24 @@ try {
 }
 mkdirSync('tmp/director', { recursive: true });
 await build({
-  entryPoints: ['api/director.ts', 'src/director-plan.ts', 'src/director-prompt.ts', 'src/catalog.ts'],
+  entryPoints: ['api/director.ts', 'src/director-plan.ts', 'src/director-prompt.ts', 'src/catalog.ts', 'src/settle.ts'],
   bundle: true,
   platform: 'node',
   format: 'esm',
   outdir: 'tmp/director',
   external: ['@anthropic-ai/sdk'],
   logLevel: 'error',
+  // EVAL_PROMPT=<file> tries a changed copy of the designer's instructions without touching src/.
+  plugins: process.env.EVAL_PROMPT
+    ? [{ name: 'try-prompt', setup: (b) => b.onResolve({ filter: /director-prompt(\.js)?$/ }, (args) => (args.importer.includes('director-prompt') ? null : { path: new URL(`../${process.env.EVAL_PROMPT}`, import.meta.url).pathname.replace(/^\/(\w:)/, '$1') })) }]
+    : [],
 });
 const stamp = Date.now();
 const { POST } = await import(`../tmp/director/api/director.js?${stamp}`);
 const { cleanThing, readPart } = await import(`../tmp/director/src/director-plan.js?${stamp}`);
 const { ASSETS } = await import(`../tmp/director/src/catalog.js?${stamp}`);
+const { settle } = await import(`../tmp/director/src/settle.js?${stamp}`);
+const BASE = new Map(ASSETS.map((asset) => [asset.label, asset]));
 
 /** Footprints of the library's pieces, in metres: width across x, length across z (src/director-prompt.ts). */
 const SIZE = {
@@ -66,6 +74,24 @@ const CASES = [
   { said: 'a wedding under an arch in a garden' },
   { said: 'make the dragon bigger', set: '- Dragon: Dragon; at x 0, z -0.8, facing 0\nCamera: at x 0, z 2.2, lens 1.6 m high, 35 mm, looking towards x 0, y 1.5, z -0.8.', edit: true, sizeOf: 'Dragon' },
   { said: 'a giant robot stepping over a bus', sizeAllowed: ['Robot'] },
+  // Held out: written on Nov 13 after the instructions above were tuned, in the shape a stranger says a shot
+  // (short, misheard, camera-only, things the library lacks). Graded before any change is made for them.
+  { said: 'a spaceship landing in a field at night' },
+  { said: 'two people arguing in a diner booth' },
+  { said: 'a bank robbery, the getaway car waiting outside' },
+  { said: 'zombies attacking a gas station' },
+  { said: 'a sword fight on a bridge' },
+  { said: 'a kid on a bike chased by a dog' },
+  { said: 'the hero walks away from an explosion' },
+  { said: 'a [unk] chase through the uh market with a horse' },
+  { said: 'a shark circling a small boat' },
+  { said: 'a basketball game in a schoolyard' },
+  { said: 'a fight' },
+  { said: 'put the camera behind the dragon', set: '- Dragon: Dragon; at x 0, z -0.8, facing 0\nCamera: at x 0, z 2.2, lens 1.6 m high, 35 mm, looking towards x 0, y 1.5, z -0.8.', edit: true, cameraMoves: true },
+  { said: 'make it night', set: SET_STREET, edit: true, keepIds: ['Truck', 'Car', 'A', 'Smoke'] },
+  { said: 'dolly in on actor a', set: SET_STREET, edit: true, cameraMoves: true, keepIds: ['Truck', 'Car', 'A', 'Smoke'] },
+  { said: 'a train robbery in the old west' },
+  { said: 'a funeral in the rain, mourners with umbrellas' },
 ];
 
 async function ask(c) {
@@ -126,6 +152,65 @@ function overlap(a, b) {
   return hits / n;
 }
 
+/**
+ * The plan as the app leaves it once the set dresser (src/settle.ts) has run: library pieces on the ground, at
+ * their measured sizes, pushed apart and kept on the stage the way src/director.ts does it. Made pieces are left
+ * where they are (their sizes are only known once built). On an edit, only what the plan names may move; the
+ * pieces already on the set are read from the case's set lines.
+ */
+function dressed(c, plan) {
+  const things = (plan.things ?? []).map((raw) => ({ ...raw }));
+  const standing = [];
+  for (const line of (c.set ?? '').split('\n')) {
+    const m = /^- ([^:]+): [^;]+; at x (-?[\d.]+), z (-?[\d.]+), facing (-?\d+)/.exec(line);
+    if (m && !things.some((t) => t.id === m[1]) && !(plan.remove ?? []).includes(m[1])) standing.push({ id: m[1], x: +m[2], z: +m[3], yaw: +m[4], size: 1, y: 0 });
+  }
+  const all = [...things.map((t) => ({ t, fixed: false })), ...standing.map((t) => ({ t, fixed: true }))];
+  const feet = [];
+  const owners = [];
+  // Made pieces stand in the way by their parts on the ground (a wall, a pillar), never by the box around them.
+  const madeParts = new Map();
+  for (const t of things) if (String(t.id).startsWith('new:') && (t.parts ?? []).length > 0) madeParts.set(String(t.id).slice(4), t.parts);
+  for (const t of things) {
+    const id = String(t.id ?? '');
+    if (!id.startsWith('new:') && !id.startsWith('copy:')) continue;
+    const parts = (madeParts.get(id.slice(id.indexOf(':') + 1)) ?? []).map(readPart).filter(Boolean);
+    if (parts.length === 0 || (t.y ?? 0) > 0.1) continue;
+    const low = Math.min(...parts.map((part) => part.y - part.h / 2));
+    const scale = t.size > 0 ? t.size : 1;
+    const yaw = ((t.yaw ?? 0) * Math.PI) / 180;
+    for (const part of parts) {
+      if (part.y - part.h / 2 - low > 0.3 || part.h < 0.3) continue;
+      const x = part.x * scale;
+      const z = part.z * scale;
+      feet.push({ x: t.x + x * Math.cos(yaw) + z * Math.sin(yaw), z: t.z - x * Math.sin(yaw) + z * Math.cos(yaw), hx: (part.w / 2) * scale, hz: (part.d / 2) * scale, yaw: yaw + (part.yaw * Math.PI) / 180, kind: 'solid', fixed: true, weight: Infinity, keepOn: false });
+      owners.push(null);
+    }
+  }
+  for (const { t, fixed } of all) {
+    const id = String(t.id ?? '');
+    const base = BASE.get(id)?.spareOf ?? id;
+    const asset = BASE.get(base);
+    if (asset == null || asset.shelf === 'Effects' || asset.shelf === 'Kit' || asset.shelf === 'Made' || (t.y ?? 0) > 0.1) continue;
+    if (['Tree', 'Lamp post'].includes(base) || !SIZE[base]) continue;
+    const kind = asset.shelf === 'Creatures' ? 'free' : asset.solid ? 'solid' : ['Horse', 'Wolf'].includes(base) ? 'animal' : asset.shelf === 'Cast' ? 'body' : 'free';
+    const scale = t.size > 0 ? t.size : 1;
+    let [w, d] = SIZE[base];
+    if (['A', 'B', 'C', 'D', 'Creature'].includes(base)) [w, d] = [Math.min(w, 0.5), Math.min(d, 0.5)];
+    feet.push({ x: t.x, z: t.z, hx: (w * scale) / 2, hz: (d * scale) / 2, yaw: ((t.yaw ?? 0) * Math.PI) / 180, kind, fixed, weight: kind === 'body' ? 0 : w * d * scale * scale, keepOn: !fixed });
+    owners.push(t);
+  }
+  const shifts = settle(feet, { halfX: 3, halfZ: 2, overhang: 0.1, bodyGap: 0.1, solidGap: 0.05, touch: 0.1 });
+  let moved = 0;
+  shifts.forEach((shift, i) => {
+    if (owners[i] == null || Math.hypot(shift.dx, shift.dz) < 1e-4) return;
+    owners[i].x = Math.round((owners[i].x + shift.dx) * 100) / 100;
+    owners[i].z = Math.round((owners[i].z + shift.dz) * 100) / 100;
+    moved++;
+  });
+  return { plan: { ...plan, things }, moved };
+}
+
 function grade(c, plan) {
   const problems = [];
   const things = (plan.things ?? []).map(cleanThing).filter(Boolean);
@@ -141,25 +226,32 @@ function grade(c, plan) {
       if (read < thing.parts.length) problems.push(`${id}: ${thing.parts.length - read} part(s) unreadable`);
     } else if (!id.startsWith('copy:') && !ids.has(id)) problems.push(`unknown id ${id}`);
     if (Math.abs(raw.x) > 3.45 || Math.abs(raw.z) > 2.45) problems.push(`${id} outside the stage at ${raw.x}, ${raw.z}`);
-    const asked = (c.sizeAllowed ?? []).includes(id) || c.sizeOf === id;
+    // An effect has no true size: rain over the whole set, a bigger fireball, are choices.
+    const asked = (c.sizeAllowed ?? []).includes(id) || c.sizeOf === id || EFFECTS.has(id.replace(/ \d$/, ''));
     if (thing.size !== 0 && Math.abs(thing.size - 1) > 0.01 && !asked) problems.push(`${id} at size ${thing.size} unasked`);
     const base = id.replace(/ \d$/, '');
     // A tree's or a lamp's footprint is its branches or its head, high above: things pass under it.
     if (SIZE[base] && !EFFECTS.has(base) && !['Tree', 'Lamp post'].includes(base) && thing.y < 0.1) {
       const scale = thing.size > 0 ? thing.size : 1;
-      const [w, d] = SIZE[base];
+      let [w, d] = SIZE[base];
+      if (['A', 'B', 'C', 'D', 'Creature'].includes(base)) [w, d] = [Math.min(w, 0.5), Math.min(d, 0.5)];
       footprints.push({ id, poly: corners(thing.x, thing.z, w * scale, d * scale, thing.yaw), area: w * d * scale * scale });
     }
     if (BRANDS.test(`${thing.name} ${id}`)) problems.push(`brand or person in a name: ${thing.name}`);
   }
   for (let i = 0; i < footprints.length; i++) {
     for (let j = i + 1; j < footprints.length; j++) {
+      // A rider on a bicycle, a motorbike or a horse is meant.
+      const pair = [footprints[i].id, footprints[j].id].map((id) => id.replace(/ \d$/, ''));
+      if (pair.some((id) => ['A', 'B', 'C', 'D'].includes(id)) && pair.some((id) => ['Bicycle', 'Motorbike', 'Horse'].includes(id))) continue;
       const share = overlap(footprints[i], footprints[j]);
       if (share > 0.35) problems.push(`${footprints[i].id} and ${footprints[j].id} overlap ${Math.round(share * 100)}%`);
     }
   }
   if (BRANDS.test(`${plan.title} ${plan.says} ${plan.next}`)) problems.push(`brand or person in the words: ${plan.title} / ${plan.says}`);
   const cam = plan.camera ?? {};
+  if (c.cameraMoves && cam.keep) problems.push('the camera was kept though the shot was asked for');
+  if ((plan.says ?? '').length > 110) problems.push(`says runs ${plan.says.length} characters`);
   if (!cam.keep) {
     if (Math.abs(cam.x) > 3.55 || cam.z > 4.05 || cam.z < -2.05) problems.push(`camera outside where it may stand, at ${cam.x}, ${cam.z}`);
     const target = things.find((thing) => thing.id === cam.look_at);
@@ -186,34 +278,65 @@ if (process.argv.includes('--regrade')) {
   const { readFileSync } = await import('node:fs');
   const saved = JSON.parse(readFileSync('tmp/director/eval.json', 'utf8'));
   let ok = 0;
+  let okAfter = 0;
+  const rows = [];
   for (const run of saved) {
     const c = CASES.find((one) => one.said === run.said);
     if (c == null || run.plan == null) continue;
     const graded = grade(c, run.plan);
+    const after = dressed(c, run.plan);
+    const settled = grade(c, after.plan);
     if (graded.problems.length === 0) ok++;
+    if (settled.problems.length === 0) okAfter++;
+    rows.push({ said: run.said, wholeReplyMs: run.ms, title: run.plan.title, things: graded.things, made: graded.made, flagged: graded.problems, setDresserMoved: after.moved, flaggedAfterSetDresser: settled.problems, plan: run.plan });
     console.log(`${graded.problems.length === 0 ? 'ok  ' : 'FLAG'} ${run.said}`);
     for (const problem of graded.problems) console.log(`       ${problem}`);
+    if (after.moved > 0) console.log(`       set dresser moved ${after.moved}; after it: ${settled.problems.length === 0 ? 'nothing to flag' : settled.problems.join('; ')}`);
   }
   console.log(`
-${ok} of ${saved.length} plans with nothing to flag.`);
+${ok} of ${saved.length} plans with nothing to flag as the model wrote them; ${okAfter} once the set dresser has run.`);
+  if (process.argv.includes('--publish')) {
+    const { statSync } = await import('node:fs');
+    writeFileSync(
+      'devpost/results/designer-eval.json',
+      JSON.stringify(
+        {
+          what: 'The set designer graded by rule (tools/eval-designer.mjs): every piece one the library has or a made piece whose parts read, nothing outside the stage or standing inside another piece, true scale unless asked, the camera where it may stand and a metre or more from its subject, no brand or real person, an edit changing only what it was asked. Each plan is graded as the model wrote it, and again after the set dresser (src/settle.ts) has moved apart what stood inside something else, with the library pieces at their measured sizes.',
+          sentences: 'Written on Nov 13 after the designer\'s instructions were settled, in the shape a stranger says a shot, and graded before any change was made for them.',
+          model: 'claude-opus-5-5, fast mode, effort low',
+          planned: new Date(statSync('tmp/director/eval.json').mtimeMs).toISOString().slice(0, 10),
+          summary: { sentences: rows.length, nothingFlaggedAsWritten: ok, nothingFlaggedAfterSetDresser: okAfter },
+          runs: rows,
+        },
+        null,
+        1,
+      ),
+    );
+    console.log('wrote devpost/results/designer-eval.json');
+  }
   process.exit(0);
 }
 const picked = process.argv.slice(2).map(Number);
 const cases = picked.length > 0 ? picked.map((i) => CASES[i]) : CASES;
 const results = [];
 let clean = 0;
+let cleanAfter = 0;
 for (const c of cases) {
   try {
     const { plan, end, ms } = await ask(c);
     const graded = grade(c, plan);
+    const after = dressed(c, plan);
+    const settled = grade(c, after.plan);
     if (graded.problems.length === 0) clean++;
-    results.push({ said: c.said, ms, stop: end?.stop, title: plan.title, says: plan.says, camera: plan.camera, ...graded, plan });
+    if (settled.problems.length === 0) cleanAfter++;
+    results.push({ said: c.said, ms, stop: end?.stop, title: plan.title, says: plan.says, camera: plan.camera, ...graded, afterDresser: settled.problems, plan });
     console.log(`${graded.problems.length === 0 ? 'ok  ' : 'FLAG'} ${(ms / 1000).toFixed(1)} s  ${c.said}  [${plan.title}: ${graded.things} things, ${graded.made} made; ${plan.camera?.lens} mm at ${plan.camera?.height} m]`);
     for (const problem of graded.problems) console.log(`       ${problem}`);
+    if (after.moved > 0) console.log(`       set dresser moved ${after.moved}; after it: ${settled.problems.length === 0 ? 'nothing to flag' : settled.problems.join('; ')}`);
   } catch (error) {
     results.push({ said: c.said, error: String(error) });
     console.log(`FAIL ${c.said}: ${error}`);
   }
 }
 writeFileSync('tmp/director/eval.json', JSON.stringify(results, null, 1));
-console.log(`\n${clean} of ${cases.length} plans with nothing to flag.`);
+console.log(`\n${clean} of ${cases.length} plans with nothing to flag as the model wrote them; ${cleanAfter} once the set dresser has run.`);

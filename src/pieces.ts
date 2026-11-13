@@ -12,6 +12,7 @@
  */
 import {
   Ray,
+  Matrix4,
   AudioSource,
   AudioUtils,
   Box3,
@@ -1292,37 +1293,54 @@ export class PiecesSystem extends createSystem({
   }
 
   /**
-   * The camera operator's check. Every visible piece but the camera and the subject is a box on the slate; the
-   * lens must not be inside one, and the line from the lens to the subject must not pass through one. The spot
-   * asked for is kept if it is clear; otherwise the spots tried, in order of how little they change the shot, are
-   * a step round the subject either way, then the same a little higher, then from further back. Slate metres.
-   * Called when the designer places the camera, never in a frame.
+   * The camera operator's check. Every visible piece but the camera and the subject is a box in its own frame, so
+   * a piece turned on the slate is tested as the shape it is, not as the square around it; the lens must not be
+   * inside one, and the line from the lens to the subject must not pass through one. A piece the subject stands
+   * inside (a car it is in, a doorway) is not in the way. The spot asked for is kept if it is clear; otherwise the
+   * spots tried, in order of how little they change the shot, are a step round the subject either way, then the
+   * same a little higher, then from further back. Slate metres. Called when the designer places the camera, never
+   * in a frame.
    */
   private clearShot(x: number, z: number, height: number, subject: Vector3, target: Entity | null, cam: Entity): [number, number, number] {
+    // Each piece's own shape, in its own frame, and the way from the slate into that frame.
     const boxes: Box3[] = [];
+    const into: Matrix4[] = [];
+    const there = new Vector3();
     for (let i = 0; i < this.dressed.length; i++) {
       const piece = this.dressed[i];
       const object = piece.object3D;
       if (object == null || !object.visible || piece === target || piece === cam || piece.hasComponent(ShotCamera)) continue;
       if (assetByLabel(String(piece.getValue(SetPiece, 'label')))?.shelf === 'Effects') continue;
       object.updateMatrix();
-      const box = localBounds(object).applyMatrix4(object.matrix);
-      if (!box.isEmpty()) boxes.push(box.expandByScalar(0.006));
+      const box = localBounds(object);
+      if (box.isEmpty()) continue;
+      const toPiece = object.matrix.clone().invert();
+      // The subject inside it: the car the actor is in, the doorway they stand in.
+      if (box.containsPoint(there.copy(subject).applyMatrix4(toPiece))) continue;
+      // A margin of 6 mm on the slate, whatever the piece's size.
+      boxes.push(box.expandByScalar(0.006 / Math.max(1e-3, object.scale.x)));
+      into.push(toPiece);
     }
     const lens = new Vector3();
     const ray = new Ray();
     const hit = new Vector3();
     const way = new Vector3();
+    const near = new Vector3();
+    const aim = new Vector3();
     const isClear = (px: number, pz: number, ph: number): boolean => {
       lens.set(px, ph, pz);
-      way.copy(subject).sub(lens);
-      const far = way.length();
+      const far = way.copy(subject).sub(lens).length();
       if (far < 1e-4) return false;
-      ray.set(lens, way.normalize());
-      for (const box of boxes) {
-        if (box.containsPoint(lens)) return false;
-        // What the subject stands in front of is not in the way.
-        if (ray.intersectBox(box, hit) != null && hit.distanceTo(lens) < far - 0.01) return false;
+      for (let i = 0; i < boxes.length; i++) {
+        near.copy(lens).applyMatrix4(into[i]);
+        if (boxes[i].containsPoint(near)) return false;
+        aim.copy(subject).applyMatrix4(into[i]).sub(near);
+        const length = aim.length();
+        if (length < 1e-6) continue;
+        ray.set(near, aim.divideScalar(length));
+        // A piece the subject stands in front of is not in the way: only a hit short of the subject counts. The
+        // fraction along the line is the same in the piece's frame as on the slate.
+        if (ray.intersectBox(boxes[i], hit) != null && hit.distanceTo(near) / length < 1 - 0.01 / far) return false;
       }
       return true;
     };
@@ -1338,7 +1356,7 @@ export class PiecesSystem extends createSystem({
           const angle = around + (turn * Math.PI) / 180;
           // The camera may stand off the slate, on the table in front of it.
           const px = Math.max(-0.35, Math.min(0.35, subject.x + Math.sin(angle) * reach * back));
-          const pz = Math.max(-0.2, Math.min(0.4, subject.z + Math.cos(angle) * reach * back));
+          const pz = Math.max(-0.24, Math.min(0.4, subject.z + Math.cos(angle) * reach * back));
           const ph = Math.min(1.1, height + rise);
           if (isClear(px, pz, ph)) return [px, pz, ph];
         }

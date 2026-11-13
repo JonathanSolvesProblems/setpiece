@@ -7,14 +7,18 @@
 import { createSystem, Entity, Object3D, Vector3 } from '@iwsdk/core';
 import type { World } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { localBounds } from './bounds.js';
 import { assetByLabel, assetTitle, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf } from './catalog.js';
+import type { Asset } from './catalog.js';
 import { LENSES } from './camera-formats.js';
-import { cleanCamera, cleanThing, plainLine, PlanReader } from './director-plan.js';
+import { cleanCamera, cleanThing, plainLine, PlanReader, readPart } from './director-plan.js';
 import type { CameraPlan, Thing } from './director-plan.js';
 import { MadeSystem } from './made.js';
 import type { MadeDef } from './made.js';
 import { PiecesSystem } from './pieces.js';
 import { understand } from './scene-request.js';
+import { settle as settleFootings } from './settle.js';
+import type { Footing, Kind } from './settle.js';
 import type { Spoken } from './scene-request.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
 import { TraySystem } from './tray.js';
@@ -49,6 +53,23 @@ const LOOK_AFTER_MS = 700;
 const MOST_LOOKS = 2;
 /** A server that said it has no key is asked again after this long. */
 const RECHECK_MS = 60000;
+/**
+ * The set dresser's room, in slate metres: the stage's half width and depth, how far a piece may hang over its
+ * edge, the space left beside a piece something stepped out of, and the overlap that is only contact.
+ */
+const ROOM = { halfX: 0.3, halfZ: 0.2, overhang: 0.01, bodyGap: 0.01, solidGap: 0.005, touch: 0.01 };
+/** An actor's body for the set dresser, half a metre across whatever the arms are doing. */
+const BODY_HALF = 0.025;
+/** Higher than this off the ground, a piece is up on something or flying, and the set dresser leaves it be. */
+const RAISED = 0.01;
+/** A made piece's part counts as standing on the ground within this of its lowest part, and this tall, in real metres. */
+const PART_FOOT = 0.3;
+const PART_TALL = 0.3;
+
+/** A piece on the set, as the set dresser reads it. */
+type Standing = { label: string; entity: Entity; object: Object3D; base: Asset; rest: number };
+/** A piece the set dresser moved: how far, and the footprint it had before, for the effects standing on it. */
+type Moved = { standing: Standing; dx: number; dz: number; foot: Footing };
 
 /** What came of a request: a set went up, the library's reader built instead, or a newer request took over. */
 export type Outcome = 'built' | 'library' | 'superseded';
@@ -248,6 +269,8 @@ export class DirectorSystem extends createSystem({
         this.fallback(said, failed || 'The set designer sent nothing back.');
         return 'library';
       }
+      // The set dresser puts right what stands inside something else, before the camera is placed.
+      build.settle((entity, object, y) => this.drop(entity, object, y));
       this.pendingCamera = build.camera;
       this.pendingCameraLabels = build.labels;
       // A new set, or a new frame, is looked at once it stands; a look that changed the frame is looked at once more.
@@ -264,6 +287,7 @@ export class DirectorSystem extends createSystem({
         return 'superseded';
       }
       if (build.begun) {
+        build.settle((entity, object, y) => this.drop(entity, object, y));
         build.end(looking ? '' : 'The set designer stopped partway; what arrived is on the set.');
         return 'built';
       }
@@ -391,6 +415,8 @@ class PlanBuild {
   /** The plan's own ids for what it put down ("new:tower", "copy:tower", "Car"), each to the label it went up as. */
   labels = new Map<string, string>();
   private placed = new Set<string>();
+  /** Where each piece this plan put down rests, in slate metres up: it may still be dropping when the reply ends. */
+  private restY = new Map<string, number>();
   /** What stood on the set before the plan began: a made piece there is not built over, and a copy there is not borrowed. */
   private before = new Set<string>();
   private removed: string[] = [];
@@ -449,6 +475,7 @@ class PlanBuild {
     const object = tray.planPiece(label, thing.x * SLATE, thing.y * SLATE, thing.z * SLATE, thing.yaw * DEG, finish, cast);
     if (object == null) return;
     this.placed.add(label);
+    this.restY.set(label, thing.y * SLATE);
     this.labels.set(thing.id, label);
     // New to the set, it drops on; already there, it is moved where the plan wants it.
     if (!was || this.fresh) drop(entity, object, thing.y * SLATE);
@@ -495,6 +522,103 @@ class PlanBuild {
     const base = asset.spareOf ?? id;
     const standing = this.fresh ? new Set<string>() : this.before;
     return [base, ...sparesOf(base)].find((label) => !this.placed.has(label) && !standing.has(label)) ?? null;
+  }
+
+  /**
+   * The set dresser (src/settle.ts). The designer reads footprints well at yaw 0 and badly once a piece is
+   * turned, so an actor can end up standing inside a car parked side-on, or the car off the slate's edge.
+   * First the made pieces this plan put down are brought onto the stage whole. Then everything on the ground is
+   * settled: library pieces by their shapes, made pieces by the parts that stand on the ground (so a car can
+   * stand under a made bridge and a guard in a made gateway, but not inside a made wall). Pieces are moved apart
+   * by the shortest push and what this plan put down is kept on the stage; what stood on the set before it and
+   * was not touched stays exactly where it was, and made pieces are never pushed. An effect moves with the piece
+   * it stood on. A piece that moves drops again onto its new mark. Pieces up on something or flying, creatures,
+   * riders on a horse or a bicycle, trees and lamps are left as the designer meant. Returns how many moved.
+   */
+  settle(drop: (entity: Entity, object: Object3D, y: number) => void): number {
+    if (!this.begun || this.placed.size === 0) return 0;
+    const tray = this.world.getSystem(TraySystem);
+    const made = this.world.getSystem(MadeSystem);
+    if (tray == null) return 0;
+    const standing: Standing[] = [];
+    for (const label of tray.onSet()) {
+      const asset = assetByLabel(label);
+      const base = asset?.spareOf != null ? assetByLabel(asset.spareOf) : asset;
+      if (asset == null || base == null || base.shelf === 'Kit') continue;
+      const entity = this.entityOf(label);
+      const object = entity?.object3D;
+      if (entity == null || object == null || !object.visible || entity.hasComponent(Held)) continue;
+      standing.push({ label, entity, object, base, rest: this.restY.get(label) ?? object.position.y });
+    }
+    const moves: Moved[] = [];
+    const apply = (feet: Footing[], owners: (Standing | null)[]): void => {
+      const shifts = settleFootings(feet, ROOM);
+      for (let i = 0; i < shifts.length; i++) {
+        const owner = owners[i];
+        const { dx, dz } = shifts[i];
+        if (owner == null || Math.abs(dx) + Math.abs(dz) < 1e-4) continue;
+        owner.object.position.x += dx;
+        owner.object.position.z += dz;
+        moves.push({ standing: owner, dx, dz, foot: feet[i] });
+      }
+    };
+    // Made pieces this plan put down, onto the stage whole: their parts move together.
+    const madeFeet: Footing[] = [];
+    const madeOwners: Standing[] = [];
+    for (const one of standing) {
+      if (!isMade(one.label) || !this.placed.has(one.label) || one.rest > RAISED) continue;
+      const foot = footingOf(one.object, 'free', false, true);
+      if (foot == null) continue;
+      madeFeet.push(foot);
+      madeOwners.push(one);
+    }
+    if (madeFeet.length > 0) apply(madeFeet, madeOwners);
+    // Then everything on the ground.
+    const feet: Footing[] = [];
+    const owners: (Standing | null)[] = [];
+    for (const one of standing) {
+      const { base, label, object } = one;
+      if (base.shelf === 'Effects' || one.rest > RAISED || base.label === 'Tree' || base.label === 'Lamp post') continue;
+      if (isMade(label)) {
+        const def = made?.defIn(label);
+        if (def == null) continue;
+        for (const foot of groundParts(object, def.parts)) {
+          feet.push(foot);
+          owners.push(null);
+        }
+        continue;
+      }
+      const kind: Kind =
+        base.shelf === 'Creatures'
+          ? 'free'
+          : base.solid === true
+            ? 'solid'
+            : base.label === 'Horse' || base.label === 'Wolf'
+              ? 'animal'
+              : base.shelf === 'Cast'
+                ? 'body'
+                : 'free';
+      const fixed = !this.placed.has(label);
+      // A creature may loom over the stage's edge, as a giant does.
+      const foot = footingOf(object, kind, fixed, !fixed && base.shelf !== 'Creatures');
+      if (foot == null) continue;
+      feet.push(foot);
+      owners.push(one);
+    }
+    if (feet.length > 0) apply(feet, owners);
+    if (moves.length === 0) return 0;
+    // An effect goes with the piece it stood on: fire on a car that moved moves with the car.
+    for (const one of standing) {
+      if (one.base.shelf !== 'Effects' || !this.placed.has(one.label)) continue;
+      const under = moves.find((move) => holds(move.foot, one.object.position.x, one.object.position.z));
+      if (under == null) continue;
+      one.object.position.x += under.dx;
+      one.object.position.z += under.dz;
+      moves.push({ standing: one, dx: under.dx, dz: under.dz, foot: under.foot });
+    }
+    for (const move of moves) drop(move.standing.entity, move.standing.object, move.standing.rest);
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    return moves.length;
   }
 
   /** The finish and dress a thing asks for, keeping what it does not mention. */
@@ -560,4 +684,72 @@ class PlanBuild {
     const next = this.next !== '' ? ` Try: "${this.next}".` : '';
     g.coachNote.value = problem !== '' ? `${title} | ${problem}${lost}` : `${title} | ${this.says || 'The set is up.'}${lost}${next}`;
   }
+}
+
+/**
+ * A piece's footprint on the stage for the set dresser, in slate metres: the middle of its shape turned as it
+ * stands, and half its width and length; an actor is the body on its mark, not the reach of an aiming arm.
+ */
+function footingOf(object: Object3D, kind: Kind, fixed: boolean, keepOn: boolean): Footing | null {
+  const box = localBounds(object);
+  if (box.isEmpty()) return null;
+  const scale = object.scale.x;
+  const yaw = object.rotation.y;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const body = kind === 'body';
+  const cx = body ? 0 : ((box.min.x + box.max.x) / 2) * scale;
+  const cz = body ? 0 : ((box.min.z + box.max.z) / 2) * scale;
+  const hx = ((box.max.x - box.min.x) / 2) * scale;
+  const hz = ((box.max.z - box.min.z) / 2) * scale;
+  return {
+    x: object.position.x + cx * c + cz * s,
+    z: object.position.z - cx * s + cz * c,
+    hx: body ? Math.min(hx, BODY_HALF) : hx,
+    hz: body ? Math.min(hz, BODY_HALF) : hz,
+    yaw,
+    kind,
+    fixed,
+    weight: kind === 'solid' ? 4 * hx * hz : 0,
+    keepOn,
+  };
+}
+
+/** The parts of a made piece that stand on the ground, each a solid footprint that never moves. */
+function groundParts(object: Object3D, lines: string[]): Footing[] {
+  const parts = lines.map(readPart).filter((part): part is NonNullable<typeof part> => part != null);
+  if (parts.length === 0) return [];
+  let low = Infinity;
+  for (const part of parts) low = Math.min(low, part.y - part.h / 2);
+  const scale = object.scale.x * SLATE;
+  const yaw = object.rotation.y;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const feet: Footing[] = [];
+  for (const part of parts) {
+    if (part.y - part.h / 2 - low > PART_FOOT || part.h < PART_TALL) continue;
+    const x = part.x * scale;
+    const z = part.z * scale;
+    feet.push({
+      x: object.position.x + x * c + z * s,
+      z: object.position.z - x * s + z * c,
+      hx: (part.w / 2) * scale,
+      hz: (part.d / 2) * scale,
+      yaw: yaw + part.yaw * DEG,
+      kind: 'solid',
+      fixed: true,
+      weight: Infinity,
+      keepOn: false,
+    });
+  }
+  return feet;
+}
+
+/** Whether a point on the stage lies within a footprint, with a few millimetres to spare. */
+function holds(foot: Footing, x: number, z: number): boolean {
+  const dx = x - foot.x;
+  const dz = z - foot.z;
+  const c = Math.cos(foot.yaw);
+  const s = Math.sin(foot.yaw);
+  return Math.abs(dx * c - dz * s) <= foot.hx + 0.005 && Math.abs(dx * s + dz * c) <= foot.hz + 0.005;
 }

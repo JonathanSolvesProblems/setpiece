@@ -361,7 +361,7 @@
     </div>
     <div id="shelf-pager" class="field" style="display: none">
       <div id="shelf-page" class="line muted">1 of 2</div>
-      <div id="btn-more" class="word">More</div>
+      <div id="btn-shelf-more" class="word">Next</div>
     </div>
     <div id="fx-note" class="line muted" style="display: none">Effects are stand-ins, not simulations.</div>
     <div class="field">

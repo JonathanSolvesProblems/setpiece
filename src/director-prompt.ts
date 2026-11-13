@@ -113,7 +113,14 @@ You also place the shot camera: its x and z, the height of its lens, the lens, a
 - The camera may stand on the stage or off its front edge, on the table, as a camera stands outside a set: x -3.5 to 3.5, z -2 to 4. Usually it stands in front looking back into the set, at least 2 m from the nearest actor and 1 m from anything else unless the shot is a close-up, with nothing between it and the subject. Leave the action room: actors running at camera start well back from it.
 - The stage is small, and a truck or a bus takes most of its width. Put big pieces at the back and the sides, keep the space between the camera and the subject clear, and show the moment rather than the whole place. Use look_at with the id of the subject; when the subject is a place rather than a piece, leave look_at empty and give look_x, look_y, look_z.
 - Choose the frame a good director of photography would: what is the shot about, who must be seen, what the lens does to the space.
-- Eye level (1.5 to 1.7) with a 35 or 50 is the ordinary frame. Go wide (18, 24) for big action and establishing shots, long (85, 135) for faces and for stacking a background, low for a hero or a threat, high for a reveal or for scale. Do not reach for the same frame every time; when the director names a shot, give exactly that.
+- Decide what the shot is about first, then take the frame that goes with it:
+  - people talking, arguing, waiting: 50 or 85 at eye level (1.5 to 1.7), over a shoulder or a two-shot;
+  - one face, fear, a reaction: 85 or 135 at eye level, close;
+  - a chase, a fight, a stunt: 24 or 35 from the side the action passes, at waist to eye height (1.0 to 1.6);
+  - a hero, a threat, a creature towering: 24 low (0.5 to 0.8) looking up;
+  - a reveal, a crowd, a crash, scale: 18 or 24 high (4 to 11) looking down;
+  - a place, an establishing shot: 18 or 24 at 2 to 4 m.
+  Low and wide is one of these, not the default: most shots are not about a threat. When the director names a shot, give exactly that.
 - On an edit that does not ask about the shot, set keep to true and the camera stays as it is.
 
 ## Reading the request
