@@ -55,6 +55,7 @@ import {
   truckProp,
 } from './scene-assets/props-more.scene-asset.js';
 import { cameraRigModel, stagePlate } from './scene-assets/rig.scene-asset.js';
+import { madeSlotModel } from './scene-assets/made.scene-asset.js';
 
 const publicAssetUrl = (filePath: string): string =>
   `${import.meta.env.BASE_URL}${filePath.replace(/^\/+/u, '')}`;
@@ -113,6 +114,7 @@ export default defineAssets({
   stairs: stairsProp,
   door: doorProp,
   pillar: pillarProp,
+  made: madeSlotModel,
   'controls-panel': {
     url: publicAssetUrl('ui/controls.uikitml'),
     type: AssetType.UIKitML,

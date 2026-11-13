@@ -22,6 +22,7 @@ import { SetPiece, StageAnchor } from './set-components.js';
 import { SCENES } from './scenes.js';
 import { noteSeconds } from './coach.js';
 import { hear } from './spoken.js';
+import { DirectorSystem } from './director.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
@@ -136,6 +137,8 @@ type Globals = {
   cameraOn: Signal<string>;
   sceneRequest: Signal<Spoken | null>;
   coachNote: Signal<string>;
+  talkOffered: Signal<boolean>;
+  designing: Signal<boolean>;
   coachLine: Signal<string>;
   shotFrames: Signal<unknown[]>;
   takeClear: Signal<number>;
@@ -190,13 +193,19 @@ export class ControlsSystem extends createSystem({
   private panelTurn = new Quaternion().setFromAxisAngle(UP, PANEL_YAW);
   private snapButton: { setProperties(properties: Record<string, unknown>): void } | null = null;
   private snapLit = false;
+  private talkLit = false;
+  /** Lights or darkens Talk for the call sheet; set once the panel is wired. */
+  private talkLight: ((on: boolean) => void) | null = null;
   private gateOpen = true;
   /**
    * A sentence the listener has written, acted on, with what was heard and what came of it said on the panel.
    * The recogniser calls it, and so can a test, with typed words.
    */
-  heard: (text: string) => void = (text) => hear(this.world, text);
+  heard: (text: string, library?: boolean) => void = (text, library) => hear(this.world, text, library === true);
   private gateOpenUntil = 0;
+  /** Until when each hand counts as being at the panel, and the time the gate last looked. */
+  private wantedUntil: Record<'left' | 'right', number> = { left: -1, right: -1 };
+  private lastTime = 0;
   private gateAt = new Vector3();
   private gateFrom = new Vector3();
   private gateWay = new Vector3();
@@ -214,11 +223,18 @@ export class ControlsSystem extends createSystem({
       if (this.panelObject != null) this.gatePanel(this.panelObject, time);
       return;
     }
-    const lit =
-      (this.globals as Globals).coachTarget.peek() === 'snap' && Math.floor(time * SNAP_FLASH_RATE * 2) % 2 === 0;
+    const target = (this.globals as Globals).coachTarget.peek();
+    const blink = Math.floor(time * SNAP_FLASH_RATE * 2) % 2 === 0;
+    const lit = target === 'snap' && blink;
     if (lit !== this.snapLit) {
       this.snapLit = lit;
       this.snapButton?.setProperties({ backgroundColor: lit ? OPTIC_YELLOW : CHALK });
+    }
+    // The call sheet asking for a sentence lights Talk the same way, unless it is listening or busy already.
+    const talk = target === 'talk' && blink;
+    if (talk !== this.talkLit) {
+      this.talkLit = talk;
+      this.talkLight?.(talk);
     }
     const stageObject = this.stage?.object3D;
     if (stageObject == null) return;
@@ -238,14 +254,21 @@ export class ControlsSystem extends createSystem({
     this.gatePanel(panel, time);
   }
 
+  /** This hand points at the panel or reaches for it, or did a moment ago: its pinch now is for the panel. */
+  panelWanted(side: 'left' | 'right'): boolean {
+    return this.gateOpen && this.lastTime <= this.wantedUntil[side];
+  }
+
   /** Opens the panel to the hand pointers while a hand points at it or reaches for it, and closes it otherwise. */
   private gatePanel(panel: Object3D, time: number): void {
     const size = this.panelRoot?.size?.value;
     const reach = (size == null ? 0.3 : Math.hypot(size[0], size[1]) * PANEL_UNIT * 0.5) + PANEL_GATE_MARGIN;
     panel.getWorldPosition(this.gateAt);
     let wanted = false;
-    for (let i = 0; i < SIDES.length && !wanted; i++) {
+    this.lastTime = time;
+    for (let i = 0; i < SIDES.length; i++) {
       const side = SIDES[i];
+      let mine = false;
       const ray = this.player.raySpaces[side];
       ray.getWorldPosition(this.gateFrom);
       // A target ray points down its own -Z.
@@ -254,9 +277,13 @@ export class ControlsSystem extends createSystem({
       const along = this.gateTo.dot(this.gateWay);
       // How far the middle of the panel is from the line the hand points along; behind the hand, from the hand itself.
       const off = along <= 0 ? this.gateTo.length() : Math.sqrt(Math.max(0, this.gateTo.lengthSq() - along * along));
-      if (off <= reach) wanted = true;
+      if (off <= reach) mine = true;
       this.player.indexTipSpaces[side].getWorldPosition(this.gateFrom);
-      if (this.gateFrom.distanceTo(this.gateAt) <= reach + PANEL_GATE_MARGIN) wanted = true;
+      if (this.gateFrom.distanceTo(this.gateAt) <= reach + PANEL_GATE_MARGIN) mine = true;
+      if (mine) {
+        wanted = true;
+        this.wantedUntil[side] = time + PANEL_GATE_HOLD;
+      }
     }
     if (wanted) this.gateOpenUntil = time + PANEL_GATE_HOLD;
     const open = time <= this.gateOpenUntil;
@@ -492,11 +519,11 @@ export class ControlsSystem extends createSystem({
         g.takeClear.value = g.takeClear.peek() + 1;
       },
     );
-    this.heard = (text: string): void => {
+    this.heard = (text: string, library?: boolean): void => {
       const posted = g.notesPosted.peek();
       heardNow = clip(text);
       try {
-        hear(this.world, text);
+        hear(this.world, text, library === true);
       } finally {
         heardNow = '';
       }
@@ -509,15 +536,20 @@ export class ControlsSystem extends createSystem({
       if (note !== '') g.coachNote.value = note;
     });
     let openTab: string = 'shoot';
+    // The panel is small until More: Talk, Snap frame, Undo, Step inside. More opens the tabs, which hold every
+    // control there is; it is kept open or shut between visits.
+    let more = loadJson<{ more?: boolean }>(StoreKey.Settings)?.more === true;
     // What the piece last touched can be given follows the wearer to every tab; the Assets tab shows it always.
     const showPieceBar = (): void => {
-      panel.getElementById('held-block')?.setProperties({ display: openTab === 'assets' || g.castLine.peek() !== '' ? 'flex' : 'none' });
+      panel.getElementById('held-block')?.setProperties({ display: (more && openTab === 'assets') || g.castLine.peek() !== '' ? 'flex' : 'none' });
     };
     const showTab = (tab: string): void => {
       openTab = tab;
       showPieceBar();
+      panel.getElementById('tabs')?.setProperties({ display: more ? 'flex' : 'none' });
+      panel.getElementById<UIKit.Text>('btn-more')?.setProperties({ text: more ? 'Less' : 'More', borderColor: more ? OPTIC_YELLOW : CHALK_HAZE });
       for (const name of TABS) {
-        panel.getElementById(`page-${name}`)?.setProperties({ display: name === tab ? 'flex' : 'none' });
+        panel.getElementById(`page-${name}`)?.setProperties({ display: more && name === tab ? 'flex' : 'none' });
         panel.getElementById(`tab-${name}`)?.setProperties({
           backgroundColor: name === tab ? OPTIC_YELLOW : undefined,
           color: name === tab ? CLOTH : CHALK,
@@ -525,29 +557,42 @@ export class ControlsSystem extends createSystem({
       }
     };
     for (const name of TABS) wire(`tab-${name}`, () => showTab(name));
+    wire('btn-more', () => {
+      more = !more;
+      saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), more });
+      showTab(openTab);
+    });
     showTab('shoot');
 
     // The full-size set, and the way back to the table.
     // Growing the whole set is not something to do by a stray pinch: it takes a second press.
+    // The same switch is on the Stage tab and, as Step inside, on the small panel.
     const life = panel.getElementById<UIKit.Text>('btn-life');
+    const inside = panel.getElementById<UIKit.Text>('btn-inside');
     let lifeArmed: ReturnType<typeof setTimeout> | null = null;
     const disarmLife = (): void => {
       if (lifeArmed != null) clearTimeout(lifeArmed);
       lifeArmed = null;
     };
     this.cleanupFuncs.push(disarmLife);
-    wire('btn-life', () => {
+    const pressLife = (): void => {
       if (!g.lifeSize.peek() && lifeArmed == null) {
         life?.setProperties({ text: 'Press again to go full size', borderColor: OPTIC_YELLOW });
+        inside?.setProperties({ text: 'Press again', borderColor: OPTIC_YELLOW });
+        says('', 'Step inside grows the set to full size around you. Press again to go in.', LIFE_CONFIRM_MS);
         lifeArmed = setTimeout(() => {
           lifeArmed = null;
-          if (!g.lifeSize.peek()) life?.setProperties({ text: 'Stand in the shot', borderColor: CHALK_HAZE });
+          if (g.lifeSize.peek()) return;
+          life?.setProperties({ text: 'Stand in the shot', borderColor: CHALK_HAZE });
+          inside?.setProperties({ text: 'Step inside', borderColor: CHALK_HAZE });
         }, LIFE_CONFIRM_MS);
         return;
       }
       disarmLife();
       g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
-    });
+    };
+    wire('btn-life', pressLife);
+    wire('btn-inside', pressLife);
     // At full size the way back is the one big button, whichever tab is showing.
     wire('btn-back', () => {
       if (g.lifeSize.peek()) g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
@@ -555,6 +600,7 @@ export class ControlsSystem extends createSystem({
     this.cleanupFuncs.push(
       g.lifeSize.subscribe((on) => {
         life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        inside?.setProperties({ text: on ? 'Back out' : 'Step inside', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         // A frame needs the slate under the actors, and the slate is back on the table.
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
         panel.getElementById('btn-back')?.setProperties({ display: on ? 'flex' : 'none' });
@@ -592,15 +638,16 @@ export class ControlsSystem extends createSystem({
     const voiceButton = panel.getElementById<UIKit.Text>('btn-voice');
     if (voiceButton != null && Voice.supported()) {
       voiceButton.setProperties({ display: 'flex' });
+      g.talkOffered.value = true;
       let voice: Voice | null = null;
       let busy = false;
       const tell = (text: string, holdMs = 0, hint = false): void => says('', text, holdMs, hint);
       const WORDS: Record<VoiceState, string> = {
-        idle: 'Say a scene',
+        idle: 'Talk',
         loading: 'Getting ready',
         listening: 'Listening',
         thinking: 'One moment',
-        error: 'Say a scene',
+        error: 'Talk',
       };
       // Keep listening: after each sentence the microphone opens again by itself, so a whole setup
       // can be said after one pinch. A quiet spell ends it, and so does the button.
@@ -614,6 +661,15 @@ export class ControlsSystem extends createSystem({
         keepButton?.setProperties({ text: keep ? 'Keep listening: on' : 'Keep listening: off', borderColor: keep ? OPTIC_YELLOW : CHALK_HAZE });
       };
       showKeep();
+      // While the set designer works, Talk says so; the call sheet can light it when it wants a sentence.
+      this.talkLight = (on) => {
+        if (!busy) voiceButton.setProperties({ backgroundColor: on ? OPTIC_YELLOW : undefined, color: on ? CLOTH : CHALK });
+      };
+      this.cleanupFuncs.push(
+        g.designing.subscribe((on) => {
+          if (!busy) voiceButton.setProperties({ text: on ? 'Designing' : 'Talk' });
+        }),
+      );
       wire('btn-keep-listening', () => {
         keep = !keep;
         saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), keep });
@@ -641,7 +697,7 @@ export class ControlsSystem extends createSystem({
           onState: (state, detail) => {
             busy = state === 'loading' || state === 'listening' || state === 'thinking';
             voiceButton.setProperties({
-              text: WORDS[state],
+              text: state === 'idle' && g.designing.peek() ? 'Designing' : WORDS[state],
               backgroundColor: state === 'listening' ? OPTIC_YELLOW : undefined,
               color: state === 'listening' ? CLOTH : CHALK,
             });
@@ -690,6 +746,9 @@ export class ControlsSystem extends createSystem({
           voice.stop();
         } else {
           chained = false;
+          // With the set designer there, anything can be said, so the listener takes any words; without it,
+          // only the library's words mean anything, and listening for just those hears them far better.
+          voice.listenFor(this.world.getSystem(DirectorSystem)?.available() === true ? undefined : wordsToHear());
           void voice.start();
         }
       });

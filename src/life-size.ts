@@ -5,10 +5,25 @@
  * eye line. The slate, the monitor and the board stay behind on the table, so
  * what is left is the blocking in the room.
  */
-import { createSystem, Entity, Object3D, PointLight, Quaternion, setWorldPosition, setWorldQuaternion, Vector3, VisibilityState } from '@iwsdk/core';
+import {
+  createSystem,
+  Entity,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  PointLight,
+  Quaternion,
+  RingGeometry,
+  setWorldPosition,
+  setWorldQuaternion,
+  Vector3,
+  VisibilityState,
+} from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { assetByLabel, assetTitle } from './catalog.js';
 import { SetPiece, SetRole, ShotCamera, StageAnchor } from './set-components.js';
 import { ViewfinderSystem } from './viewfinder.js';
+import { ControlsSystem } from './controls.js';
 
 /** The set is 1:10, so this is true scale. */
 const LIFE_SCALE = 10;
@@ -18,6 +33,16 @@ const UP = new Vector3(0, 1, 0);
 /** Where the lens is on the rig: this far along its forward, -Z. */
 const LENS_AHEAD = -0.06;
 /** What stays on the table: the furniture of the miniature, not the blocking. */
+/** Where a pointing hand would stand the wearer: a ring on the floor, this wide on the slate (ten times that at full size). */
+const MARK_INNER = 0.022;
+const MARK_OUTER = 0.032;
+/** A hand points at the floor when its ray falls at least this steeply, and the floor is between these, in metres. */
+const FALLS = -0.12;
+const NEAREST = 0.4;
+const FARTHEST = 25;
+const SIDES = ['left', 'right'] as const;
+type Side = (typeof SIDES)[number];
+const OPTIC_YELLOW = 0xd6e13c;
 const LEFT_BEHIND = new Set(['Plate', 'Rim', 'ClapperStripe', 'Strip', 'Viewfinder', 'StoryboardCard', 'HandleLabel', 'StageHandle', 'LensBackdrop']);
 
 type Globals = { lifeSize: Signal<boolean>; lifeSizeRequested: Signal<number> };
@@ -40,6 +65,16 @@ export class LifeSizeSystem extends createSystem({
   private offset = new Vector3();
   private turn = new Quaternion();
   private cameraTurn = new Quaternion();
+  private stand = new Vector3();
+  private toward = new Vector3();
+  /** The ring on the floor where a pinch would stand the wearer, and which hand is pointing there. */
+  private mark: Mesh | null = null;
+  private aimed: Side | null = null;
+  private armed: Side | null = null;
+  private from = new Vector3();
+  private way = new Vector3();
+  private hit = new Vector3();
+  private floor = new Vector3();
 
   init(): void {
     const g = this.globals as Globals;
@@ -55,6 +90,128 @@ export class LifeSizeSystem extends createSystem({
         if (state === VisibilityState.NonImmersive && g.lifeSize.peek()) this.leave(false);
       }),
     );
+  }
+
+  /**
+   * At full size, a hand pointing down at the floor marks where it would stand the wearer, and a pinch there
+   * takes them: the set slides so that spot is under their feet. A hand at the panel is the panel's.
+   */
+  update(): void {
+    const g = this.globals as Globals;
+    const object = this.stage()?.object3D;
+    const life = g.lifeSize.peek() && object != null && this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+    if (!life) {
+      if (this.mark != null) this.mark.visible = false;
+      this.aimed = null;
+      this.armed = null;
+      return;
+    }
+    const mark = this.ensureMark(object);
+    object.getWorldPosition(this.floor);
+    const controls = this.world.getSystem(ControlsSystem);
+    this.aimed = null;
+    for (let i = 0; i < SIDES.length && this.aimed == null; i++) {
+      const side = SIDES[i];
+      if (controls?.panelWanted(side) === true) continue;
+      const ray = this.player.raySpaces[side];
+      ray.getWorldPosition(this.from);
+      // A target ray points down its own -Z.
+      ray.getWorldDirection(this.way).negate();
+      if (this.way.y > FALLS) continue;
+      const t = (this.floor.y - this.from.y) / this.way.y;
+      if (t < NEAREST || t > FARTHEST) continue;
+      this.hit.copy(this.from).addScaledVector(this.way, t);
+      this.aimed = side;
+    }
+    if (this.aimed == null) {
+      mark.visible = false;
+      this.armed = null;
+      return;
+    }
+    mark.visible = true;
+    mark.position.copy(this.hit);
+    object.worldToLocal(mark.position);
+    mark.position.y = 0.0006;
+    const pad = this.input.xr.gamepads[this.aimed];
+    if (pad?.getSelectStart() === true) this.armed = this.aimed;
+    if (this.armed === this.aimed && pad?.getSelectEnd() === true) {
+      this.armed = null;
+      // The spot comes to the wearer's feet; the set keeps its turn.
+      this.player.head.getWorldPosition(this.head);
+      this.head.y = this.floor.y;
+      this.offset.copy(this.head).sub(this.hit);
+      this.offset.y = 0;
+      this.floor.add(this.offset);
+      setWorldPosition(object, this.floor);
+      this.world.getSystem(ViewfinderSystem)?.refresh();
+    }
+  }
+
+  private ensureMark(object: Object3D): Mesh {
+    if (this.mark == null) {
+      const mark = new Mesh(new RingGeometry(MARK_INNER, MARK_OUTER, 40), new MeshBasicMaterial({ color: OPTIC_YELLOW, toneMapped: false }));
+      mark.name = 'WalkMark';
+      mark.rotation.x = -Math.PI / 2;
+      mark.raycast = () => {};
+      mark.visible = false;
+      this.world.getSystem(ViewfinderSystem)?.hideFromLens(mark);
+      this.mark = mark;
+    }
+    if (this.mark.parent !== object) object.add(this.mark);
+    return this.mark;
+  }
+
+  /**
+   * Walks the wearer to a piece on the full-size set, by word: they stand a step in front of it, facing it.
+   * "Camera" puts them at the lens, as Step inside does. On the table, the set grows first. Returns the line
+   * for the call sheet.
+   */
+  goTo(label: string): string {
+    const g = this.globals as Globals;
+    if (this.world.visibilityState.peek() === VisibilityState.NonImmersive) return 'IN THE HEADSET | Walking the set is done in the headset.';
+    if (label === 'Camera') {
+      if (g.lifeSize.peek()) this.leave();
+      this.enter();
+      return g.lifeSize.peek() ? 'AT THE CAMERA | You stand at the lens, looking down it. Say step out to go back.' : '';
+    }
+    let piece: Entity | null = null;
+    for (const entity of this.queries.pieces.entities) {
+      if (String(entity.getValue(SetPiece, 'label')) === label && entity.object3D?.visible === true) piece = entity;
+    }
+    const target = piece?.object3D;
+    if (target == null) return `NO ${assetTitle(label).toUpperCase()} ON THE SET | Name it first and it goes on.`;
+    if (!g.lifeSize.peek()) this.enter();
+    const object = this.stage()?.object3D;
+    if (object == null || !g.lifeSize.peek()) return '';
+    // A step in front of it, facing it: its own reach and half a metre more, in slate metres.
+    const reach = (assetByLabel(label)?.grab?.[0] ?? 0.08) * target.scale.x + 0.05;
+    this.toward.set(0, 0, 1).applyQuaternion(target.quaternion);
+    this.toward.y = 0;
+    if (this.toward.lengthSq() < 1e-6) this.toward.set(0, 0, 1);
+    this.toward.normalize();
+    this.stand.copy(target.position).addScaledVector(this.toward, reach);
+    this.stand.y = 0;
+    // The way to look, from where they stand to the piece, as a yaw on the set: 0 looks along -z.
+    const lookYaw = Math.atan2(this.toward.x, this.toward.z);
+    this.player.head.getWorldPosition(this.head);
+    this.player.head.getWorldDirection(this.forward).negate();
+    const headYaw = Math.atan2(-this.forward.x, -this.forward.z);
+    this.turn.setFromAxisAngle(UP, headYaw - lookYaw);
+    this.offset.copy(this.stand).multiplyScalar(LIFE_SCALE).applyQuaternion(this.turn);
+    this.head.y = 0;
+    this.head.sub(this.offset);
+    setWorldQuaternion(object, this.turn);
+    setWorldPosition(object, this.head);
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    return `BY THE ${assetTitle(label).toUpperCase()} | Look around. Say take me to another piece, or step out.`;
+  }
+
+  /** Back to the table, by word. */
+  out(): string {
+    const g = this.globals as Globals;
+    if (!g.lifeSize.peek()) return 'ON THE TABLE | The set is already on the table. Say step inside to go in.';
+    this.leave();
+    return 'BACK ON THE TABLE | Everything is where you left it.';
   }
 
   private stage(): Entity | undefined {

@@ -11,7 +11,9 @@
 import type { World } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { CAMERAS, LENSES, Rig } from './camera-formats.js';
-import { assetTitle, PAINTS } from './catalog.js';
+import { assetTitle, isMade, PAINTS } from './catalog.js';
+import { DirectorSystem } from './director.js';
+import { LifeSizeSystem } from './life-size.js';
 import { PiecesSystem } from './pieces.js';
 import { partsOf, understand } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
@@ -47,9 +49,42 @@ const PAINT_LIST = PAINTS.map((paint) => paint.name.toLowerCase()).join(', ');
 
 const TAKE_IS_RUNNING = 'A TAKE IS RUNNING | Say stop first, then say it again.';
 
-/** Acts on one sentence, spoken or typed: each thing it asks for, in the order it was said. */
-export function hear(world: World, text: string): void {
+/**
+ * Acts on one sentence, spoken or typed: each thing it asks for, in the order it was said. With the set
+ * designer there, the panel's own controls (snap, a lens, record, undo) are still done here at once, and
+ * everything else, a set, a change to it, a move, goes to the designer; controls said after it wait until
+ * the designer's set is up. Without the designer, the library's reader builds what it can.
+ */
+export function hear(world: World, text: string, library = false): void {
   const g = world.globals as unknown as Globals;
+  const director = world.getSystem(DirectorSystem);
+  if (!library && director != null && director.available()) {
+    const forDesigner: string[] = [];
+    const later: Command[] = [];
+    for (const part of partsOf(text)) {
+      const command = part.command;
+      // Moving is the designer's; so is painting a piece it made, which it makes again in the new colour.
+      const designers =
+        command == null ||
+        command.do === 'byHand' ||
+        (command.do === 'paint' && (command.labels ?? [g.selectedLabel.peek()]).some((label) => isMade(label)));
+      if (designers) forDesigner.push(part.text);
+      else if (forDesigner.length > 0) later.push(command);
+      else {
+        const note = obey(world, g, command);
+        if (note !== '') g.coachNote.value = note;
+      }
+    }
+    g.lastSpoken.value = text;
+    if (forDesigner.length === 0) return;
+    void director.ask(forDesigner.join(', then ')).then(() => {
+      for (const command of later) {
+        const note = obey(world, g, command);
+        if (note !== '') g.coachNote.value = note;
+      }
+    });
+    return;
+  }
   for (const part of partsOf(text)) {
     if (part.command == null) {
       g.sceneRequest.value = understand(part.text);
@@ -68,6 +103,13 @@ const changed = (title: string, count: number, now: string): string =>
 /** Does the one thing asked, and returns the line for the call sheet; empty when the thing speaks for itself. */
 function obey(world: World, g: Globals, command: Command): string {
   switch (command.do) {
+    case 'inside': {
+      const life = world.getSystem(LifeSizeSystem);
+      if (life == null) return '';
+      return command.on ? life.goTo('Camera') : life.out();
+    }
+    case 'go':
+      return world.getSystem(LifeSizeSystem)?.goTo(command.labels[0]) ?? '';
     case 'snap':
       if (g.lifeSize.peek()) return 'BACK TO THE TABLE FIRST | A frame is snapped from the table. Say it again there.';
       bump(g.snapRequested);

@@ -15,6 +15,8 @@ export const StoreKey = {
   Tray: 'setpiece.tray.v2',
   Settings: 'setpiece.settings.v1',
   Briefs: 'setpiece.briefs.v1',
+  /** The pieces the set designer made, and which place on the set each is in. */
+  Made: 'setpiece.made.v1',
 } as const;
 
 type Key = (typeof StoreKey)[keyof typeof StoreKey];

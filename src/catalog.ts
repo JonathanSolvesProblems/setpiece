@@ -5,7 +5,7 @@
  */
 export const SHELVES = ['Cast', 'Creatures', 'Vehicles', 'Effects', 'Set', 'Props'] as const;
 /** Kit is the camera department's own: on the set from the Shoot page, never on a shelf. */
-export type Shelf = (typeof SHELVES)[number] | 'Kit' | 'Spare';
+export type Shelf = (typeof SHELVES)[number] | 'Kit' | 'Spare' | 'Made';
 
 export type Asset = {
   /** The piece's label, which is also its name on the panel unless `title` says otherwise. */
@@ -102,6 +102,16 @@ for (const label of SPARE_OF) {
     ASSETS.push({ ...base, label: `${label} ${n}`, title: `${base.title ?? label} ${n}`, shelf: 'Spare', spareOf: label, aliases: undefined, starts: false });
   }
 }
+/**
+ * Places for the pieces the set designer makes. Each starts empty and off the set; when a piece is made into
+ * one, it takes that piece's name and reach (src/made.ts), so everything that reads the catalog reads it.
+ */
+export const MADE_SLOTS = 20;
+export const MADE_PREFIX = 'Made ';
+for (let n = 1; n <= MADE_SLOTS; n++) {
+  ASSETS.push({ label: `${MADE_PREFIX}${n}`, title: 'New piece', shelf: 'Made', grab: [0.1, 0.2], solid: true });
+}
+export const isMade = (label: string): boolean => label.startsWith(MADE_PREFIX) && assetByLabel(label)?.shelf === 'Made';
 export const sparesOf = (label: string): string[] => ASSETS.filter((asset) => asset.spareOf === label).map((asset) => asset.label);
 const onShelf = (asset: Asset): boolean => (SHELVES as readonly string[]).includes(asset.shelf);
 /** What can be named, found or put on from a shelf. */
@@ -126,6 +136,16 @@ export function searchAssets(query: string): Asset[] {
   const within = kit.filter((asset) => !named.includes(asset) && q.length > 1 && words(asset).some((word) => word.includes(q)));
   return [...named, ...within];
 }
+
+/** How an actor stands, and what they wear. */
+export const LOOKS = [
+  { name: 'Wood', top: 0, legs: 0, hair: false },
+  { name: 'Dark suit', top: 0x30343f, legs: 0x262a33, hair: true },
+  { name: 'Red jacket', top: 0xb3312a, legs: 0x35475f, hair: true },
+  { name: 'White shirt', top: 0xe6e4da, legs: 0x2a2c31, hair: true },
+  { name: 'Hi-vis', top: 0xd6e13c, legs: 0x2f3a45, hair: true },
+] as const;
+export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim'] as const;
 
 /** Model maker's enamels: everything comes in bare wood, and colour is a choice. */
 export const PAINTS = [

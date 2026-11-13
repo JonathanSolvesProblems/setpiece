@@ -193,6 +193,28 @@
     cursor: pointer;
   }
   .word:hover { background-color: #5a4b3d; }
+  .talk {
+    text-align: center;
+    font-family: "Grotesk";
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 20px;
+    color: #f6f7ef;
+    background-color: #2a211c;
+    height: 40px;
+    min-width: 96px;
+    justify-content: center;
+    align-items: center;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-width: 2px;
+    border-color: #d6e13c;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .talk:hover { background-color: #5a4b3d; }
+  .row3 { flex-direction: row; gap: 6px; width: 100%; }
+  .grow { flex-grow: 1; }
   .primary {
     font-family: "Grotesk";
     font-weight: 600;
@@ -227,18 +249,19 @@
 <div id="panel-root" class="slate">
   <div class="field">
     <div id="panel-title" class="title">SETPIECE</div>
-    <div id="btn-voice" class="word" style="display: none">Say a scene</div>
+    <div id="btn-voice" class="talk" style="display: none">Talk</div>
   </div>
   <div id="says" class="says">
     <div id="voice-line" class="line muted">Floating. Not on your table yet.</div>
   </div>
   <div id="btn-snap" class="primary">Snap frame</div>
   <div id="btn-back" class="primary" style="display: none">Back to the table</div>
-  <div class="field">
-    <div class="line muted">A slip? Take it back.</div>
-    <div id="btn-undo" class="word">Undo</div>
+  <div class="row3">
+    <div id="btn-undo" class="word grow">Undo</div>
+    <div id="btn-inside" class="word grow">Step inside</div>
+    <div id="btn-more" class="word grow">More</div>
   </div>
-  <div class="tabs">
+  <div id="tabs" class="tabs">
     <div id="tab-shoot" class="tab">Shoot</div>
     <div id="tab-camera" class="tab">Camera</div>
     <div id="tab-assets" class="tab">Assets</div>

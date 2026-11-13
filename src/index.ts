@@ -7,6 +7,8 @@ import type { Signal } from '@preact/signals-core';
 import projectOptions from 'virtual:iwsdk-project';
 import { CoachSystem } from './coach.js';
 import { ControlsSystem } from './controls.js';
+import { DirectorSystem } from './director.js';
+import { MadeSystem } from './made.js';
 import { MarksSystem } from './marks.js';
 import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
@@ -60,8 +62,13 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.coachTarget = signal('');
   // A line the call sheet shows for a few seconds, as "LABEL | words"; and a count of setups recalled from the card.
   globals.coachNote = signal('');
+  // The set designer is working on a set: the voice button says so.
+  globals.designing = signal(false);
   // Start over, pressed on the page: the next person is shown every step again.
   globals.startOver = signal(0);
+  // Sets asked for in words, built by the set designer or the library's reader; and whether Talk is on the panel.
+  globals.setsBuilt = signal(0);
+  globals.talkOffered = signal(false);
   // The last note the sheet took, and how many it has taken: the panel repeats each one where the hand is.
   globals.noteSaid = signal('');
   globals.notesPosted = signal(0);
@@ -130,6 +137,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     .registerSystem(ReactionsSystem, { priority: 18 })
     .registerSystem(MarksSystem, { priority: 19 })
     .registerSystem(ViewfinderSystem, { priority: 20 })
+    .registerSystem(MadeSystem, { priority: 21 })
+    .registerSystem(DirectorSystem, { priority: 22 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })
     .registerSystem(CoachSystem, { priority: 28 })
@@ -224,6 +233,31 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
       lensMm.value = Number(button.dataset.lens);
     });
   }
+  // The shot in words, typed on the page: the same road as a sentence said to Talk in the headset.
+  const ask = document.getElementById('page-ask') as HTMLFormElement | null;
+  const askText = document.getElementById('page-ask-text') as HTMLInputElement | null;
+  const askGo = document.getElementById('page-ask-go') as HTMLButtonElement | null;
+  const askNote = document.getElementById('page-ask-note');
+  ask?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const text = askText?.value.trim() ?? '';
+    if (text === '') return;
+    world.getSystem(ControlsSystem)?.heard(text);
+  });
+  (globals.panelSays as Signal<string>).subscribe((said) => {
+    if (askNote == null || said === '') return;
+    const [title = '', words = ''] = said.split(' | ');
+    // Where the set stands on a table, and the headset's opening steps, mean nothing on a laptop.
+    if (title === 'STAGE' || /^\d OF \d/.test(title)) return;
+    askNote.textContent = title === '' ? words : `${title.charAt(0)}${title.slice(1).toLowerCase()}. ${words}`;
+  });
+  (globals.designing as Signal<boolean>).subscribe((busy) => {
+    if (askGo != null) {
+      askGo.disabled = busy;
+      askGo.textContent = busy ? 'Designing' : 'Build it';
+    }
+  });
+
   document.getElementById('page-snap')?.addEventListener('click', () => {
     snapRequested.value += 1;
   });
@@ -395,8 +429,9 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     world,
     viewfinder: world.getSystem(ViewfinderSystem),
     // The same thing the voice button does, from typed words.
-    say: (text: string) => hear(world, String(text)),
+    // Typed words for the library's own reader, as the tests use it: it never asks the set designer.
+    say: (text: string) => hear(world, String(text), true),
     // The same again as the listener does it: the panel says what was heard and what came of it.
-    heard: (text: string) => world.getSystem(ControlsSystem)?.heard(String(text)),
+    heard: (text: string, library?: boolean) => world.getSystem(ControlsSystem)?.heard(String(text), library === true),
   };
 }).catch(setFailed);

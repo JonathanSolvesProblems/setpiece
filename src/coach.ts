@@ -49,6 +49,7 @@ const Step = {
   Fill: 5,
   Done: 6,
   Welcome: 7,
+  Say: 8,
 } as const;
 type StepId = (typeof Step)[keyof typeof Step];
 
@@ -65,6 +66,8 @@ type Globals = {
   notesPosted: Signal<number>;
   briefIndex: Signal<number>;
   startOver: Signal<number>;
+  setsBuilt: Signal<number>;
+  talkOffered: Signal<boolean>;
 };
 /** Seconds a passing note stays on the sheet: long enough to read a reason and act on it. */
 const NOTE_SECONDS = 6;
@@ -75,7 +78,7 @@ const AIMED = 0.15;
 /** A longer note takes longer to read: about nine letters a second, never under six seconds or over twelve. */
 export const noteSeconds = (note: string): number => Math.min(NOTE_LONGEST, Math.max(NOTE_SECONDS, note.length / 9));
 /** The thing each step asks the wearer to put a hand on; it is marked on the set while the step is up. */
-const TARGET: Partial<Record<StepId, string>> = { [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
+const TARGET: Partial<Record<StepId, string>> = { [Step.Say]: 'talk', [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
 type CoachState = { done: boolean };
 
 export class CoachSystem extends createSystem({
@@ -96,6 +99,8 @@ export class CoachSystem extends createSystem({
   private seasoned = false;
   private moved = false;
   private framed = false;
+  /** A set has been asked for in words. */
+  private said = false;
   /** Up to two pieces in two hands: where each stood, and how it was turned and tipped, when it was picked up. */
   private watched: (Entity | null)[] = [null, null];
   private watchedFrom = [new Vector3(), new Vector3()];
@@ -154,7 +159,7 @@ export class CoachSystem extends createSystem({
       this.queries.held.subscribe('qualify', (piece) => {
         const role = piece.getValue(SetPiece, 'role');
         const object = piece.object3D;
-        if (object == null || (role !== SetRole.Actor && role !== SetRole.Creature && role !== SetRole.Camera)) return;
+        if (object == null || role === SetRole.Stage) return;
         // A place for it among the two being watched; one whose piece is no longer in a hand is free.
         let slot = -1;
         for (let i = 0; i < this.watched.length && slot < 0; i++) {
@@ -189,6 +194,10 @@ export class CoachSystem extends createSystem({
         this.seasoned = false;
         this.moved = false;
         this.framed = false;
+        this.said = false;
+      }),
+      g.setsBuilt.subscribe((n) => {
+        if (n > 0) this.said = true;
       }),
       () => this.texture.dispose(),
     );
@@ -304,7 +313,7 @@ export class CoachSystem extends createSystem({
     }
     // A floating set is somewhere to work too: once a piece has been picked
     // up, the sheet stops asking for a table.
-    if (floating && !this.moved && !this.framed && this.shots === 0) {
+    if (floating && !this.moved && !this.framed && !this.said && this.shots === 0) {
       this.step = Step.Land;
       return;
     }
@@ -321,8 +330,11 @@ export class CoachSystem extends createSystem({
     }
     if (this.shots > 0) this.step = Step.Fill;
     else if (this.seasoned) this.step = Step.Snap;
+    // Say the shot, move what is not right by hand, snap. The set designer frames the camera, so framing it by
+    // hand is no longer a step of its own; without a voice, the steps are the old ones.
+    else if (!this.said && (this.globals as Globals).talkOffered.peek()) this.step = Step.Say;
     else if (!this.moved) this.step = Step.Move;
-    else if (!this.framed) this.step = Step.Frame;
+    else if (!this.framed && !this.said) this.step = Step.Frame;
     else this.step = Step.Snap;
   }
 
@@ -374,13 +386,27 @@ export class CoachSystem extends createSystem({
               ? 'Touch your table and pinch. Or pinch Find my table.'
               : 'Touch your table and pinch.',
         ];
-      case Step.Move:
+      case Step.Say:
         return [
-          '2 OF 4 · BLOCK IT',
+          '2 OF 4 · SAY THE SHOT',
           this.controllers
-            ? 'Hold the trigger on an actor and move it. Turn your wrist to turn it.'
-            : 'Reach in, pinch an actor and move it. Turn your wrist to turn it.',
+            ? 'Pull the trigger on Talk and say what happens in the shot.'
+            : 'Pinch Talk on the panel and say what happens: a dragon lands on a burning car.',
         ];
+      case Step.Move:
+        return this.said
+          ? [
+              '3 OF 4 · BLOCK IT',
+              this.controllers
+                ? 'Hold the trigger on any piece and move it, or press Talk and say what to change.'
+                : 'Pinch any piece and move it, or press Talk and say what to change.',
+            ]
+          : [
+              '2 OF 4 · BLOCK IT',
+              this.controllers
+                ? 'Hold the trigger on an actor and move it. Turn your wrist to turn it.'
+                : 'Reach in, pinch an actor and move it. Turn your wrist to turn it.',
+            ];
       case Step.Frame:
         return [
           '3 OF 4 · FRAME IT',

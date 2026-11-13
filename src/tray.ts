@@ -20,14 +20,8 @@ import { TakeSystem } from './take.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { withGrain } from './wood-grain.js';
 
-export const LOOKS = [
-  { name: 'Wood', top: 0, legs: 0, hair: false },
-  { name: 'Dark suit', top: 0x30343f, legs: 0x262a33, hair: true },
-  { name: 'Red jacket', top: 0xb3312a, legs: 0x35475f, hair: true },
-  { name: 'White shirt', top: 0xe6e4da, legs: 0x2a2c31, hair: true },
-  { name: 'Hi-vis', top: 0xd6e13c, legs: 0x2f3a45, hair: true },
-] as const;
-export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim'] as const;
+import { LOOKS, POSES } from './catalog.js';
+export { LOOKS, POSES };
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
 const WOOD_LEGS = /^Leg/;
 const PAINTED = /^Body/;
@@ -48,7 +42,7 @@ const BURNING = /\b(burning|on fire|in flames|ablaze)\b/;
 
 /** Paint, size and fitting, each an index. */
 /** Paint, size step, fitting, and a size set by two hands (0 or absent: the size step counts). */
-type Finish = [number, number, number, number?];
+export type Finish = [number, number, number, number?];
 /** The pointer events library reads this off any object: false, and it does not look inside. */
 type Walked = Object3D & { intersectChildren?: boolean };
 type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
@@ -72,6 +66,7 @@ type Globals = {
   lensMm: Signal<number>;
   setupRecalled: Signal<number>;
   coachNote: Signal<string>;
+  setsBuilt: Signal<number>;
   trayToggle: Signal<string>;
   trayOn: Signal<string[]>;
   setReady: Signal<boolean>;
@@ -512,6 +507,7 @@ export class TraySystem extends createSystem({
       return;
     }
     const nothingDone = names.length === 0 && request.remove.length === 0 && !request.clear;
+    if (!nothingDone) g.setsBuilt.value = g.setsBuilt.peek() + 1;
     g.coachNote.value = `${nothingDone ? 'NOT IN THE KIT' : 'SET FROM YOUR WORDS'} | ${parts.join(' ')}`;
   }
 
@@ -897,6 +893,85 @@ export class TraySystem extends createSystem({
   }
 
   /** A new board starts from the opening cast, in wood and primer. The camera kit stays as it is. */
+  /**
+   * The set designer's plan begins (src/director.ts). A fresh set takes everything off but the camera kit,
+   * strikes the old take and undresses the pieces; an edit leaves the set as it is. False when the set cannot
+   * change now, and the reason is on the call sheet.
+   */
+  planBegin(fresh: boolean): boolean {
+    if (!this.ready || !this.readyToRebuild()) return false;
+    if (!fresh) return true;
+    const g = this.globals as Globals;
+    if (g.takeLength.peek() > 0) g.takeClear.value = g.takeClear.peek() + 1;
+    if (g.cameraOn.peek() !== CAMERAS[0]) g.cameraOn.value = CAMERAS[0];
+    this.selected = null;
+    this.wear({ cast: {}, finish: {} });
+    this.setOn(new Set([...this.on].filter((label) => assetByLabel(label)?.shelf === 'Kit')));
+    return true;
+  }
+
+  /**
+   * One piece of the plan, on the set where the plan put it, in slate metres and radians, and dressed as it
+   * asked. Returns the piece's object, or null when there is no such piece. The set is published at the end.
+   */
+  planPiece(label: string, x: number, y: number, z: number, yaw: number, finish: Finish | null, cast: [number, number] | null): Object3D | null {
+    const piece = this.managed.find((entity) => this.key(entity) === label);
+    const object = piece?.object3D;
+    if (piece == null || object == null || assetByLabel(label)?.shelf === 'Kit') return null;
+    if (finish != null) {
+      this.finish.set(label, finish);
+      this.coat(piece, finish);
+    }
+    if (cast != null && piece.getValue(SetPiece, 'role') === SetRole.Actor) {
+      this.cast.set(label, cast);
+      this.dress(piece, cast);
+    }
+    if (!this.on.has(label)) {
+      this.on.add(label);
+      this.show(piece, true);
+    }
+    object.position.set(x, y, z);
+    object.rotation.set(0, yaw, 0);
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    return object;
+  }
+
+  /** Pieces the plan takes off. */
+  planRemove(labels: string[]): void {
+    for (const label of labels) {
+      const piece = this.managed.find((entity) => this.key(entity) === label);
+      if (piece == null || !this.on.has(label) || assetByLabel(label)?.shelf === 'Kit') continue;
+      this.on.delete(label);
+      this.show(piece, false);
+      if (piece === this.selected) this.selected = null;
+    }
+  }
+
+  /** The plan is all down: the set is published and kept, and a fresh set has everyone on their feet. */
+  planEnd(fresh: boolean): void {
+    const g = this.globals as Globals;
+    this.publish();
+    this.save();
+    this.layoutDone();
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    if (fresh) g.setupRecalled.value = g.setupRecalled.peek() + 1;
+  }
+
+  /** How a piece is finished and dressed now, for the set designer to be told. */
+  dressOf(label: string): { finish: Finish; cast: [number, number] | null } {
+    return { finish: this.finishOf(label), cast: this.cast.get(label) ?? null };
+  }
+
+  /** What is on the set now. */
+  onSet(): string[] {
+    return [...this.on];
+  }
+
+  /** The piece last picked up or put on. */
+  selectedLabel(): string {
+    return this.selected == null ? '' : this.key(this.selected);
+  }
+
   private clear(): void {
     this.wear({ cast: {}, finish: {} });
     clearKey(StoreKey.Tray);

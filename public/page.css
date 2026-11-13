@@ -373,6 +373,27 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
   .marks-note { order: 2; margin-top: var(--unit); }
 }
 
+/* The shot in words: the same set designer the headset's Talk asks, typed. */
+.ask { display: flex; flex: 1; min-width: 0; gap: calc(var(--unit) * 2); }
+.ask input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 calc(var(--unit) * 3);
+  font: 500 1rem/1.2 var(--text);
+  color: var(--chalk);
+  background: var(--cloth);
+  border: 2px solid var(--seam);
+  border-radius: 2px;
+}
+.ask input::placeholder { color: var(--chalk-dust); opacity: 0.75; }
+.ask input:focus-visible { outline: none; border-color: var(--selected); }
+.ask-note { margin: 0; padding-left: calc(var(--label-col) + var(--unit) * 3); min-height: 2.8em; }
+@container (max-width: 520px) {
+  .ask { flex-wrap: wrap; }
+  .ask .block { width: 100%; }
+}
+
 /* Lens and take. Everything here presses, so everything here is a block. */
 .take-note { margin: 0; padding-left: calc(var(--label-col) + var(--unit) * 3); }
 .take-note[hidden] { display: none; }

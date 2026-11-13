@@ -41,6 +41,8 @@ export type Command =
   | { do: 'size'; labels: string[] | null; all: boolean; size: SizeAsked }
   | { do: 'remove' }
   | { do: 'undo' }
+  | { do: 'inside'; on: boolean }
+  | { do: 'go'; labels: string[] }
   | { do: 'byHand' };
 
 /** Words that carry no instruction of their own. */
@@ -116,6 +118,13 @@ const SIZES: Record<string, SizeAsked> = {
 const SIZE_FILLER = new Set(['bit', 'much', 'more', 'lot', 'way', 'even', 'slightly']);
 const WHOLE_SIZES = new Set(['normal size', 'original size', 'regular size']);
 
+/** Into the set at full size, and out again, as it is said. */
+const INSIDE = new Set(['step inside', 'go inside', 'step in', 'stand in the shot', 'full size', 'life size', 'walk inside', 'go in']);
+const OUTSIDE = new Set(['step out', 'step outside', 'back out', 'go out', 'back to the table', 'go back to the table', 'leave the set', 'small again']);
+/** Walking to a piece on a full-size set: "take me to the dragon", "stand next to the car". */
+const GO_VERBS = new Set(['take', 'walk', 'stand', 'teleport', 'jump', 'head']);
+const GO_JOINS = new Set(['by', 'next', 'near', 'beside', 'behind', 'over', 'up', 'across', 'me', 'us']);
+
 /** Taking the last change back, as it is said. "Bring it back" after a piece was struck is this too. */
 const UNDO = new Set(['undo', 'undo that', 'undo it', 'undo this', 'put it back', 'put that back', 'bring it back', 'bring that back', 'take that back']);
 const POLITE = new Set(['please', 'now', 'okay', 'ok', 'just', 'um', 'uh', 'and', 'then', 'can', 'you', 'could']);
@@ -153,8 +162,15 @@ export function commandIn(words: string[], named: Named[]): Command | null {
   const asksForOne = target != null && NEW_ONE.has(words[target.at - 1] ?? '');
   const except = (...sets: Set<string>[]): string[] => core.filter((word) => !sets.some((set) => set.has(word)));
 
+  const plain = words.filter((word) => !POLITE.has(word)).join(' ');
   if (pieces.length === 0) {
-    if (UNDO.has(words.filter((word) => !POLITE.has(word)).join(' '))) return { do: 'undo' };
+    if (UNDO.has(plain)) return { do: 'undo' };
+    if (INSIDE.has(plain) || INSIDE.has(rest)) return { do: 'inside', on: true };
+    if (OUTSIDE.has(plain) || OUTSIDE.has(rest)) return { do: 'inside', on: false };
+    // "Take me to the camera": stand at the lens, as Step inside does.
+    if (onCamera && (GO_VERBS.has(first) || first === 'go') && core.every((word) => word === 'camera' || GO_VERBS.has(word) || GO_JOINS.has(word))) {
+      return { do: 'go', labels: ['Camera'] };
+    }
     // Snap: the one word, or "take the frame".
     if ((core.includes('snap') || core.includes('snapshot')) && core.every((word) => SNAP_WORDS.has(word))) return { do: 'snap' };
     if (TAKE_A_FRAME.test(rest)) return { do: 'snap' };
@@ -238,6 +254,16 @@ export function commandIn(words: string[], named: Named[]): Command | null {
       const between = words.slice(from + 1, target.at).every((word) => AIM_JOINS.has(word) || word in COLOURS || word in SIZES);
       const behind = words.slice(target.at + target.length).every((word) => OPENERS.has(word));
       if (before && between && behind) return { do: 'aim', labels: target.labels };
+    }
+  }
+
+  // Walking to a piece: a verb of going, the piece, and nothing else asked.
+  if (target != null && !asksForOne && (GO_VERBS.has(first) || first === 'go') && words.includes(first)) {
+    const going = words.slice(opens, target.at).every((word) => GO_VERBS.has(word) || GO_JOINS.has(word) || FILLER.has(word) || OPENERS.has(word));
+    const behind = words.slice(target.at + target.length).every((word) => OPENERS.has(word) || POLITE.has(word));
+    const lens = words.slice(opens, target.at).some((word) => LENS_UNITS.has(word));
+    if (going && behind && !lens && (words.includes('to') || words.slice(opens, target.at).some((word) => GO_JOINS.has(word) && word !== 'me' && word !== 'us'))) {
+      return { do: 'go', labels: target.labels };
     }
   }
 

@@ -27,6 +27,43 @@ export default defineConfig(({ command }) => ({
   plugins: [
     iwsdkDev(),
     {
+      // The set designer (api/director.ts) is a Vercel function in production. Here the dev server answers for
+      // it, with the same code, so the emulator and a headset on the dev server can use it too.
+      name: 'setpiece-director-dev',
+      apply: 'serve',
+      configureServer(server) {
+        server.middlewares.use('/api/director', async (req, res) => {
+          try {
+            const handlers = (await server.ssrLoadModule('/api/director.ts')) as {
+              GET: () => Response;
+              POST: (request: Request) => Promise<Response>;
+            };
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of req) chunks.push(chunk as Uint8Array);
+            const headers = new Headers();
+            for (const [key, value] of Object.entries(req.headers)) if (typeof value === 'string' && !key.startsWith(':')) headers.set(key, value);
+            const post = req.method === 'POST';
+            const request = new Request('https://localhost/api/director', { method: req.method, headers, body: post ? Buffer.concat(chunks) : undefined });
+            const response = post ? await handlers.POST(request) : handlers.GET();
+            res.statusCode = response.status;
+            response.headers.forEach((value, key) => res.setHeader(key, value));
+            if (response.body != null) {
+              const reader = response.body.getReader();
+              for (;;) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                res.write(value);
+              }
+            }
+            res.end();
+          } catch (error) {
+            res.statusCode = 500;
+            res.end(`${JSON.stringify({ t: 'error', m: String(error) })}\n`);
+          }
+        });
+      },
+    },
+    {
       name: 'setpiece-version',
       apply: 'build',
       generateBundle() {

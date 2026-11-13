@@ -162,6 +162,11 @@ export class Voice {
   private limitTimer = 0;
   private flushTimer = 0;
 
+  /** What to listen for from the next sentence on: a list of words, or anything at all. */
+  listenFor(words: string[] | undefined): void {
+    this.options.words = words;
+  }
+
   constructor(options: VoiceOptions) {
     this.options = options;
   }

@@ -51,6 +51,9 @@ import { ViewfinderSystem } from './viewfinder.js';
 const MAX_FROM_CENTRE = 0.8;
 /** A camera let go this close to the slate stands on it; higher, it stays up, as on a crane. */
 const CAMERA_FLOOR_SNAP = 0.03;
+/** The camera head's pivot above the bottom of its rig, and its lens above the pivot, in slate metres (viewfinder.ts). */
+const HEAD_PIVOT = ViewfinderSystem.HEAD_PIVOT;
+const LENS_ABOVE_PIVOT = ViewfinderSystem.LENS_ABOVE_PIVOT;
 const CAMERA_MAX_HEIGHT = 0.45;
 const UP = new Vector3(0, 1, 0);
 /**
@@ -246,6 +249,8 @@ export class PiecesSystem extends createSystem({
   private blockedBy = -1;
   /** The turn and the tilt a spoken aim asks of the camera. */
   private aim: [number, number] = [0, 0];
+  /** Baby legs kept from the last visit, put back once the camera is mounted. */
+  private legsToRestore = 0;
   /** How far the last point given to nearestTo was from the piece it found, in metres. */
   private nearestGap = 0;
   private rings: Mesh[] = [];
@@ -301,6 +306,8 @@ export class PiecesSystem extends createSystem({
         this.chosenLabel = label;
         this.chosenStale = true;
       }),
+      // A flown camera has no legs; landed again, it stands on the full tripod.
+      g.cameraRig.subscribe(() => this.world.getSystem(ViewfinderSystem)?.setLegs(1)),
       this.queries.grabbed.subscribe('qualify', (piece) => {
         if (this.isStage(piece)) return;
         // A hand already has it: the other hand's ray does not get to pull on it as well.
@@ -359,6 +366,13 @@ export class PiecesSystem extends createSystem({
       return;
     }
     if (this.guard > 0) this.guard -= delta;
+    if (this.legsToRestore > 0) {
+      const viewfinder = this.world.getSystem(ViewfinderSystem);
+      if (viewfinder?.liveCamera() != null) {
+        viewfinder.setLegs(this.legsToRestore);
+        this.legsToRestore = 0;
+      }
+    }
     this.reachWith('left', delta);
     this.reachWith('right', delta);
     this.followHands(delta, time);
@@ -990,6 +1004,36 @@ export class PiecesSystem extends createSystem({
   }
 
   /** The unseen cylinder that makes a piece easy to catch, and the ring that says it is caught. */
+  /**
+   * A made piece took a new shape (src/made.ts): its grab zone, its ring, the room it takes on the slate and
+   * whether it stops a rolling car are worked out again from the shape it has now. Called when a piece is
+   * made, never in a frame.
+   */
+  reshape(piece: Entity, radius: number, height: number): void {
+    const index = this.dressed.indexOf(piece);
+    const object = piece.object3D;
+    if (index < 0 || object == null) return;
+    const shape = localBounds(object);
+    const asset = assetByLabel(String(piece.getValue(SetPiece, 'label')));
+    this.solids[index] = asset?.solid === true && !shape.isEmpty() ? shape.clone() : null;
+    this.blockers[index] = asset != null && !ROLL_THROUGH.has(asset.shelf) && !shape.isEmpty() ? shape.clone() : null;
+    const room = shape.isEmpty() ? radius : Math.min(radius, THIN_REACH);
+    shape.expandByPoint(this.local.set(room, height, room));
+    shape.expandByPoint(this.local.set(-room, 0, -room));
+    this.bounds[index] = shape;
+    this.spans[index] = Math.max(shape.min.length(), shape.max.length());
+    const volume = object.getObjectByName('GrabVolume') as Mesh | undefined;
+    if (volume != null) {
+      volume.geometry.dispose();
+      volume.geometry = new CylinderGeometry(radius, radius, height, 14, 1);
+      volume.position.y = height / 2;
+      volume.updateMatrix();
+    }
+    const ring = this.rings[index];
+    ring.geometry.dispose();
+    ring.geometry = new RingGeometry(radius * 0.9, radius * 1.1, 40);
+  }
+
   private dress(piece: Entity): void {
     const object = piece.object3D!;
     const size =
@@ -1096,7 +1140,9 @@ export class PiecesSystem extends createSystem({
       const pose = saved?.[key];
       if (isPose(pose)) this.apply(piece, pose);
       if (this.key(piece) === FIRST_CAMERA) {
-        const camera = loadJson<{ tilt: number; aimed: boolean }>(StoreKey.Camera);
+        const camera = loadJson<{ tilt: number; aimed: boolean; legs?: number }>(StoreKey.Camera);
+        // Baby legs come back as they were left; the head pivot exists once the viewfinder has the rig.
+        if (camera?.legs != null && camera.legs < 1) this.legsToRestore = camera.legs;
         if (camera?.aimed === true && Number.isFinite(camera.tilt)) {
           piece.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, camera.tilt)));
           piece.setValue(ShotCamera, 'aimed', true);
@@ -1183,6 +1229,64 @@ export class PiecesSystem extends createSystem({
    * Returns how far that was; 'limit' when it is as far as it goes; 'busy' when a hand has the
    * camera or a take is running.
    */
+  /**
+   * The set designer's camera: the live camera stood at x, z on the slate with its lens at this height, all in
+   * slate metres, then turned and tilted to look at a piece (by label) or, with no label, at a point on the
+   * slate. A lens higher than the legs reach flies the camera. Returns false when a hand has it or a take runs.
+   */
+  placeCamera(x: number, z: number, lensHeight: number, label: string, point: Vector3 | null): boolean {
+    const viewfinder = this.world.getSystem(ViewfinderSystem);
+    const cam = viewfinder?.liveCamera();
+    const rig = cam?.object3D;
+    const stage = rig?.parent;
+    if (viewfinder == null || cam == null || rig == null || stage == null) return false;
+    const g = this.globals as Globals;
+    if (cam.hasComponent(Held) || g.takeState.peek() !== 'idle') return false;
+    const first = this.key(cam) === FIRST_CAMERA;
+    const tallest = CAMERA_MAX_HEIGHT + HEAD_PIVOT + LENS_ABOVE_PIVOT;
+    const fly = first && lensHeight > tallest + 0.005;
+    if (first && fly !== (g.cameraRig.peek() === 'drone')) g.cameraRig.value = fly ? 'drone' : 'tripod';
+    const base = lensHeight - HEAD_PIVOT - LENS_ABOVE_PIVOT;
+    rig.position.set(x, fly ? Math.max(DRONE_MIN_HEIGHT, Math.min(DRONE_MAX_HEIGHT, base)) : Math.max(0, Math.min(CAMERA_MAX_HEIGHT, base)), z);
+    // Lower than the tripod stands, the legs are shortened instead: baby legs, as a grip would set them.
+    const legs = !fly && base < 0 ? (lensHeight - LENS_ABOVE_PIVOT) / HEAD_PIVOT : 1;
+    if (first) viewfinder.setLegs(legs);
+    // What it looks at, on the slate: a piece's eyes if it has them, else the middle of its shape.
+    let target: Entity | null = null;
+    for (let i = 0; i < this.dressed.length && target == null && label !== ''; i++) {
+      const piece = this.dressed[i];
+      if (piece.object3D?.visible === true && !piece.hasComponent(ShotCamera) && String(piece.getValue(SetPiece, 'label')) === label) target = piece;
+    }
+    if (target != null) {
+      const object = target.object3D!;
+      const eyes = target.getValue(SetPiece, 'eyeHeight') ?? 0;
+      if (eyes > 0) this.point.set(0, eyes, 0);
+      else localBounds(object).getCenter(this.point);
+      object.updateWorldMatrix(true, false);
+      object.localToWorld(this.point);
+      stage.updateWorldMatrix(true, false);
+      stage.worldToLocal(this.point);
+    } else if (point != null) {
+      this.point.copy(point);
+    } else {
+      this.point.set(0, 0.08, 0);
+    }
+    const dx = this.point.x - rig.position.x;
+    const dz = this.point.z - rig.position.z;
+    const run = Math.hypot(dx, dz);
+    // The lens looks along -z when the rig is not turned.
+    rig.rotation.set(0, run > 1e-4 ? Math.atan2(-dx, -dz) : rig.rotation.y, 0);
+    const pivot = rig.position.y + HEAD_PIVOT * (first ? viewfinder.legs() : 1);
+    const far = Math.hypot(run, this.point.y - pivot);
+    const tilt = Math.atan2(this.point.y - pivot, run) - (far > LENS_ABOVE_PIVOT ? Math.asin(LENS_ABOVE_PIVOT / far) : 0);
+    cam.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, tilt)));
+    cam.setValue(ShotCamera, 'aimed', true);
+    viewfinder.refresh();
+    this.knock(Cue.Place, cam);
+    this.save();
+    return true;
+  }
+
   stepCamera(step: CameraStep): string {
     const viewfinder = this.world.getSystem(ViewfinderSystem);
     const cam = viewfinder?.liveCamera();
@@ -1219,6 +1323,11 @@ export class PiecesSystem extends createSystem({
   }
 
   /** The knock comes from the piece: the cue's source sits beside it under the stage. */
+  /** The sound of a piece set down on the slate, where it is. */
+  landed(piece: Entity): void {
+    this.knock(Cue.Place, piece);
+  }
+
   private knock(cue: string, piece: Entity): void {
     const at = piece.object3D;
     for (const source of this.queries.cues.entities) {
@@ -1240,6 +1349,7 @@ export class PiecesSystem extends createSystem({
         saveJson(StoreKey.Camera, {
           tilt: piece.getValue(ShotCamera, 'tilt') ?? 0,
           aimed: piece.getValue(ShotCamera, 'aimed') === true,
+          legs: this.world.getSystem(ViewfinderSystem)?.legs() ?? 1,
         });
       }
     }

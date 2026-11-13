@@ -86,6 +86,10 @@ const AIM_BELOW_EYES = 0.012;
 const MAX_TILT = 0.6;
 /** The camera head pivots at the top of the tripod; these parts of the rig ride it. */
 const HEAD_PIVOT_Y = 0.112;
+/** The shot lens rides this far above the head's pivot. */
+const LENS_LIFT = 0.006;
+/** The shortest the legs go: a lens about half a metre off the ground, at full scale. */
+const LEGS_SHORTEST = 0.4;
 const HEAD_PARTS = /^(Body|Magazine|Lens|FocusRing|MatteBox|Eyepiece|Tally)/;
 /** The studio the shot lens sees around the set: 25 m away at the set's scale. */
 const BACKDROP_RADIUS = 2.5;
@@ -129,6 +133,10 @@ export interface Setup {
   dress?: Dress;
   /** Which camera the frame was taken on. */
   cam?: string;
+  /** Which made piece was in each place for one (src/made.ts). */
+  made?: Record<string, string>;
+  /** How long the live camera's legs were: 1 is the full tripod, less is baby legs. */
+  legs?: number;
 }
 
 /** The board as it is kept between visits: the frames on the card and how many were ever taken. */
@@ -253,6 +261,8 @@ export class ViewfinderSystem extends createSystem({
    * system fills this in: the set's own position is its business, and Undo only needs to ask.
    */
   stageBack: ((since: number) => boolean) | null = null;
+  /** The made pieces: which is in each place, and putting them back. src/made.ts fills this in. */
+  madeState: { read(): Record<string, string>; apply(slots: Record<string, string>): void } | null = null;
   private historyClock = 0;
   private historyPending = '';
   private effectTick = 0;
@@ -409,6 +419,31 @@ export class ViewfinderSystem extends createSystem({
   liveCamera(): Entity | undefined {
     return this.cameraEntity();
   }
+
+  /**
+   * Shortens or restores the live camera's legs: 1 is the full tripod, 0.25 the shortest baby legs. The legs
+   * and the post shrink from the ground up and the head comes down with them, so the lens sits that much
+   * lower. A flown camera has no legs to shorten.
+   */
+  setLegs(length: number): void {
+    const rig = this.cameraEntity()?.object3D;
+    const head = this.cameraHead;
+    if (rig == null || head == null) return;
+    const k = Math.max(LEGS_SHORTEST, Math.min(1, Number.isFinite(length) ? length : 1));
+    for (const part of rig.children) if (part.name === 'Base' || part.name === 'Post') part.scale.y = k;
+    head.position.y = HEAD_PIVOT_Y * k;
+    this.refresh();
+  }
+
+  /** How long the live camera's legs are now. */
+  legs(): number {
+    const head = this.cameraHead;
+    return head == null ? 1 : Math.round((head.position.y / HEAD_PIVOT_Y) * 1000) / 1000;
+  }
+
+  /** The lens above the bottom of the rig, and the pivot it tilts on, at full legs, in slate metres. */
+  static readonly HEAD_PIVOT = HEAD_PIVOT_Y;
+  static readonly LENS_ABOVE_PIVOT = LENS_LIFT;
 
   /** Where the live lens is and which way it looks, in the room. */
   lensPose(position: Vector3, direction: Vector3): void {
@@ -606,6 +641,9 @@ export class ViewfinderSystem extends createSystem({
   /** Puts the set as a setup has it: what is on it and how it is dressed, every piece on its mark, the camera and its lens. */
   private restore(setup: Setup): void {
     const g = this.globals as Globals;
+    // The made pieces take their shapes first, so the pieces that come on are the right ones.
+    if (setup.made != null) this.madeState?.apply(setup.made);
+    this.setLegs(setup.legs ?? 1);
     if (setup.rig) g.cameraRig.value = setup.rig;
     if (setup.on) g.trayRestore.value = setup.on;
     if (setup.dress) g.trayDressRestore.value = setup.dress;
@@ -708,6 +746,8 @@ export class ViewfinderSystem extends createSystem({
       on: (this.globals as Globals).trayOn.peek(),
       dress: (this.globals as Globals).trayDress.peek(),
       cam: (this.globals as Globals).cameraOn.peek(),
+      made: this.madeState?.read(),
+      legs: this.legs(),
     };
   }
 
@@ -1035,7 +1075,7 @@ export class ViewfinderSystem extends createSystem({
     if (head == null) return;
     head.add(this.lensCamera);
     // Just in front of the lens barrel, so the rig's own body is never in frame.
-    this.lensCamera.position.set(0, 0.118 - HEAD_PIVOT_Y, -0.06);
+    this.lensCamera.position.set(0, LENS_LIFT, -0.06);
     this.lensCamera.rotation.set(0, 0, 0);
     this.cameraHead = head;
     this.shotCamera = entity;

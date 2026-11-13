@@ -96,7 +96,15 @@
             <p class="marks-note">One tape colour per actor, so nobody walks to the wrong mark.</p>
           </div>
 
-          <div class="strip" role="group" aria-label="Lens and take" inert>
+          <div class="strip" role="group" aria-label="Shot, lens and take" inert>
+            <div class="field">
+              <label class="label" for="page-ask-text">Shot</label>
+              <form class="ask" id="page-ask" autocomplete="off">
+                <input id="page-ask-text" name="shot" type="text" maxlength="300" placeholder="A dragon lands on a burning car at night" aria-describedby="page-ask-note" enterkeyhint="go" />
+                <button class="block" id="page-ask-go" type="submit">Build it</button>
+              </form>
+            </div>
+            <p class="marks-note ask-note" id="page-ask-note" aria-live="polite">Say what happens in the shot. The set designer builds it piece by piece, and every piece can be moved.</p>
             <div class="field">
               <span class="label" id="lens-label">Lens</span>
               <div class="lenses" role="group" aria-labelledby="lens-label">

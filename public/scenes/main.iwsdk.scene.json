@@ -2834,6 +2834,826 @@
           }
         },
         {
+          "id": "prop-made-1",
+          "name": "Made 1",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.27,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 1",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-2",
+          "name": "Made 2",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.24,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 2",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-3",
+          "name": "Made 3",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.21,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 3",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-4",
+          "name": "Made 4",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.18,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 4",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-5",
+          "name": "Made 5",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.15,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 5",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-6",
+          "name": "Made 6",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.12,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 6",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-7",
+          "name": "Made 7",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.09,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 7",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-8",
+          "name": "Made 8",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.06,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 8",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-9",
+          "name": "Made 9",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.03,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 9",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-10",
+          "name": "Made 10",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0.0,
+              0,
+              -0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 10",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-11",
+          "name": "Made 11",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.27,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 11",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-12",
+          "name": "Made 12",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.24,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 12",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-13",
+          "name": "Made 13",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.21,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 13",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-14",
+          "name": "Made 14",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.18,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 14",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-15",
+          "name": "Made 15",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.15,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 15",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-16",
+          "name": "Made 16",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.12,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 16",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-17",
+          "name": "Made 17",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.09,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 17",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-18",
+          "name": "Made 18",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.06,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 18",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-19",
+          "name": "Made 19",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              -0.03,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 19",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
+          "id": "prop-made-20",
+          "name": "Made 20",
+          "metadata": {
+            "iwsdk.validation": {
+              "allowFloating": true
+            }
+          },
+          "content": {
+            "type": "asset",
+            "asset": "made",
+            "castShadow": true,
+            "receiveShadow": true
+          },
+          "transform": {
+            "position": [
+              0.0,
+              0,
+              0.15
+            ],
+            "rotationDeg": [
+              0,
+              0,
+              0
+            ]
+          },
+          "components": {
+            "SetPiece": {
+              "role": "prop",
+              "label": "Made 20",
+              "eyeHeight": 0.0
+            },
+            "RayInteractable": {},
+            "DistanceGrabbable": {
+              "movementMode": "MoveAtSource",
+              "translate": true,
+              "rotate": true,
+              "scale": false
+            }
+          }
+        },
+        {
           "id": "cue-pick",
           "name": "Cue pick",
           "transform": {
