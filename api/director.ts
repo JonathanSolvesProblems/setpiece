@@ -33,7 +33,7 @@ const LOOK = `This picture is what the shot camera sees now, through its lens. L
 - If there is a fault, set camera.keep to false and give a better camera, and list only a piece you move. Keep the camera at least 2 m from the nearest actor unless the shot is a close-up of that actor.
 - If the frame already works, set camera.keep to true and list no things.
 - fresh is false. remove is empty.
-- In says, name what you changed in the frame in a few words, or say the frame holds.`;
+- In says, name what you changed (the camera's place, height, lens, a piece moved) in a few words, or say the frame holds. You have not seen the new frame yet, so do not say what it will show or that something now reads; the next look checks that.`;
 /**
  * Per visitor: this many plans in this many minutes; and across everyone this server instance answers, this
  * many a minute. Neither is a wall: an Origin header can be written by anything that is not a browser. The cap

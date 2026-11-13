@@ -323,6 +323,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             after = await page.evaluate(lens)
             looks = await page.evaluate('globalThis.__looks')
             note = await page.inner_text('#page-ask-note')
+            measured = await page.evaluate("[...globalThis.setpiece.world.getSystems()].find((s) => typeof s.frameReport === 'function').frameReport()")
             if not looks:
                 raise RuntimeError('the designer did not look through the lens')
             first = Image.open(io.BytesIO(base64.b64decode(looks[0]['image']))).convert('RGB').resize((1280, 720))
@@ -339,18 +340,20 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             for line in looks[0]['report'].split('\n')[:4]:
                 draw.text((0, y), line[2:][:68], font=face, fill=(199, 199, 183))
                 y += 46
+            # Its note says what it changed; the lines under it are measured from the frame it left.
             words = note.split('. ', 1)[-1]
-            y = 800
-            for i in range(0, min(len(words), 260), 62):
-                draw.text((1360, y), words[i:i + 62], font=face, fill=(246, 247, 239))
+            draw.text((1360, 800), words[:68], font=face, fill=(246, 247, 239))
+            y = 846
+            for line in measured.split('\n')[:3]:
+                draw.text((1360, y), line[2:][:68], font=face, fill=(199, 199, 183))
                 y += 46
             sheet.save(png)
     elif recipe == 'dresser':
         from PIL import Image, ImageDraw, ImageFont
         runs = json.loads((ROOT / 'devpost/results/designer-eval.json').read_text(encoding='utf-8'))['runs']
         run = next(r for r in runs if r['said'] == 'zombies attacking a gas station')
-        # The plan streams as the server streams it; the reply's end waits for globalThis.__release, and a look
-        # through the lens keeps the frame, so nothing here asks the model.
+        # The plan arrives whole; the reply's end waits for globalThis.__release, and a look through the lens keeps
+        # the frame, so nothing here asks the model.
         await page.evaluate('''(plan) => {
           const real = window.fetch;
           const enc = new TextEncoder();
@@ -360,10 +363,8 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             const reply = body.image ? { ...plan, fresh: false, remove: [], things: [], camera: { ...plan.camera, keep: true } } : plan;
             const text = JSON.stringify(reply);
             const stream = new ReadableStream({ async start(c) {
-              for (let i = 0; i < text.length; i += 48) {
-                c.enqueue(enc.encode(JSON.stringify({ t: 'd', s: text.slice(i, i + 48) }) + '\\n'));
-                await new Promise((d) => setTimeout(d, 20));
-              }
+              // All at once: under software GL a timer fires about once a frame, so a slow trickle would take a minute.
+              c.enqueue(enc.encode(JSON.stringify({ t: 'd', s: text }) + '\\n'));
               if (!body.image) { globalThis.__held = true; await new Promise((go) => { globalThis.__release = go; }); }
               c.enqueue(enc.encode(JSON.stringify({ t: 'end', stop: 'end_turn', ms: 1 }) + '\\n'));
               c.close();
@@ -387,24 +388,68 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
           view.camera.position.fromArray(globalThis.__view.p);
           view.camera.quaternion.fromArray(globalThis.__view.q);
         }'''
+        # Where the car and the two actors are on the page, in CSS pixels, from the page's own view.
+        where = '''() => {
+          const w = globalThis.setpiece.world;
+          const view = [...w.getSystems()].find((s) => typeof s.fit === 'function' && typeof s.ensureRoom === 'function');
+          const pieces = [...w.getSystems()].find((s) => Array.isArray(s.rolling) && Array.isArray(s.dressed));
+          const rect = document.querySelector('.stage canvas').getBoundingClientRect();
+          const out = {};
+          for (const piece of pieces.dressed) {
+            const label = pieces.key(piece).split(':').pop();
+            if (!['Car', 'A', 'B'].includes(label) || !piece.object3D?.visible) continue;
+            const o = piece.object3D;
+            const v = o.localToWorld(o.position.clone().set(0, label === 'Car' ? 0.07 : 0.09, 0)).project(view.camera);
+            out[label] = [rect.left + ((v.x + 1) / 2) * rect.width, rect.top + ((1 - v.y) / 2) * rect.height];
+          }
+          return out;
+        }'''
         await page.wait_for_timeout(800)
         await page.evaluate(hold)
         before = png.with_name('live-dresser-before.png')
-        await stage_png(page, before)
+        await page.screenshot(path=str(before), timeout=120000)
+        marks_before = await page.evaluate(where)
         await page.evaluate('globalThis.__release()')
         await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === false', timeout=30000)
         for _ in range(12):
             await page.evaluate(keep)
             await page.wait_for_timeout(250)
         after = png.with_name('live-dresser-after.png')
-        await stage_png(page, after)
-        left = Image.open(before).convert('RGB')
-        right = Image.open(after).convert('RGB')
-        k = 1280 / left.width
-        size = (1280, int(left.height * k))
-        sheet = Image.new('RGB', (2640, size[1] + 260), (27, 20, 17))
-        sheet.paste(left.resize(size), (0, 0))
-        sheet.paste(right.resize(size), (1360, 0))
+        await page.screenshot(path=str(after), timeout=120000)
+        marks_after = await page.evaluate(where)
+        # One crop for both, around the car and the actors as they stood before and after, at 16:9.
+        points = list(marks_before.values()) + list(marks_after.values())
+        x0 = min(p[0] for p in points) - 160
+        x1 = max(p[0] for p in points) + 160
+        y0 = min(p[1] for p in points) - 120
+        y1 = max(p[1] for p in points) + 120
+        if (x1 - x0) / (y1 - y0) < 16 / 9:
+            grow = ((y1 - y0) * 16 / 9 - (x1 - x0)) / 2
+            x0, x1 = x0 - grow, x1 + grow
+        else:
+            grow = ((x1 - x0) * 9 / 16 - (y1 - y0)) / 2
+            y0, y1 = y0 - grow, y1 + grow
+        ring = (214, 225, 60)
+
+        def framed(path, marks):
+            im = Image.open(path).convert('RGB')
+            k = im.width / W
+            pic = im.crop(tuple(int(v * k) for v in (x0, y0, x1, y1))).resize((1280, 720))
+            pen = ImageDraw.Draw(pic)
+            scale = 1280 / (x1 - x0)
+            for label in ('A', 'B'):
+                if label not in marks:
+                    continue
+                cx = (marks[label][0] - x0) * scale
+                cy = (marks[label][1] - y0) * scale
+                r = 38 * scale
+                pen.ellipse((cx - r, cy - r * 1.5, cx + r, cy + r * 1.5), outline=ring, width=6)
+            return pic
+
+        sheet = Image.new('RGB', (2640, 720 + 260), (27, 20, 17))
+        sheet.paste(framed(before, marks_before), (0, 0))
+        sheet.paste(framed(after, marks_after), (1360, 0))
+        size = (1280, 720)
         draw = ImageDraw.Draw(sheet)
         face = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'SchibstedGrotesk-Medium.ttf'), 34)
         label = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'BigShoulders-Bold.ttf'), 40)
@@ -435,8 +480,11 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         for lens in ['18', '50']:
             await click(f'.lens[data-lens="{lens}"]')
             await page.wait_for_timeout(1200)
+            filled = await page.evaluate("document.querySelectorAll('#board li.filled img').length")
             await click('#page-snap')
-            await page.wait_for_timeout(2500)
+            # Under software GL a frame can take several seconds to reach the board.
+            await page.wait_for_function(f"document.querySelectorAll('#board li.filled img').length > {filled}", timeout=60000)
+            await page.wait_for_timeout(500)
             parts.append(await page.evaluate("[...document.querySelectorAll('#board li.filled img')].pop().src"))
         # Two frames side by side.
         from PIL import Image
@@ -536,7 +584,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         csv_path = out / 'saved-shot-list.csv'
         await (await waiting.value).save_as(str(csv_path))
         board = Image.open(board_path).convert('RGB')
-        import csv, io
+        import csv
         rows = list(csv.reader(io.StringIO(csv_path.read_text(encoding='utf-8'))))[:4]
         width, height = 2400, 1300
         sheet = Image.new('RGB', (width, height), (42, 33, 28))
@@ -610,6 +658,13 @@ async def main():
             print(f'{n} {s["slug"]}  caption {len(caption)}')
         await browser.close()
         await plain.close()
+    # A full run leaves only this list's slides: a slide renumbered or dropped is not left behind to be uploaded.
+    if not only:
+        keep = {f'{n}-{slug}.png' for n, slug, _ in captions}
+        for old in OUT.glob('*.png'):
+            if old.name not in keep:
+                old.unlink()
+                print('removed', old.name)
     lines = ['# Gallery captions', '', 'One block per image, in gallery order. Paste the block, nothing else.', '']
     for n, slug, caption in captions:
         lines += [f'## {n} {slug}', '', '```', caption, '```', '']
