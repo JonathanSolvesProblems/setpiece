@@ -57,6 +57,11 @@ const fps = frames.samples.map((sample) => sample.fps).sort((a, b) => a - b);
 const median = fps[Math.floor(fps.length / 2)];
 // The tagline claims only what every headset sample supports: the light sessions, and the heavier set before and after its fix.
 const frameTime = JSON.parse(read('devpost/results/quest-frame-time.json'));
+// The set designer's speed, as the README quotes it, against the run that measured it.
+const designer = JSON.parse(read('devpost/results/designer-latency.json')).summary;
+const seconds = (ms) => (ms / 1000).toFixed(1);
+expect(`README quotes the designer's first piece at a median of ${seconds(designer.firstPieceMs.median)} s`, readme.includes(`first piece a median of ${seconds(designer.firstPieceMs.median)} s`) || readme.includes(`first piece down a median of ${seconds(designer.firstPieceMs.median)} s`));
+expect(`README quotes the designer's whole set at a median of ${seconds(designer.wholeMs.median)} s`, readme.includes(`whole set ${seconds(designer.wholeMs.median)} s`) || readme.includes(`whole a median of ${seconds(designer.wholeMs.median)} s`));
 const everySample = [...fps, ...(frameTime.before?.frames_per_second ?? []), ...(frameTime.after?.frames_per_second ?? [])];
 const lowest = Math.min(...everySample);
 expect(`the tagline's frame rate is what all ${everySample.length} headset samples support: never under 60 (lowest ${lowest})`, tagline.includes('never under 60 fps') && lowest >= 60);
