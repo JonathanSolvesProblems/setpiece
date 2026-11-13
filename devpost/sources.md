@@ -36,7 +36,7 @@ All on a Meta Quest 3S in the Quest Browser, hands tracked, on the live site.
 
 | Number | Source |
 |---|---|
-| The main script is 2.59 MB, down from 6.78 MB | Vite's build output for commits 93ad62d and f140935, in `devpost/results/load-and-size.json` (34b580d was 2.54 before the rebuilt models and driving, 9807181 was 2.56 before the pickup, truck, bus and boat were rebuilt, ee2c915 was 2.57 before the spoken controls); the live size is checked by `tools/check-live.mjs` |
+| The main script is 2.6 MB, down from 6.78 MB | Vite's build output for commits b315aba and f140935, in `devpost/results/load-and-size.json` (34b580d was 2.54 before the rebuilt models and driving, 9807181 was 2.56 before the pickup, truck, bus and boat were rebuilt, ee2c915 was 2.57 before the spoken controls, 93ad62d was 2.59 before Undo and the panel's own line); the live size is checked by `tools/check-live.mjs` |
 | The recogniser heard "Mexican standoff" in 14 of 14 sentences spoken by two synthetic voices, and wrote nearly every other word | `devpost/results/voice-recognition.json`: Windows voices played into the real recogniser through a fake microphone in desktop Chromium. Not a real voice, and not the headset's microphone |
 | The voice model is 41.1 MB (the panel rounds it to "a 40 MB download") plus a 4.3 MB worker | `public/voice/`, listed by `tools/check-live.mjs`. The model is vosk-model-small-en-us-0.15, Apache-2.0: https://alphacephei.com/vosk/models |
 | Jitter while a held piece is still fell by 61% and the lag of a fast turn halved, with the filter in `src/hand-turn.ts` | A simulation of tracking noise at 0.2 to 0.4 degrees against both versions of the turn code (tmp/turn-sim.mjs); the filter is the One Euro filter, Casiez, Roussel and Vogel, CHI 2012 |

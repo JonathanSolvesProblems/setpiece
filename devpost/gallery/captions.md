@@ -77,7 +77,7 @@ After a reload in the headset the panel lists what came back: the set, the piece
 ## 13 load
 
 ```
-Main script 2.59 MB, down from 6.78. On the Quest: a set in 11.2 s on a first visit, 3.4 s on a reload.
+Main script 2.6 MB, down from 6.78. On the Quest: a set in 11.2 s on a first visit, 3.4 s on a reload.
 ```
 
 ## 14 leave
