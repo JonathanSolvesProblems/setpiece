@@ -23,7 +23,7 @@ import type { Spoken } from './scene-request.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
 import { TraySystem } from './tray.js';
 import type { Finish } from './tray.js';
-import { ViewfinderSystem } from './viewfinder.js';
+import { jpegOf, ViewfinderSystem } from './viewfinder.js';
 
 type Globals = {
   coachNote: Signal<string>;
@@ -108,6 +108,8 @@ export class DirectorSystem extends createSystem({
   private looks = 0;
   private lookAt = 0;
   private lensCanvas: HTMLCanvasElement | null = null;
+  /** Counts looks begun: a look still reading its picture when a newer one begins is dropped. */
+  private lookGeneration = 0;
   private point = new Vector3();
   private lensAt = new Vector3();
   private lensWay = new Vector3();
@@ -203,11 +205,17 @@ export class DirectorSystem extends createSystem({
   private async look(said: string): Promise<void> {
     const viewfinder = this.world.getSystem(ViewfinderSystem);
     if (viewfinder == null || this.asking != null) return;
+    // Measured, and the set described, as the frame stands now; the picture is read back and encoded beside the
+    // frames, not inside one. A newer look, or anything asked meanwhile, comes first and this one is dropped.
+    const mine = ++this.lookGeneration;
+    const report = viewfinder.frameReport();
+    const set = this.describe();
+    const subject = this.subject;
     this.lensCanvas ??= document.createElement('canvas');
-    viewfinder.copyMonitor(this.lensCanvas);
-    const image = this.lensCanvas.toDataURL('image/jpeg', 0.82).split(',')[1] ?? '';
-    if (image === '') return;
-    await this.request(said, { said, set: this.describe(), image, report: viewfinder.frameReport(), subject: this.subject }, true);
+    if (!(await viewfinder.readMonitor(this.lensCanvas)) || mine !== this.lookGeneration) return;
+    const image = (await jpegOf(this.lensCanvas, 0.82)).split(',')[1] ?? '';
+    if (image === '' || mine !== this.lookGeneration || this.asking != null) return;
+    await this.request(said, { said, set, image, report, subject }, true);
   }
 
   private async request(said: string, body: Record<string, unknown>, looking: boolean): Promise<Outcome> {

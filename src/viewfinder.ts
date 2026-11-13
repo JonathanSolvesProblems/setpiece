@@ -30,6 +30,7 @@ import {
   PlaneGeometry,
   RayInteractable,
   PointLight,
+  VisibilityState,
   RepeatWrapping,
   Sprite,
   SpriteMaterial,
@@ -53,6 +54,8 @@ import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 export const SET_SCALE = 10;
 const RT_WIDTH = 640;
 const RT_HEIGHT = 360;
+/** Frames into the page or a session before every piece's shaders are compiled ahead, once that mode's lights are set. */
+const WARM_AFTER_FRAMES = 30;
 const MAX_FRAMES = 6;
 const FRAME_WIDTH = 0.1;
 const FRAME_HEIGHT = (FRAME_WIDTH * 9) / 16;
@@ -219,6 +222,18 @@ export class ViewfinderSystem extends createSystem({
   pieces: { required: [SetPiece] },
 }) {
   private target!: WebGLRenderTarget;
+  /** The look's own copy of the monitor's pixels, read back without holding up a frame. */
+  private lookPixels: Uint8Array | null = null;
+  /**
+   * The modes (the page, a session) whose shaders are compiled ahead, how many frames the set has been shown in
+   * the current one, and which of the three ways of drawing it is compiled next.
+   */
+  private warmed = new Set<string>();
+  private warmMode = '';
+  private warmFrames = 0;
+  private warmStep = 0;
+  /** What the warm-up showed for its compile and puts away again. */
+  private warmShown: Object3D[] = [];
   private lensCamera!: PerspectiveCamera;
   private monitor: Mesh | null = null;
   private cameraHead: Group | null = null;
@@ -418,6 +433,33 @@ export class ViewfinderSystem extends createSystem({
     const image = ctx.createImageData(w, h);
     for (let y = 0; y < h; y++) image.data.set(this.pixels.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
     ctx.putImageData(image, 0, 0);
+  }
+
+  /**
+   * The monitor's picture as it stands, right way up, on a canvas, read back without holding up a frame: the
+   * look's picture. Read with the blocking call, and encoded beside it, it was about 15 ms of one frame in the
+   * emulator each time a new set was looked at. False when the picture could not be read.
+   */
+  async readMonitor(canvas: HTMLCanvasElement): Promise<boolean> {
+    const w = RT_WIDTH;
+    const h = RT_HEIGHT;
+    this.lookPixels ??= new Uint8Array(w * h * 4);
+    const pixels = this.lookPixels;
+    const renderer = this.renderer as AsyncReader;
+    try {
+      if (renderer.readRenderTargetPixelsAsync) await renderer.readRenderTargetPixelsAsync(this.target, 0, 0, w, h, pixels);
+      else renderer.readRenderTargetPixels(this.target, 0, 0, w, h, pixels);
+    } catch {
+      return false;
+    }
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (ctx == null) return false;
+    const image = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) image.data.set(pixels.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+    ctx.putImageData(image, 0, 0);
+    return true;
   }
 
   /** Something changed that the pose of a piece does not show: draw the monitor again. */
@@ -1246,6 +1288,7 @@ export class ViewfinderSystem extends createSystem({
   update(delta: number, time: number): void {
     const cam = this.cameraEntity();
     if (cam?.object3D == null || !this.ensureMonitor()) return;
+    this.warmUp();
     this.historyClock += delta;
     if (this.historyClock >= HISTORY_EVERY) {
       this.historyClock = 0;
@@ -1473,6 +1516,69 @@ export class ViewfinderSystem extends createSystem({
   }
 
   /** Off-screen pass from the shot camera, inside the same XR frame. */
+  /**
+   * Compiles every piece's shaders ahead, hidden pieces included, once in the page and once in a session, so a
+   * piece shown for the first time does not stop the frame it shows in to compile them (measured in the emulator:
+   * 25 to 50 ms for that frame). It runs a few frames into the page or a session, before anything is placed,
+   * because walking every material holds a frame (22 to 32 ms each of three frames in the emulator). A program is
+   * made for the lights that are showing, and the set's key light and the monitor's glow are part of the set, so
+   * the set is shown for the moment of each compile, which draws nothing, and put away again. One a frame, it
+   * makes the three ways the scene is drawn here: the room's view, the room's view with the monitor put away (as
+   * on a set stepped inside), and the lens, which draws to a target of its own with the monitor put away and the
+   * backdrop up. In a session the headset's own target is current here, so its programs are the ones made. Where
+   * the browser has KHR_parallel_shader_compile, the driver compiles them beside the frames.
+   */
+  private warmUp(): void {
+    const mode = this.world.visibilityState.peek() === VisibilityState.NonImmersive ? 'page' : 'session';
+    if (mode !== this.warmMode) {
+      this.warmMode = mode;
+      this.warmFrames = 0;
+      this.warmStep = 0;
+    }
+    const monitor = this.monitor;
+    if (this.warmed.has(mode) || monitor == null) return;
+    // In a session the headset's own target must be current, or the programs made are not the ones it draws with.
+    const current = this.renderer.getRenderTarget() as (WebGLRenderTarget & { isXRRenderTarget?: boolean }) | null;
+    if (mode === 'session' && current?.isXRRenderTarget !== true) return;
+    if (++this.warmFrames < WARM_AFTER_FRAMES) return;
+    const shown = this.warmShown;
+    shown.length = 0;
+    for (let o: Object3D | null = monitor; o != null; o = o.parent) {
+      if (!o.visible) {
+        o.visible = true;
+        shown.push(o);
+      }
+    }
+    const renderer = this.renderer;
+    const backdrop = this.backdrop;
+    const backdropShown = backdrop?.visible === true;
+    const step = this.warmStep++;
+    const ignore = (): void => undefined;
+    try {
+      if (step === 0) {
+        void renderer.compileAsync(this.scene, this.world.camera).catch(ignore);
+      } else if (step === 1) {
+        monitor.visible = false;
+        void renderer.compileAsync(this.scene, this.world.camera).catch(ignore);
+      } else {
+        monitor.visible = false;
+        if (backdrop) backdrop.visible = true;
+        renderer.setRenderTarget(this.target);
+        void renderer.compileAsync(this.scene, this.lensCamera).catch(ignore);
+        this.warmed.add(mode);
+      }
+    } catch {
+      // A head start only: whatever is not compiled here is compiled when it first shows.
+      this.warmed.add(mode);
+    } finally {
+      monitor.visible = true;
+      if (backdrop) backdrop.visible = backdropShown;
+      for (const o of shown) o.visible = false;
+      shown.length = 0;
+      renderer.setRenderTarget(current);
+    }
+  }
+
   private renderViewfinder(): void {
     const renderer = this.renderer;
     const xr = renderer.xr;
@@ -1565,6 +1671,9 @@ export class ViewfinderSystem extends createSystem({
     }
     ctx.putImageData(image, 0, 0);
 
+    // Encoded here, in the snap's own frame (about 10 ms of it in the emulator): an encoder the browser may put off
+    // to idle time, which a headset's frame loop may not leave, would hold back the snap's sound, flash and card.
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
     this.taken += 1;
     const shot: Shot = {
       index: this.taken,
@@ -1573,7 +1682,7 @@ export class ViewfinderSystem extends createSystem({
       distanceToCreatureM: distance < 0 ? NO_BALL : distance * SET_SCALE,
       eyelineDeg: firstEyeline,
       eyelines: eyelines || (ballOn ? 'no actor on the set' : 'no eyeline ball on the set'),
-      dataUrl: canvas.toDataURL('image/jpeg', 0.86),
+      dataUrl,
       setup,
     };
     const sensor = SENSORS[sensorIndex];
@@ -1610,4 +1719,43 @@ export class ViewfinderSystem extends createSystem({
     saveJson(StoreKey.Board, { taken: this.taken, shots: this.shots } satisfies SavedBoard);
     this.publishBoard();
   }
+}
+
+/**
+ * A canvas as a JPEG data URL, for what can wait for it (the look, not a snap). toBlob leaves the encoding to the
+ * browser, which does it beside the frames rather than inside the one that asked, but may hold it for idle time a
+ * headset's frame loop does not leave: after waitMs, or if toBlob fails, it is encoded at once with toDataURL.
+ */
+export function jpegOf(canvas: HTMLCanvasElement, quality: number, waitMs = 1500): Promise<string> {
+  return new Promise((done) => {
+    let settled = false;
+    let timer = 0;
+    const finish = (url: string): void => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      done(url);
+    };
+    const now = (): void => finish(canvas.toDataURL('image/jpeg', quality));
+    timer = window.setTimeout(now, waitMs);
+    try {
+      canvas.toBlob(
+        (blob) => {
+          if (settled) return;
+          if (blob == null) {
+            now();
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => (typeof reader.result === 'string' ? finish(reader.result) : now());
+          reader.onerror = now;
+          reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        quality,
+      );
+    } catch {
+      now();
+    }
+  });
 }

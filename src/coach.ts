@@ -466,12 +466,28 @@ export class CoachSystem extends createSystem({
     ctx.font = `700 58px ${STENCIL}`;
     ctx.fillText(label, 60, 96);
     const room = W - 110;
-    let px = 112;
-    ctx.font = `700 ${px}px ${TEXT}`;
-    while (px > 52 && ctx.measureText(line).width > room) {
-      px -= 4;
-      ctx.font = `700 ${px}px ${TEXT}`;
-    }
+    // Text widens with its size, so one measurement at the largest size finds the size that fits, kept on the
+    // same 4 px steps so the browser's font caches are reused. Trying each size in turn cost up to 16 ms of one
+    // frame in the emulator as a set was built, most of it in measuring at sizes not used before.
+    const fit = (texts: string[], most: number, least: number): number => {
+      ctx.font = `700 ${most}px ${TEXT}`;
+      let width = 0;
+      for (const text of texts) width = Math.max(width, ctx.measureText(text).width);
+      if (width <= room) return most;
+      let size = Math.max(least, Math.floor((most * room) / width / 4) * 4);
+      ctx.font = `700 ${size}px ${TEXT}`;
+      // Widths do not scale quite evenly with size: a step smaller at a time until it fits, as before.
+      let wide = 0;
+      for (const text of texts) wide = Math.max(wide, ctx.measureText(text).width);
+      while (wide > room && size > least) {
+        size -= 4;
+        ctx.font = `700 ${size}px ${TEXT}`;
+        wide = 0;
+        for (const text of texts) wide = Math.max(wide, ctx.measureText(text).width);
+      }
+      return size;
+    };
+    let px = fit([line], 112, 52);
     ctx.fillStyle = CHALK;
     if (ctx.measureText(line).width <= room) {
       ctx.fillText(line, 60, 232);
@@ -491,12 +507,7 @@ export class CoachSystem extends createSystem({
       }
       const first = line.slice(0, at);
       const second = line.slice(at + 1);
-      px = 84;
-      ctx.font = `700 ${px}px ${TEXT}`;
-      while (px > 44 && Math.max(ctx.measureText(first).width, ctx.measureText(second).width) > room) {
-        px -= 4;
-        ctx.font = `700 ${px}px ${TEXT}`;
-      }
+      px = fit([first, second], 84, 44);
       const top = 112 + px * 0.8;
       ctx.fillText(first, 60, top);
       ctx.fillText(second, 60, top + px * 1.08);
