@@ -64,8 +64,58 @@ if (script) {
 const panel = await get('ui/controls.uikitml');
 check('the headset panel is served', panel.status === 200);
 const panelText = panel.text();
-for (const id of ['btn-snap', 'btn-record', 'btn-voice', 'btn-life', 'tab-assets', 'btn-find-table']) {
+for (const id of ['btn-snap', 'btn-record', 'btn-voice', 'btn-life', 'tab-assets', 'btn-find-table', 'btn-more', 'btn-shelf-more', 'btn-undo', 'btn-inside']) {
   check(`the panel has ${id}`, panelText.includes(`id="${id}"`));
+}
+// A second element with the same id is never found, so its button does nothing.
+const ids = [...panelText.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+const twice = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+check('every panel element id is used once', twice.length === 0, twice.join(', '));
+
+// The set designer: the page asks it, the server has its key, and other sites are refused.
+check('the page has the Shot box and three shots to try', /id="page-ask"/.test(html) && (html.match(/class="shot-try"/g) ?? []).length === 3);
+const designer = await get('api/director');
+let ready = null;
+try {
+  ready = JSON.parse(designer.text()).ready;
+} catch {
+  // reported below
+}
+check('the set designer answers and has its key', designer.status === 200 && ready === true, `${designer.status}, ready ${ready}`);
+const foreign = await fetch(new URL('api/director', base), {
+  method: 'POST',
+  headers: { origin: 'https://example.com', 'content-type': 'application/json' },
+  body: JSON.stringify({ said: 'a horse in a field', set: '' }),
+});
+check('another site is refused by the set designer', foreign.status === 403, `${foreign.status}`);
+// One real sentence, from the site's own address: the plan streams back. About 7 cents of the key's budget.
+{
+  const started = Date.now();
+  const asked = await fetch(new URL('api/director', base), {
+    method: 'POST',
+    headers: { origin: new URL(base).origin, 'content-type': 'application/json' },
+    body: JSON.stringify({ said: 'a horse in a field at dawn', set: 'Nothing is on the set.', heard: [] }),
+  });
+  const text = asked.status === 200 ? await asked.text() : '';
+  const events = text.split('\n').filter((line) => line.trim() !== '').map((line) => {
+    try {
+      return JSON.parse(line);
+    } catch {
+      return {};
+    }
+  });
+  const end = events.find((event) => event.t === 'end');
+  let plan = null;
+  try {
+    plan = JSON.parse(events.filter((event) => event.t === 'd').map((event) => event.s).join(''));
+  } catch {
+    // reported below
+  }
+  check(
+    'a sentence comes back as a set with a horse in it',
+    asked.status === 200 && end?.stop === 'end_turn' && Array.isArray(plan?.things) && plan.things.some((thing) => thing.id === 'Horse'),
+    `${asked.status}, ${end?.stop ?? 'no end'}, first piece of the reply at ${end?.firstMs ?? '?'} ms, whole ${Date.now() - started} ms`,
+  );
 }
 
 for (const font of ['BigShoulders-Medium', 'BigShoulders-Bold', 'BigShouldersStencil-Bold', 'BigShouldersStencil-Black', 'SchibstedGrotesk-Medium', 'SchibstedGrotesk-SemiBold']) {

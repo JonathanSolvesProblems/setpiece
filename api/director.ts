@@ -30,6 +30,7 @@ const LOOK = `This picture is what the shot camera sees now, through its lens. L
 1. Is the subject of the shot whole in the frame? A head, a creature or a vehicle cut off at an edge is a fault. The measured lines say which pieces are cut off and where.
 2. Is anything near the camera covering a large part of the frame (a head, a shoulder, a wall, a vehicle) that the shot did not ask for? The measured lines give each piece's share of the frame and what it hides. That is a fault: move the camera so the piece is not between the lens and the subject, or move that piece aside.
 3. Does the angle and the lens match what was asked (low, high, wide, close)?
+4. Is the frame about what the sentence is about? The pieces the action is about (the people running, the creature, the car) should be among the largest in the measured lines. A backdrop (a house front, a wall, a building) taking more of the frame than the action is a fault unless the shot is about the place: move the camera nearer the action, lower or to the side, or take a longer lens, and keep the people whole down to the knees.
 - If there is a fault, set camera.keep to false and give a better camera, and list only a piece you move. Keep the camera at least 2 m from the nearest actor unless the shot is a close-up of that actor.
 - If the frame already works, set camera.keep to true and list no things.
 - fresh is false. remove is empty.

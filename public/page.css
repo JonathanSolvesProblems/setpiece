@@ -390,14 +390,14 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
 .ask input:focus-visible { outline: none; border-color: var(--selected); }
 .ask-note { margin: 0; padding-left: calc(var(--label-col) + var(--unit) * 3); min-height: 2.8em; }
 /* Shots to try: quieter than the blocks, so the box stays the thing to use. */
-.tries {
+.shot-tries {
   display: flex;
   flex-wrap: wrap;
   gap: var(--unit);
   margin-top: calc(var(--unit) * 2);
   padding-left: calc(var(--label-col) + var(--unit) * 3);
 }
-.try {
+.shot-try {
   min-height: 44px;
   padding: 0 calc(var(--unit) * 2.5);
   font: 500 0.9rem/1.2 var(--text);
@@ -408,13 +408,13 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
   border-radius: 2px;
   cursor: pointer;
 }
-.try:hover { color: var(--chalk); border-color: var(--chalk-dust); }
-.try:focus-visible { outline: 2px solid var(--selected); outline-offset: 2px; }
-.try:disabled { opacity: 0.5; cursor: default; }
+.shot-try:hover { color: var(--chalk); border-color: var(--chalk-dust); }
+.shot-try:focus-visible { outline: 2px solid var(--selected); outline-offset: 2px; }
+.shot-try:disabled { opacity: 0.5; cursor: default; }
 @container (max-width: 520px) {
   .ask { flex-wrap: wrap; }
   .ask .block { width: 100%; }
-  .tries { padding-left: 0; }
+  .shot-tries { padding-left: 0; }
 }
 
 /* Lens and take. Everything here presses, so everything here is a block. */

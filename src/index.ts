@@ -252,7 +252,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     askNote.textContent = title === '' ? words : `${title.charAt(0)}${title.slice(1).toLowerCase()}. ${words}`;
   });
   // Shots to try, for a visitor who has not thought of one yet: the shot goes in the box and is built.
-  const tries = [...document.querySelectorAll<HTMLButtonElement>('.try')];
+  const tries = [...document.querySelectorAll<HTMLButtonElement>('.shot-try')];
   for (const button of tries) {
     button.addEventListener('click', () => {
       if (askText == null || ask == null || (globals.designing as Signal<boolean>).peek()) return;

@@ -550,6 +550,33 @@ class PlanBuild {
       if (entity == null || object == null || !object.visible || entity.hasComponent(Held)) continue;
       standing.push({ label, entity, object, base, rest: this.restY.get(label) ?? object.position.y });
     }
+    // What each effect, and each thing up on a piece, stands on, read before anything moves: for a raised piece
+    // the piece whose top is nearest the height it rests at (the roof under a dragon, not a taller truck parked
+    // beside the house), for an effect on the ground the smallest footprint around it (the car, not the house
+    // front behind it).
+    const under = new Map<Standing, Standing>();
+    const supports: { one: Standing; foot: Footing; top: number }[] = [];
+    for (const one of standing) {
+      if (one.base.shelf === 'Effects' || one.rest > RAISED) continue;
+      const box = localBounds(one.object);
+      const foot = footingOf(one.object, 'free', true, false);
+      if (box.isEmpty() || foot == null) continue;
+      supports.push({ one, foot, top: one.rest + box.max.y * one.object.scale.y });
+    }
+    for (const one of standing) {
+      if (!this.placed.has(one.label) || (one.base.shelf !== 'Effects' && one.rest <= RAISED)) continue;
+      let best: Standing | null = null;
+      let score = Infinity;
+      for (const support of supports) {
+        if (support.one === one || !holds(support.foot, one.object.position.x, one.object.position.z)) continue;
+        const value = one.rest > RAISED ? Math.abs(support.top - one.rest) : support.foot.hx * support.foot.hz;
+        if (value < score) {
+          score = value;
+          best = support.one;
+        }
+      }
+      if (best != null) under.set(one, best);
+    }
     const moves: Moved[] = [];
     const apply = (feet: Footing[], owners: (Standing | null)[]): void => {
       const shifts = settleFootings(feet, ROOM);
