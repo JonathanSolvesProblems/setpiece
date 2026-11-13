@@ -97,17 +97,19 @@ export function separation(a: Footing, b: Footing): { nx: number; nz: number; de
   return { nx: bx, nz: bz, depth: best };
 }
 
-/** Moves a footing back inside the stage, as far as it can go; true when it moved. */
+/**
+ * Keeps a footing on the stage, the way a set is dressed on a table: its middle stays on the stage, and its front
+ * does not hang off towards the camera. Its sides and back may hang over the edge, which is how a set shows less
+ * of a place too big for it (a truck parked half off the side); over the edge it stands only a slate's thickness
+ * above the table. True when it moved.
+ */
 function keepOnStage(f: Footing, room: Room): boolean {
   const c = Math.abs(Math.cos(f.yaw));
   const s = Math.abs(Math.sin(f.yaw));
-  const ex = f.hx * c + f.hz * s;
   const ez = f.hx * s + f.hz * c;
-  const limitX = room.halfX + room.overhang;
-  const limitZ = room.halfZ + room.overhang;
-  // Wider than the stage: it stands in the middle, the stage shows what it can of it.
-  const x = ex >= limitX ? 0 : Math.min(limitX - ex, Math.max(-(limitX - ex), f.x));
-  const z = ez >= limitZ ? 0 : Math.min(limitZ - ez, Math.max(-(limitZ - ez), f.z));
+  const x = Math.min(room.halfX, Math.max(-room.halfX, f.x));
+  // The front no further than the front edge; a piece deeper than the stage hangs off the back instead.
+  const z = Math.max(-room.halfZ, Math.min(Math.min(room.halfZ, f.z), room.halfZ + room.overhang - ez));
   if (Math.abs(x - f.x) < 1e-9 && Math.abs(z - f.z) < 1e-9) return false;
   f.x = x;
   f.z = z;

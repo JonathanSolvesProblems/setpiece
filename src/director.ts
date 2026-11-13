@@ -531,8 +531,8 @@ class PlanBuild {
    * settled: library pieces by their shapes, made pieces by the parts that stand on the ground (so a car can
    * stand under a made bridge and a guard in a made gateway, but not inside a made wall). Pieces are moved apart
    * by the shortest push and what this plan put down is kept on the stage; what stood on the set before it and
-   * was not touched stays exactly where it was, and made pieces are never pushed. An effect moves with the piece
-   * it stood on. A piece that moves drops again onto its new mark. Pieces up on something or flying, creatures,
+   * was not touched stays exactly where it was, and made pieces are never pushed. An effect, or anything up on a
+   * piece (a dragon on a roof), moves with the piece it stood on. A piece that moves drops again onto its new mark. Pieces up on something or flying, creatures,
    * riders on a horse or a bicycle, trees and lamps are left as the designer meant. Returns how many moved.
    */
   settle(drop: (entity: Entity, object: Object3D, y: number) => void): number {
@@ -607,9 +607,9 @@ class PlanBuild {
     }
     if (feet.length > 0) apply(feet, owners);
     if (moves.length === 0) return 0;
-    // An effect goes with the piece it stood on: fire on a car that moved moves with the car.
+    // What stood on a piece that moved goes with it: fire on a car, a dragon on a roof, a lamp on a table.
     for (const one of standing) {
-      if (one.base.shelf !== 'Effects' || !this.placed.has(one.label)) continue;
+      if (!this.placed.has(one.label) || (one.base.shelf !== 'Effects' && one.rest <= RAISED)) continue;
       const under = moves.find((move) => holds(move.foot, one.object.position.x, one.object.position.z));
       if (under == null) continue;
       one.object.position.x += under.dx;
