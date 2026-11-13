@@ -5,6 +5,7 @@
  * made, never in a frame.
  */
 import {
+  Box3,
   BoxGeometry,
   BufferGeometry,
   Color,
@@ -76,7 +77,7 @@ export type Footprint = { w: number; d: number; h: number };
  * One mesh's worth of parts. Lines that cannot be read are left out; a piece with nothing readable in it
  * comes back as null, and is not made.
  */
-export function buildMade(lines: string[]): { geometry: BufferGeometry; footprint: Footprint; parts: number } | null {
+export function buildMade(lines: string[]): { geometry: BufferGeometry; footprint: Footprint; parts: number; surfaces: Box3[] } | null {
   const parts = lines.map(readPart).filter((part): part is Part => part != null);
   if (parts.length === 0) return null;
   // The lowest point of the piece goes on the ground, whatever heights were written.
@@ -95,8 +96,12 @@ export function buildMade(lines: string[]): { geometry: BufferGeometry; footprin
   const v = new Vector3();
   const colour = new Color();
   let o = 0;
+  // Each part's own box, in the piece's frame: what can be set down on, part by part.
+  const surfaces: Box3[] = [];
   for (const part of parts) {
     const source = unit(part.shape);
+    const surface = new Box3();
+    surfaces.push(surface);
     euler.set(part.pitch * DEG, part.yaw * DEG, part.roll * DEG, 'YXZ');
     rotation.setFromEuler(euler);
     matrix.compose(at.set(part.x * SCALE, part.y * SCALE, part.z * SCALE), rotation, size.set(part.w * SCALE, part.h * SCALE, part.d * SCALE));
@@ -107,6 +112,7 @@ export function buildMade(lines: string[]): { geometry: BufferGeometry; footprin
     const t = source.attributes.uv;
     for (let i = 0; i < p.count; i++, o++) {
       v.fromBufferAttribute(p, i).applyMatrix4(matrix);
+      surface.expandByPoint(v);
       positions[o * 3] = v.x;
       positions[o * 3 + 1] = v.y;
       positions[o * 3 + 2] = v.z;
@@ -123,7 +129,13 @@ export function buildMade(lines: string[]): { geometry: BufferGeometry; footprin
   }
   let low = Infinity;
   for (let i = 1; i < positions.length; i += 3) low = Math.min(low, positions[i]);
-  if (Number.isFinite(low) && Math.abs(low) > 1e-5) for (let i = 1; i < positions.length; i += 3) positions[i] -= low;
+  if (Number.isFinite(low) && Math.abs(low) > 1e-5) {
+    for (let i = 1; i < positions.length; i += 3) positions[i] -= low;
+    for (const surface of surfaces) {
+      surface.min.y -= low;
+      surface.max.y -= low;
+    }
+  }
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new Float32BufferAttribute(normals, 3));
@@ -137,5 +149,5 @@ export function buildMade(lines: string[]): { geometry: BufferGeometry; footprin
     d: (box.max.z - box.min.z) / SCALE,
     h: (box.max.y - box.min.y) / SCALE,
   };
-  return { geometry, footprint, parts: parts.length };
+  return { geometry, footprint, parts: parts.length, surfaces };
 }

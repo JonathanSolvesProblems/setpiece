@@ -277,6 +277,8 @@ export class PiecesSystem extends createSystem({
   private bounds: Box3[] = [];
   /** The shape of each piece that others can be set down on, by index; null for the rest. */
   private solids: (Box3 | null)[] = [];
+  /** A made piece's parts, each a box something can be set down on, by index; null for every other piece. */
+  private surfaces: (Box3[] | null)[] = [];
   /** The shape a rolling vehicle stops against, for every piece that has one: not an effect, an actor or a camera. */
   private blockers: (Box3 | null)[] = [];
   /** How far each piece reaches from its own origin, by index: a quick way to rule a hand out. */
@@ -1009,13 +1011,15 @@ export class PiecesSystem extends createSystem({
    * whether it stops a rolling car are worked out again from the shape it has now. Called when a piece is
    * made, never in a frame.
    */
-  reshape(piece: Entity, radius: number, height: number): void {
+  reshape(piece: Entity, radius: number, height: number, surfaces: Box3[] = []): void {
     const index = this.dressed.indexOf(piece);
     const object = piece.object3D;
     if (index < 0 || object == null) return;
     const shape = localBounds(object);
     const asset = assetByLabel(String(piece.getValue(SetPiece, 'label')));
     this.solids[index] = asset?.solid === true && !shape.isEmpty() ? shape.clone() : null;
+    // Set down on part by part: a roof slab under a chimney holds what stands on it.
+    this.surfaces[index] = this.solids[index] != null && surfaces.length > 0 ? surfaces.map((box) => box.clone()) : null;
     this.blockers[index] = asset != null && !ROLL_THROUGH.has(asset.shelf) && !shape.isEmpty() ? shape.clone() : null;
     const room = shape.isEmpty() ? radius : Math.min(radius, THIN_REACH);
     shape.expandByPoint(this.local.set(room, height, room));
@@ -1044,6 +1048,7 @@ export class PiecesSystem extends createSystem({
     const asset = assetByLabel(String(piece.getValue(SetPiece, 'label')));
     const role = piece.getValue(SetPiece, 'role');
     this.solids.push(asset?.solid === true ? shape.clone() : null);
+    this.surfaces.push(null);
     const inTheWay = asset != null && (!ROLL_THROUGH.has(asset.shelf) || asset.mover === true) && role !== SetRole.Actor && role !== SetRole.Camera && !shape.isEmpty();
     this.blockers.push(inTheWay ? shape.clone() : null);
     // A thin piece gets room around it for the hand; a big one is its own shape, so a hand
@@ -1094,10 +1099,16 @@ export class PiecesSystem extends createSystem({
       const other = this.dressed[j].object3D;
       if (other == null || !other.visible || other.parent !== object.parent || this.dressed[j].hasComponent(Held)) continue;
       other.worldToLocal(this.local.copy(this.point));
-      if (this.local.x < box.min.x || this.local.x > box.max.x || this.local.z < box.min.z || this.local.z > box.max.z) continue;
-      const height = other.position.y + box.max.y * other.scale.y;
-      if (object.position.y < height - STACK_SLACK) continue;
-      if (height > top) top = height;
+      // A made piece is tried part by part; anything else as its whole shape.
+      const parts = this.surfaces[j];
+      const count = parts == null ? 1 : parts.length;
+      for (let k = 0; k < count; k++) {
+        const part = parts == null ? box : parts[k];
+        if (this.local.x < part.min.x || this.local.x > part.max.x || this.local.z < part.min.z || this.local.z > part.max.z) continue;
+        const height = other.position.y + part.max.y * other.scale.y;
+        if (object.position.y < height - STACK_SLACK) continue;
+        if (height > top) top = height;
+      }
     }
     return top;
   }
@@ -1319,12 +1330,13 @@ export class PiecesSystem extends createSystem({
       const box = localBounds(object);
       if (box.isEmpty()) continue;
       const toPiece = object.matrix.clone().invert();
-      // The subject inside it: the car the actor is in, the doorway they stand in.
-      if (box.containsPoint(there.copy(subject).applyMatrix4(toPiece))) continue;
+      // The subject inside it (the car the actor is in, the doorway they stand in) is not in the way of the line
+      // to the subject, but the lens still keeps out of it.
+      const holdsSubject = box.containsPoint(there.copy(subject).applyMatrix4(toPiece));
       // A margin of 6 mm on the slate, whatever the piece's size.
       boxes.push(box.expandByScalar(0.006 / Math.max(1e-3, object.scale.x)));
       into.push(toPiece);
-      blocks.push(piece.getValue(SetPiece, 'role') !== SetRole.Actor);
+      blocks.push(!holdsSubject && piece.getValue(SetPiece, 'role') !== SetRole.Actor);
     }
     const lens = new Vector3();
     const ray = new Ray();

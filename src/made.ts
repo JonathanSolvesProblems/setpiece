@@ -5,7 +5,7 @@
  * visits and in every frame's setup, so going back to a frame brings its made pieces back too.
  */
 import { createSystem, Entity, Mesh, MeshStandardMaterial } from '@iwsdk/core';
-import type { BufferGeometry } from '@iwsdk/core';
+import type { Box3, BufferGeometry } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { ASSETS, isMade, MADE_PREFIX, MADE_SLOTS } from './catalog.js';
 import { buildMade } from './made-shapes.js';
@@ -29,7 +29,7 @@ export class MadeSystem extends createSystem({
   pieces: { required: [SetPiece] },
 }) {
   private defs = new Map<string, MadeDef>();
-  private built = new Map<string, { geometry: BufferGeometry; footprint: Footprint }>();
+  private built = new Map<string, { geometry: BufferGeometry; footprint: Footprint; surfaces: Box3[] }>();
   /** Which made piece is in each place. */
   private slots = new Map<string, string>();
   /** When each place was last given a piece, so the one left longest is taken first. */
@@ -165,7 +165,7 @@ export class MadeSystem extends createSystem({
     if (built == null) {
       const made = buildMade(def.parts);
       if (made == null) return;
-      built = { geometry: made.geometry, footprint: made.footprint };
+      built = { geometry: made.geometry, footprint: made.footprint, surfaces: made.surfaces };
       this.built.set(id, built);
     }
     body.geometry = built.geometry;
@@ -178,7 +178,7 @@ export class MadeSystem extends createSystem({
       asset.title = def.name;
       asset.grab = [radius, height];
     }
-    this.world.getSystem(PiecesSystem)?.reshape(piece, radius, height);
+    this.world.getSystem(PiecesSystem)?.reshape(piece, radius, height, built.surfaces);
     this.world.getSystem(ViewfinderSystem)?.refresh();
     this.forgetUnused();
     if (keep) this.save();

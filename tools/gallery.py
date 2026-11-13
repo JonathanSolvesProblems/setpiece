@@ -305,10 +305,16 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === true', timeout=20000)
         await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === false', timeout=90000)
         # The looks through the lens follow by themselves; the page's own view then glides to frame the set.
-        for _ in range(2):
-            await page.wait_for_timeout(1800)
-            await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === false', timeout=90000)
-        await page.wait_for_timeout(2500)
+        # Under software GL a frame takes most of a second, so a look can start well after the last one ended: the
+        # designer must have been idle for eight seconds running before the picture is taken.
+        idle = 0
+        for _ in range(400):
+            await page.wait_for_timeout(500)
+            busy = await page.evaluate('globalThis.setpiece.world.globals.designing.peek()')
+            idle = 0 if busy else idle + 1
+            if idle >= 16:
+                break
+        await page.wait_for_timeout(1000)
         lens = '''() => { const v = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.copyMonitor === 'function');
           v.refresh(); const c = document.createElement('canvas'); v.copyMonitor(c); return c.toDataURL('image/png'); }'''
         if recipe == 'designer':

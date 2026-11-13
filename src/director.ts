@@ -33,6 +33,7 @@ type Globals = {
   lastSpoken: Signal<string>;
   designing: Signal<boolean>;
   setsBuilt: Signal<number>;
+  layoutChanged: Signal<number>;
 };
 
 /** Real metres to the slate's, and back. */
@@ -62,6 +63,10 @@ const ROOM = { halfX: 0.3, halfZ: 0.2, overhang: 0.01, bodyGap: 0.01, solidGap: 
 const BODY_HALF = 0.025;
 /** Higher than this off the ground, a piece is up on something or flying, and the set dresser leaves it be. */
 const RAISED = 0.01;
+/** A piece the set dresser moves less than this (slate metres, 10 cm real) is slid, not dropped again. */
+const NUDGE = 0.01;
+/** A raised piece rests on a top no more than this above its own height (slate metres, 6 cm real). */
+const RESTS_ON = 0.006;
 /** A made piece's part counts as standing on the ground within this of its lowest part, and this tall, in real metres. */
 const PART_FOOT = 0.3;
 const PART_TALL = 0.3;
@@ -135,6 +140,7 @@ export class DirectorSystem extends createSystem({
   }
 
   update(delta: number): void {
+    const dropping = this.drops > 0;
     for (let i = 0; i < this.drops; ) {
       const object = this.dropObjects[i]!;
       // A hand took it on the way down: it is the hand's now.
@@ -157,6 +163,11 @@ export class DirectorSystem extends createSystem({
       this.dropT[i] = this.dropT[last];
       this.dropObjects[last] = null;
       this.dropEntities[last] = null;
+    }
+    // The last piece has landed: the set is kept where it rests (it was kept once already, mid-fall, at the plan's end).
+    if (dropping && this.drops === 0) {
+      const g = this.globals as unknown as Globals;
+      g.layoutChanged.value = g.layoutChanged.peek() + 1;
     }
     if (this.drops === 0 && this.pendingCamera != null) {
       const plan = this.pendingCamera;
@@ -417,6 +428,8 @@ class PlanBuild {
   private placed = new Set<string>();
   /** Where each piece this plan put down rests, in slate metres up: it may still be dropping when the reply ends. */
   private restY = new Map<string, number>();
+  /** The set dresser has run for this plan. */
+  private settled = false;
   /** What stood on the set before the plan began: a made piece there is not built over, and a copy there is not borrowed. */
   private before = new Set<string>();
   private removed: string[] = [];
@@ -536,7 +549,8 @@ class PlanBuild {
    * riders on a horse or a bicycle, trees and lamps are left as the designer meant. Returns how many moved.
    */
   settle(drop: (entity: Entity, object: Object3D, y: number) => void): number {
-    if (!this.begun || this.placed.size === 0) return 0;
+    if (!this.begun || this.placed.size === 0 || this.settled) return 0;
+    this.settled = true;
     const tray = this.world.getSystem(TraySystem);
     const made = this.world.getSystem(MadeSystem);
     if (tray == null) return 0;
@@ -550,26 +564,33 @@ class PlanBuild {
       if (entity == null || object == null || !object.visible || entity.hasComponent(Held)) continue;
       standing.push({ label, entity, object, base, rest: this.restY.get(label) ?? object.position.y });
     }
-    // What each effect, and each thing up on a piece, stands on, read before anything moves: for a raised piece
-    // the piece whose top is nearest the height it rests at (the roof under a dragon, not a taller truck parked
-    // beside the house), for an effect on the ground the smallest footprint around it (the car, not the house
-    // front behind it).
+    // What each effect, and each thing up on a piece, stands on, read before anything moves. A raised piece rests
+    // on the highest top at or just below its own height (a made piece is read part by part, so a dragon is on the
+    // roof slab, not on the chimney, and not on a taller truck parked beside the house); an effect on the ground
+    // stands on the smallest footprint around it (the car, not the house front behind it).
     const under = new Map<Standing, Standing>();
     const supports: { one: Standing; foot: Footing; top: number }[] = [];
     for (const one of standing) {
       if (one.base.shelf === 'Effects' || one.rest > RAISED) continue;
+      const def = isMade(one.label) ? made?.defIn(one.label) : null;
+      if (def != null) {
+        for (const part of partTops(one.object, def.parts)) supports.push({ one, foot: part.foot, top: one.rest + part.top });
+        continue;
+      }
       const box = localBounds(one.object);
       const foot = footingOf(one.object, 'free', true, false);
       if (box.isEmpty() || foot == null) continue;
       supports.push({ one, foot, top: one.rest + box.max.y * one.object.scale.y });
     }
     for (const one of standing) {
-      if (!this.placed.has(one.label) || (one.base.shelf !== 'Effects' && one.rest <= RAISED)) continue;
+      if (one.base.shelf !== 'Effects' && one.rest <= RAISED) continue;
+      const raised = one.rest > RAISED;
       let best: Standing | null = null;
       let score = Infinity;
       for (const support of supports) {
         if (support.one === one || !holds(support.foot, one.object.position.x, one.object.position.z)) continue;
-        const value = one.rest > RAISED ? Math.abs(support.top - one.rest) : support.foot.hx * support.foot.hz;
+        if (raised && support.top > one.rest + RESTS_ON) continue;
+        const value = raised ? -support.top : support.foot.hx * support.foot.hz;
         if (value < score) {
           score = value;
           best = support.one;
@@ -635,15 +656,17 @@ class PlanBuild {
     if (feet.length > 0) apply(feet, owners);
     if (moves.length === 0) return 0;
     // What stood on a piece that moved goes with it: fire on a car, a dragon on a roof, a lamp on a table.
-    for (const one of standing) {
-      if (!this.placed.has(one.label) || (one.base.shelf !== 'Effects' && one.rest <= RAISED)) continue;
-      const under = moves.find((move) => holds(move.foot, one.object.position.x, one.object.position.z));
-      if (under == null) continue;
-      one.object.position.x += under.dx;
-      one.object.position.z += under.dz;
-      moves.push({ standing: one, dx: under.dx, dz: under.dz, foot: under.foot });
+    for (const [one, base] of under) {
+      const move = moves.find((moved) => moved.standing === base);
+      if (move == null) continue;
+      one.object.position.x += move.dx;
+      one.object.position.z += move.dz;
+      moves.push({ standing: one, dx: move.dx, dz: move.dz, foot: move.foot });
     }
-    for (const move of moves) drop(move.standing.entity, move.standing.object, move.standing.rest);
+    // A piece moved far enough to see drops onto its new mark; a nudge is only a nudge.
+    for (const move of moves) {
+      if (Math.hypot(move.dx, move.dz) >= NUDGE) drop(move.standing.entity, move.standing.object, move.standing.rest);
+    }
     this.world.getSystem(ViewfinderSystem)?.refresh();
     return moves.length;
   }
@@ -770,6 +793,37 @@ function groundParts(object: Object3D, lines: string[]): Footing[] {
     });
   }
   return feet;
+}
+
+/** Every part of a made piece as a footprint and the height of its top above the piece's origin, slate metres. */
+function partTops(object: Object3D, lines: string[]): { foot: Footing; top: number }[] {
+  const parts = lines.map(readPart).filter((part): part is NonNullable<typeof part> => part != null);
+  if (parts.length === 0) return [];
+  // The piece was built with its lowest point on the ground.
+  let low = Infinity;
+  for (const part of parts) low = Math.min(low, part.y - part.h / 2);
+  const scale = object.scale.x * SLATE;
+  const yaw = object.rotation.y;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return parts.map((part) => {
+    const x = part.x * scale;
+    const z = part.z * scale;
+    return {
+      foot: {
+        x: object.position.x + x * c + z * s,
+        z: object.position.z - x * s + z * c,
+        hx: (part.w / 2) * scale,
+        hz: (part.d / 2) * scale,
+        yaw: yaw + part.yaw * DEG,
+        kind: 'free' as Kind,
+        fixed: true,
+        weight: 0,
+        keepOn: false,
+      },
+      top: (part.y + part.h / 2 - low) * scale,
+    };
+  });
 }
 
 /** Whether a point on the stage lies within a footprint, with a few millimetres to spare. */
