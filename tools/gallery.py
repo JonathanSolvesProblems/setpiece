@@ -10,12 +10,13 @@ Change a number in devpost/results and the slide that shows it re-renders with t
 
 Needs Python 3 with playwright and Pillow, and the fonts in public/ui/fonts.
 """
-import asyncio, base64, json, os, re, sys
+import asyncio, base64, io, json, os, re, sys
 from pathlib import Path
 from playwright.async_api import async_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-LIVE = 'https://setpiece.jonathansolvesproblems.com/'
+# The live site, unless GALLERY_BASE points at a development build; the badge on those slides then says so.
+LIVE = os.environ.get('GALLERY_BASE', 'https://setpiece.jonathansolvesproblems.com/')
 OUT = ROOT / 'devpost' / 'gallery'
 
 
@@ -36,6 +37,7 @@ quest_controls = quest_voice['control_sentences_fed_to_the_recogniser_on_the_hea
 load = json.loads((ROOT / 'devpost/results/load-and-size.json').read_text(encoding='utf-8'))
 checks = (ROOT / 'devpost/checks/last-run.md').read_text(encoding='utf-8')
 catalog = (ROOT / 'src/catalog.ts').read_text(encoding='utf-8')
+designer = json.loads((ROOT / 'devpost/results/designer-latency.json').read_text(encoding='utf-8'))
 
 all_fps = [s['fps'] for s in fps['samples']]
 N = {
@@ -60,23 +62,30 @@ N = {
     'quest_reload_s': load['quest_3s'][1]['seconds_to_set_ready'],
     'assets': len(re.findall(r"\{ label: '", catalog)) - len(re.findall(r"shelf: 'Kit'", catalog)),
     'scenes': len(re.findall(r'^\s+title: ', (ROOT / 'src/scenes.ts').read_text(encoding='utf-8'), re.M)),
+    'designer_first_s': f"{designer['summary']['firstPieceMs']['median'] / 1000:.1f}",
+    'designer_whole_s': f"{designer['summary']['wholeMs']['median'] / 1000:.1f}",
+    'designer_sentences': designer['summary']['sentences'],
     'checks_passed': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(1),
     'checks_total': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(2),
 }
 QUEST = 'Quest 3S · headset capture · 6 Nov 2026'
-LIVE_BADGE = 'Live site · setpiece.jonathansolvesproblems.com'
+LIVE_BADGE = 'Live site · setpiece.jonathansolvesproblems.com' if 'GALLERY_BASE' not in os.environ else 'Development build · desktop browser'
 
 # One entry per slide, in the order a judge scrolls. `picture` is a file under devpost/, a live
 # recipe run on the deployed page, or a result rendered as text.
 SLIDES = [
+    dict(slug='say', badge=LIVE_BADGE, headline='Say the shot', picture=('live', 'designer'),
+         caption='"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.'),
     dict(slug='table', badge=QUEST, headline='The shot, on your table', picture='captures/quest-set-on-table.jpg',
          caption='A 1:10 film set lands on your real table. Two wooden stand-ins, a tennis ball for the creature, a 35 mm camera, your own hands.'),
+    dict(slug='made', badge=LIVE_BADGE, headline='It makes what the library lacks', picture=('live', 'castle'),
+         caption='Asked for a castle gate, it built the gate and two towers from simple wooden shapes, then two guards and a horse, low and wide.'),
+    dict(slug='look', badge=LIVE_BADGE, headline='It checks its own frame', picture=('live', 'look'),
+         caption="It is shown the camera's picture and what each piece covers. A truck in the way, a dragon cut off: it moves the camera and looks again."),
+    dict(slug='speed', badge='Result · devpost/results/designer-latency.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
+         caption='{designer_sentences} fresh sets from a desktop: the first piece a median {designer_first_s} s after asking, the whole set {designer_whole_s} s. Headset time is next.'),
     dict(slug='pinch', badge=QUEST, headline='Reach in and pick it up', picture='captures/quest-hands-card.jpg',
          caption='Put your fingers on a piece and pinch, or close a fist around it. The pointing ray steps aside when a hand is near a piece.'),
-    dict(slug='say', badge=LIVE_BADGE, headline='Say the scene', picture=('live', 'standoff'),
-         caption='"A Mexican standoff after a car chase": three actors on marks, each aiming at the next, two crashed cars behind. All of it movable.'),
-    dict(slug='heard', badge='Result · devpost/results/quest-voice.json', headline='What the headset wrote down', picture=('result', 'voice'),
-         caption='{quest_voice_read} of {quest_voice_clips} recorded sentences read as what was said, inside the Quest Browser, in about a quarter of real time. A real voice is next.'),
     dict(slug='board', badge=LIVE_BADGE, headline='Six setups, each with its numbers', picture=('live', 'board'),
          caption='Each frame on the board is stamped with its lens, camera height, distance and every actor’s eyeline, measured where the pieces stood.'),
     dict(slug='lenses', badge=LIVE_BADGE, headline='Six lenses, 18 to 135 mm', picture=('live', 'lenses'),
@@ -87,14 +96,10 @@ SLIDES = [
          caption='Rain over the fire puts it out. A car pushed hard and let go drives on, and the actor in its way goes down.'),
     dict(slug='library', badge=LIVE_BADGE, headline='{assets} pieces on six shelves', picture=('live', 'pieces'),
          caption='Cast, creatures, vehicles, effects, set and props, every one a bare maquette you can paint, size and fit out. {scenes} scenes to start from.'),
-    dict(slug='scene', badge=LIVE_BADGE, headline='Ten scenes to start from', picture=('live', 'dragon'),
-         caption='Dragon attack: a dragon, a house on fire and two actors, placed as a blocking. Start here, then move anything.'),
     dict(slug='back', badge=QUEST, headline='It keeps your set and your board', picture='captures/quest-car-bicycle.jpg',
          caption='After a reload in the headset the panel lists what came back: the set, the pieces and the board. Same spot after a relaunch: next to prove.'),
     dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json and quest-frame-time.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
          caption='{fps_samples} one-second samples, {fps_days} Nov: median {fps_median}, lowest {fps_min}. A heavier set on 11 Nov ran at {heavy_fps}, {heavy_then}.'),
-    dict(slug='load', badge=LIVE_BADGE, headline='The wait is a call sheet', picture=('live', 'loading'),
-         caption='Main script {bundle_mb} MB, down from {bundle_before_mb}. On the Quest: a set in {quest_first_s} s on a first visit, {quest_reload_s} s on a reload.'),
     dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
          caption='Saved from the page: the board as an image with each frame’s numbers, and the shot list as a CSV. A take saves as a short video too.'),
     dict(slug='camera', badge=QUEST, headline='Format, rig, second camera', picture='captures/quest-camera-tab.jpg',
@@ -150,6 +155,14 @@ def result_body(kind: str) -> str:
         rows = ''.join(f"<tr><td>{said}</td><td class='yes'>{heard}</td></tr>" for said, heard in pairs)
         return (f'<div class="result"><p class="muted">Recorded sentences fed to the recogniser the app ships, inside the Quest Browser on a Quest 3S. No microphone was open and nobody spoke. The right column is what it wrote down.</p>'
                 f'<table><tr><th>Said</th><th>Written on the headset</th></tr>{rows}</table></div>')
+    if kind == 'designer':
+        rows = ''.join(
+            f"<tr><td>{run['said']}</td><td class='yes'>{run['firstPieceMs'] / 1000:.1f} s</td><td>{run['wholeMs'] / 1000:.1f} s</td></tr>"
+            for run in designer['runs']
+        )
+        return (f'<div class="result"><div class="big">{N["designer_first_s"]}<span class="unit">s to the first piece, median of {N["designer_sentences"]} sets</span></div>'
+                f'<p class="muted">From the request to the first piece of a fresh set, and to the whole set: the app\'s own server function, from a desktop on home broadband. The headset\'s time is still to be measured.</p>'
+                f'<table><tr><th>Said</th><th>First piece</th><th>Whole set</th></tr>{rows}</table></div>')
     if kind == 'checks':
         lines = [l for l in checks.splitlines() if l.startswith('| ') and not l.startswith('| Check') and not l.startswith('|---')]
         rows = ''.join(f"<tr><td>{l.split('|')[1].strip()}</td><td class='{'yes' if 'pass' in l.split('|')[2] else ''}'>{l.split('|')[2].strip()}</td></tr>" for l in lines[:14])
@@ -241,7 +254,8 @@ async def stage_png(page, path: Path):
 async def live_capture(browser, recipe: str, out: Path) -> Path:
     """Drives the deployed page into one state and saves the set's picture, or the whole viewport."""
     # Captured at twice the pixel density, so a crop of the set still fills a slide.
-    ctx = await browser.new_context(viewport={'width': W, 'height': H}, color_scheme='dark', device_scale_factor=2)
+    # A development build is served with a local certificate.
+    ctx = await browser.new_context(viewport={'width': W, 'height': H}, color_scheme='dark', device_scale_factor=2, ignore_https_errors='GALLERY_BASE' in os.environ)
     page = await ctx.new_page()
     png = out / f'live-{recipe}.png'
     if recipe == 'loading':
@@ -266,7 +280,70 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
     await page.wait_for_timeout(1200)
     say = lambda t: page.evaluate('(t) => globalThis.setpiece.say(t)', t)
     click = lambda s: page.evaluate(f"document.querySelector('{s}').click()")
-    if recipe == 'standoff':
+    if recipe in ('designer', 'castle', 'look'):
+        said = {
+            'designer': 'a night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop',
+            'castle': 'a medieval castle gate with two guards and a horse, low angle',
+            'look': 'a night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop',
+        }[recipe]
+        # What the designer was shown at its first look, kept from the request the page sends.
+        await page.evaluate('''() => {
+          const real = window.fetch;
+          globalThis.__looks = [];
+          window.fetch = async (url, init) => {
+            if (String(url).includes('/api/director') && init?.method === 'POST') {
+              const body = JSON.parse(init.body);
+              if (body.image) globalThis.__looks.push({ image: body.image, report: body.report ?? '' });
+            }
+            return real(url, init);
+          };
+        }''')
+        await page.fill('#page-ask-text', said)
+        await click('#page-ask-go')
+        await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === true', timeout=20000)
+        await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === false', timeout=90000)
+        # The looks through the lens follow by themselves; the page's own view then glides to frame the set.
+        for _ in range(2):
+            await page.wait_for_timeout(1800)
+            await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === false', timeout=90000)
+        await page.wait_for_timeout(2500)
+        lens = '''() => { const v = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.copyMonitor === 'function');
+          v.refresh(); const c = document.createElement('canvas'); v.copyMonitor(c); return c.toDataURL('image/png'); }'''
+        if recipe == 'designer':
+            await stage_png(page, png)
+        elif recipe == 'castle':
+            await page.wait_for_timeout(800)
+            url = await page.evaluate(lens)
+            png.write_bytes(base64.b64decode(url.split(',')[1]))
+        else:
+            from PIL import Image, ImageDraw, ImageFont
+            await page.wait_for_timeout(800)
+            after = await page.evaluate(lens)
+            looks = await page.evaluate('globalThis.__looks')
+            note = await page.inner_text('#page-ask-note')
+            if not looks:
+                raise RuntimeError('the designer did not look through the lens')
+            first = Image.open(io.BytesIO(base64.b64decode(looks[0]['image']))).convert('RGB').resize((1280, 720))
+            last = Image.open(io.BytesIO(base64.b64decode(after.split(',')[1]))).convert('RGB').resize((1280, 720))
+            sheet = Image.new('RGB', (2640, 1150), (27, 20, 17))
+            sheet.paste(first, (0, 0))
+            sheet.paste(last, (1360, 0))
+            draw = ImageDraw.Draw(sheet)
+            face = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'SchibstedGrotesk-Medium.ttf'), 34)
+            label = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'BigShoulders-Bold.ttf'), 40)
+            draw.text((0, 740), 'WHAT IT SAW FIRST', font=label, fill=(214, 225, 60))
+            draw.text((1360, 740), 'AFTER IT LOOKED', font=label, fill=(214, 225, 60))
+            y = 800
+            for line in looks[0]['report'].split('\n')[:4]:
+                draw.text((0, y), line[2:][:68], font=face, fill=(199, 199, 183))
+                y += 46
+            words = note.split('. ', 1)[-1]
+            y = 800
+            for i in range(0, min(len(words), 260), 62):
+                draw.text((1360, y), words[i:i + 62], font=face, fill=(246, 247, 239))
+                y += 46
+            sheet.save(png)
+    elif recipe == 'standoff':
         await say('a mexican standoff after a car chase')
         await page.wait_for_timeout(1500)
         await stage_png(page, png)
