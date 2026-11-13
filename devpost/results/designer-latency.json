@@ -1,0 +1,171 @@
+{
+ "measured": "2026-11-13",
+ "what": "Seconds from the request to the first piece of the plan being complete, and to the whole plan, for fresh sets, calling api/director.ts from a desktop on home broadband with the instructions cached. claude-opus-5-5, fast mode, low effort, structured output.",
+ "limit": "The headset's own share is not in this number: its speech recogniser, the Quest's network, and drawing the pieces.",
+ "summary": {
+  "sentences": 7,
+  "firstPieceMs": {
+   "median": 1841,
+   "lowest": 1054,
+   "highest": 7011
+  },
+  "wholeMs": {
+   "median": 3035,
+   "lowest": 1433,
+   "highest": 8448
+  },
+  "cacheWriteRun": {
+   "firstPieceMs": 9566,
+   "wholeMs": 11022
+  }
+ },
+ "runs": [
+  {
+   "said": "a night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop",
+   "firstPieceMs": 7011,
+   "wholeMs": 8448,
+   "stop": "end_turn",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input": 68,
+    "cacheRead": 6056,
+    "cacheWrite": 0,
+    "output": 2210
+   },
+   "title": "Night Chase",
+   "says": "Red car races past a burning truck as two actors run in, dragon on the roof; low wide 18mm shot.",
+   "pieces": 8,
+   "made": 0,
+   "camera": {
+    "height": 0.7,
+    "lens": 18
+   }
+  },
+  {
+   "said": "a medieval castle gate with two guards and a horse, low angle",
+   "firstPieceMs": 1841,
+   "wholeMs": 2661,
+   "stop": "end_turn",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input": 52,
+    "cacheRead": 6056,
+    "cacheWrite": 0,
+    "output": 735
+   },
+   "title": "Castle Gate",
+   "says": "A stone gatehouse flanked by two guards with a horse before it, shot from a low angle on a 24mm.",
+   "pieces": 4,
+   "made": 1,
+   "camera": {
+    "height": 0.6,
+    "lens": 24
+   }
+  },
+  {
+   "said": "a spaceship landing in a desert canyon, an astronaut walking toward it at sunset",
+   "firstPieceMs": 1054,
+   "wholeMs": 2809,
+   "stop": "end_turn",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input": 61,
+    "cacheRead": 6056,
+    "cacheWrite": 0,
+    "output": 794
+   },
+   "title": "Canyon landing",
+   "says": "Saucer settling between canyon rocks in dust, astronaut walking to it; low wide shot from behind him.",
+   "pieces": 7,
+   "made": 1,
+   "camera": {
+    "height": 0.7,
+    "lens": 24
+   }
+  },
+  {
+   "said": "two people arguing across a cafe table",
+   "firstPieceMs": 1352,
+   "wholeMs": 3035,
+   "stop": "end_turn",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input": 43,
+    "cacheRead": 6056,
+    "cacheWrite": 0,
+    "output": 918
+   },
+   "title": "Cafe argument",
+   "says": "Two actors face off across a small cafe table, framed as a 50mm two-shot at eye level from the side.",
+   "pieces": 6,
+   "made": 2,
+   "camera": {
+    "height": 1.6,
+    "lens": 50
+   }
+  },
+  {
+   "said": "a crowd running from a giant robot down a city street",
+   "firstPieceMs": 4172,
+   "wholeMs": 6052,
+   "stop": "end_turn",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input": 47,
+    "cacheRead": 6056,
+    "cacheWrite": 0,
+    "output": 1682
+   },
+   "title": "Robot Street Panic",
+   "says": "A giant robot looms over a street as a crowd flees towards a low 18mm camera looking up past them.",
+   "pieces": 9,
+   "made": 1,
+   "camera": {
+    "height": 0.6,
+    "lens": 18
+   }
+  },
+  {
+   "said": "a car and a red dragon",
+   "firstPieceMs": 1096,
+   "wholeMs": 1433,
+   "stop": "end_turn",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input": 40,
+    "cacheRead": 6056,
+    "cacheWrite": 0,
+    "output": 294
+   },
+   "title": "Dragon and car",
+   "says": "A red dragon looms over a parked car, framed low and wide from the front so the beast towers.",
+   "pieces": 2,
+   "made": 0,
+   "camera": {
+    "height": 0.7,
+    "lens": 24
+   }
+  },
+  {
+   "said": "a wizard casting a spell on a bridge in the fog",
+   "firstPieceMs": 3724,
+   "wholeMs": 4496,
+   "stop": "end_turn",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input": 50,
+    "cacheRead": 6056,
+    "cacheWrite": 0,
+    "output": 1206
+   },
+   "title": "Wizard on Foggy Bridge",
+   "says": "A stone bridge in low fog, a wizard mid-spell on top, framed low and heroic on a 35.",
+   "pieces": 4,
+   "made": 1,
+   "camera": {
+    "height": 0.8,
+    "lens": 35
+   }
+  }
+ ]
+}
