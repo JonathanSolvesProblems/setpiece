@@ -83,7 +83,7 @@ SLIDES = [
     dict(slug='look', badge=LIVE_BADGE, headline='It checks its own frame', picture=('live', 'look'),
          caption="It is shown the camera's picture and what each piece covers. A truck in the way, a dragon cut off: it moves the camera and looks again."),
     dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
-         caption="The designer's own plan stood two actors inside a car parked side-on, off the slate. Code stepped them out and the car back on."),
+         caption="The designer's own plan stood two actors inside a car parked side-on. Code stepped them out beside it before the camera was placed."),
     dict(slug='speed', badge='Result · devpost/results/designer-latency.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
          caption='{designer_sentences} fresh sets from a desktop: the first piece a median {designer_first_s} s after asking, the whole set {designer_whole_s} s. Headset time is next.'),
     dict(slug='pinch', badge=QUEST, headline='Reach in and pick it up', picture='captures/quest-hands-card.jpg',
@@ -411,8 +411,8 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         y = size[1] + 30
         draw.text((0, y), 'AS THE DESIGNER WROTE IT', font=label, fill=(214, 225, 60))
         draw.text((1360, y), 'AFTER THE SET DRESSER', font=label, fill=(214, 225, 60))
-        draw.text((0, y + 64), 'Two actors inside the car, the car off the slate', font=face, fill=(199, 199, 183))
-        draw.text((1360, y + 64), 'Stepped out, and the car back on the slate', font=face, fill=(246, 247, 239))
+        draw.text((0, y + 64), 'Two actors standing inside the car', font=face, fill=(199, 199, 183))
+        draw.text((1360, y + 64), 'Stepped out beside it, before the camera is placed', font=face, fill=(246, 247, 239))
         sheet.save(png)
     elif recipe == 'standoff':
         await say('a mexican standoff after a car chase')
