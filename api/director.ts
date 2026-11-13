@@ -26,8 +26,11 @@ const LONGEST_SET = 6000;
 /** The camera's picture, when the designer is asked to look through the lens: a small JPEG, base64. */
 const LARGEST_IMAGE = 400_000;
 /** What the designer is asked when it is shown the camera's picture. */
-const LOOK = `This picture is what the shot camera sees now, through its lens. Look at it as the director of photography, against what the director asked for.
-- If the subject is cut off, too small, hidden behind something, or the angle does not match what was asked, set camera.keep to false and give a better camera. Move a piece only if it blocks the shot, and list only that piece.
+const LOOK = `This picture is what the shot camera sees now, through its lens. Look at it as the director of photography, against what the director asked for. Check, in this order:
+1. Is the subject of the shot whole in the frame? A head, a creature or a vehicle cut off at an edge is a fault. The measured lines say which pieces are cut off and where.
+2. Is anything near the camera covering a large part of the frame (a head, a shoulder, a wall, a vehicle) that the shot did not ask for? The measured lines give each piece's share of the frame and what it hides. That is a fault: move the camera so the piece is not between the lens and the subject, or move that piece aside.
+3. Does the angle and the lens match what was asked (low, high, wide, close)?
+- If there is a fault, set camera.keep to false and give a better camera, and list only a piece you move. Keep the camera at least 2 m from the nearest actor unless the shot is a close-up of that actor.
 - If the frame already works, set camera.keep to true and list no things.
 - fresh is false. remove is empty.
 - In says, name what you changed in the frame in a few words, or say the frame holds.`;
@@ -64,10 +67,18 @@ function tooMany(visitor: string): boolean {
   return false;
 }
 
+/** The frame, measured from the pieces, as the headset reports it beside the picture. */
+const frame = (report: unknown): string =>
+  typeof report === 'string' && report.trim() !== '' ? `What the frame holds, measured from the pieces (largest first):\n${report.slice(0, 3000)}\n\n` : '';
+
+/** What the shot was framed on: a look keeps the shot about that, and only moves the camera to show it better. */
+const subjectLine = (subject: unknown): string =>
+  typeof subject === 'string' && subject.trim() !== '' ? `The shot is framed on ${subject.trim().slice(0, 40)}. Keep it the subject.\n\n` : '';
+
 const refuse = (status: number, message: string): Response =>
   new Response(JSON.stringify({ t: 'error', m: message }) + '\n', { status, headers: { 'content-type': 'application/x-ndjson' } });
 
-type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown };
+type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown };
 
 /** What the designer is asked: the set as it stands, then the words, with the recogniser's other guesses. */
 function question(asked: Asked): string | null {
@@ -126,9 +137,7 @@ export async function POST(request: Request): Promise<Response> {
       ? text
       : [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
-          { type: 'text', text: `${text}
-
-${LOOK}` },
+          { type: 'text', text: `${text}\n\n${frame(asked.report)}${subjectLine(asked.subject)}${LOOK}` },
         ];
 
   const client = new Anthropic({ apiKey });

@@ -11,6 +11,7 @@
  * same. Near a piece the ray steps aside, so what the hand is on is what it gets.
  */
 import {
+  Ray,
   AudioSource,
   AudioUtils,
   Box3,
@@ -1241,14 +1242,6 @@ export class PiecesSystem extends createSystem({
     const g = this.globals as Globals;
     if (cam.hasComponent(Held) || g.takeState.peek() !== 'idle') return false;
     const first = this.key(cam) === FIRST_CAMERA;
-    const tallest = CAMERA_MAX_HEIGHT + HEAD_PIVOT + LENS_ABOVE_PIVOT;
-    const fly = first && lensHeight > tallest + 0.005;
-    if (first && fly !== (g.cameraRig.peek() === 'drone')) g.cameraRig.value = fly ? 'drone' : 'tripod';
-    const base = lensHeight - HEAD_PIVOT - LENS_ABOVE_PIVOT;
-    rig.position.set(x, fly ? Math.max(DRONE_MIN_HEIGHT, Math.min(DRONE_MAX_HEIGHT, base)) : Math.max(0, Math.min(CAMERA_MAX_HEIGHT, base)), z);
-    // Lower than the tripod stands, the legs are shortened instead: baby legs, as a grip would set them.
-    const legs = !fly && base < 0 ? (lensHeight - LENS_ABOVE_PIVOT) / HEAD_PIVOT : 1;
-    if (first) viewfinder.setLegs(legs);
     // What it looks at, on the slate: a piece's eyes if it has them, else the middle of its shape.
     let target: Entity | null = null;
     for (let i = 0; i < this.dressed.length && target == null && label !== ''; i++) {
@@ -1269,6 +1262,19 @@ export class PiecesSystem extends createSystem({
     } else {
       this.point.set(0, 0.08, 0);
     }
+    // The spot asked for, or the nearest clear one: the lens never inside a piece, nothing between it and the subject.
+    const clear = this.clearShot(x, z, lensHeight, this.point, target, cam);
+    x = clear[0];
+    z = clear[1];
+    lensHeight = clear[2];
+    const tallest = CAMERA_MAX_HEIGHT + HEAD_PIVOT + LENS_ABOVE_PIVOT;
+    const fly = first && lensHeight > tallest + 0.005;
+    if (first && fly !== (g.cameraRig.peek() === 'drone')) g.cameraRig.value = fly ? 'drone' : 'tripod';
+    const base = lensHeight - HEAD_PIVOT - LENS_ABOVE_PIVOT;
+    rig.position.set(x, fly ? Math.max(DRONE_MIN_HEIGHT, Math.min(DRONE_MAX_HEIGHT, base)) : Math.max(0, Math.min(CAMERA_MAX_HEIGHT, base)), z);
+    // Lower than the tripod stands, the legs are shortened instead: baby legs, as a grip would set them.
+    const legs = !fly && base < 0 ? (lensHeight - LENS_ABOVE_PIVOT) / HEAD_PIVOT : 1;
+    if (first) viewfinder.setLegs(legs);
     const dx = this.point.x - rig.position.x;
     const dz = this.point.z - rig.position.z;
     const run = Math.hypot(dx, dz);
@@ -1283,6 +1289,62 @@ export class PiecesSystem extends createSystem({
     this.knock(Cue.Place, cam);
     this.save();
     return true;
+  }
+
+  /**
+   * The camera operator's check. Every visible piece but the camera and the subject is a box on the slate; the
+   * lens must not be inside one, and the line from the lens to the subject must not pass through one. The spot
+   * asked for is kept if it is clear; otherwise the spots tried, in order of how little they change the shot, are
+   * a step round the subject either way, then the same a little higher, then from further back. Slate metres.
+   * Called when the designer places the camera, never in a frame.
+   */
+  private clearShot(x: number, z: number, height: number, subject: Vector3, target: Entity | null, cam: Entity): [number, number, number] {
+    const boxes: Box3[] = [];
+    for (let i = 0; i < this.dressed.length; i++) {
+      const piece = this.dressed[i];
+      const object = piece.object3D;
+      if (object == null || !object.visible || piece === target || piece === cam || piece.hasComponent(ShotCamera)) continue;
+      if (assetByLabel(String(piece.getValue(SetPiece, 'label')))?.shelf === 'Effects') continue;
+      object.updateMatrix();
+      const box = localBounds(object).applyMatrix4(object.matrix);
+      if (!box.isEmpty()) boxes.push(box.expandByScalar(0.006));
+    }
+    const lens = new Vector3();
+    const ray = new Ray();
+    const hit = new Vector3();
+    const way = new Vector3();
+    const isClear = (px: number, pz: number, ph: number): boolean => {
+      lens.set(px, ph, pz);
+      way.copy(subject).sub(lens);
+      const far = way.length();
+      if (far < 1e-4) return false;
+      ray.set(lens, way.normalize());
+      for (const box of boxes) {
+        if (box.containsPoint(lens)) return false;
+        // What the subject stands in front of is not in the way.
+        if (ray.intersectBox(box, hit) != null && hit.distanceTo(lens) < far - 0.01) return false;
+      }
+      return true;
+    };
+    if (isClear(x, z, height)) return [x, z, height];
+    const around = Math.atan2(x - subject.x, z - subject.z);
+    const reach = Math.hypot(x - subject.x, z - subject.z);
+    const turns = [0, 15, -15, 30, -30, 45, -45, 60, -60];
+    const rises = [0, 0.05, 0.1, 0.2, 0.35];
+    const backs = [1, 1.25, 1.5];
+    for (const back of backs) {
+      for (const rise of rises) {
+        for (const turn of turns) {
+          const angle = around + (turn * Math.PI) / 180;
+          // The camera may stand off the slate, on the table in front of it.
+          const px = Math.max(-0.35, Math.min(0.35, subject.x + Math.sin(angle) * reach * back));
+          const pz = Math.max(-0.2, Math.min(0.4, subject.z + Math.cos(angle) * reach * back));
+          const ph = Math.min(1.1, height + rise);
+          if (isClear(px, pz, ph)) return [px, pz, ph];
+        }
+      }
+    }
+    return [x, z, height];
   }
 
   stepCamera(step: CameraStep): string {

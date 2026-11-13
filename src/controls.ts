@@ -39,6 +39,8 @@ const PANEL_OFFSET = new Vector3(-0.38, 0.33, -0.16);
  * panel unit is measured from the panel as it is scaled in the scene.
  */
 const PANEL_TOP = 0.725;
+/** The least the panel's bottom stands above the slate. */
+const PANEL_CLEAR = 0.035;
 const LIFE_CONFIRM_MS = 3000;
 /** Search keeps the keys on the panel, so it shows fewer results at once. */
 const SEARCH_SLOTS = 4;
@@ -244,7 +246,8 @@ export class ControlsSystem extends createSystem({
     stageObject.updateWorldMatrix(true, false);
     this.panelPosition.copy(PANEL_OFFSET);
     const height = this.panelHeight();
-    if (height > 0) this.panelPosition.y = PANEL_TOP - (height * PANEL_UNIT) / 2;
+    // It hangs from its top; a page tall enough to reach the slate lifts it instead, so it never sinks into the set.
+    if (height > 0) this.panelPosition.y = Math.max(PANEL_TOP - (height * PANEL_UNIT) / 2, PANEL_CLEAR + (height * PANEL_UNIT) / 2);
     this.panelPosition.applyMatrix4(stageObject.matrixWorld);
     stageObject.getWorldQuaternion(this.panelQuaternion).multiply(this.panelTurn);
     setWorldPosition(panel, this.panelPosition);

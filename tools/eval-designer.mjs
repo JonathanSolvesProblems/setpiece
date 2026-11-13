@@ -140,7 +140,7 @@ function grade(c, plan) {
       if (thing.parts.length < 1) problems.push(`${id}: no parts`);
       if (read < thing.parts.length) problems.push(`${id}: ${thing.parts.length - read} part(s) unreadable`);
     } else if (!id.startsWith('copy:') && !ids.has(id)) problems.push(`unknown id ${id}`);
-    if (Math.abs(raw.x) > 3.05 || Math.abs(raw.z) > 2.05) problems.push(`${id} outside the stage at ${raw.x}, ${raw.z}`);
+    if (Math.abs(raw.x) > 3.45 || Math.abs(raw.z) > 2.45) problems.push(`${id} outside the stage at ${raw.x}, ${raw.z}`);
     const asked = (c.sizeAllowed ?? []).includes(id) || c.sizeOf === id;
     if (thing.size !== 0 && Math.abs(thing.size - 1) > 0.01 && !asked) problems.push(`${id} at size ${thing.size} unasked`);
     const base = id.replace(/ \d$/, '');
@@ -161,7 +161,7 @@ function grade(c, plan) {
   if (BRANDS.test(`${plan.title} ${plan.says} ${plan.next}`)) problems.push(`brand or person in the words: ${plan.title} / ${plan.says}`);
   const cam = plan.camera ?? {};
   if (!cam.keep) {
-    if (Math.abs(cam.x) > 3.05 || cam.z > 2.45 || cam.z < -2.05) problems.push(`camera outside the stage at ${cam.x}, ${cam.z}`);
+    if (Math.abs(cam.x) > 3.55 || cam.z > 4.05 || cam.z < -2.05) problems.push(`camera outside where it may stand, at ${cam.x}, ${cam.z}`);
     const target = things.find((thing) => thing.id === cam.look_at);
     const tx = target ? target.x : cam.look_x;
     const tz = target ? target.z : cam.look_z;
@@ -181,6 +181,23 @@ function grade(c, plan) {
   return { problems, things: things.length, made: things.filter((t) => t.id.startsWith('new:')).length };
 }
 
+// --regrade grades the plans saved by the last run again, without asking the model.
+if (process.argv.includes('--regrade')) {
+  const { readFileSync } = await import('node:fs');
+  const saved = JSON.parse(readFileSync('tmp/director/eval.json', 'utf8'));
+  let ok = 0;
+  for (const run of saved) {
+    const c = CASES.find((one) => one.said === run.said);
+    if (c == null || run.plan == null) continue;
+    const graded = grade(c, run.plan);
+    if (graded.problems.length === 0) ok++;
+    console.log(`${graded.problems.length === 0 ? 'ok  ' : 'FLAG'} ${run.said}`);
+    for (const problem of graded.problems) console.log(`       ${problem}`);
+  }
+  console.log(`
+${ok} of ${saved.length} plans with nothing to flag.`);
+  process.exit(0);
+}
 const picked = process.argv.slice(2).map(Number);
 const cases = picked.length > 0 ? picked.map((i) => CASES[i]) : CASES;
 const results = [];

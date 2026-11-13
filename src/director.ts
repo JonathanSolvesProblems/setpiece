@@ -45,6 +45,8 @@ const WHOLE_MS = 90000;
 const ENDPOINT = '/api/director';
 /** Long enough after the camera stands for the monitor to show what it sees. */
 const LOOK_AFTER_MS = 700;
+/** The most looks through the lens a set gets. */
+const MOST_LOOKS = 2;
 /** A server that said it has no key is asked again after this long. */
 const RECHECK_MS = 60000;
 
@@ -74,6 +76,10 @@ export class DirectorSystem extends createSystem({
   private keys = new Map<string, MadeDef>();
   /** The words of the set just built, until its lens has been looked through; and when to look. */
   private lookFor = '';
+  /** What the shot was framed on, kept through the looks: the plan's subject, or a point. */
+  private subject = '';
+  /** Looks taken at this set: a look that changed the frame is checked once more, never more than twice in all. */
+  private looks = 0;
   private lookAt = 0;
   private lensCanvas: HTMLCanvasElement | null = null;
   private point = new Vector3();
@@ -153,6 +159,7 @@ export class DirectorSystem extends createSystem({
   async ask(said: string, heard: string[] = []): Promise<Outcome> {
     this.lookFor = '';
     this.lookAt = 0;
+    this.looks = 0;
     return this.request(said, { said, heard, set: this.describe() }, false);
   }
 
@@ -168,7 +175,7 @@ export class DirectorSystem extends createSystem({
     viewfinder.copyMonitor(this.lensCanvas);
     const image = this.lensCanvas.toDataURL('image/jpeg', 0.82).split(',')[1] ?? '';
     if (image === '') return;
-    await this.request(said, { said, set: this.describe(), image }, true);
+    await this.request(said, { said, set: this.describe(), image, report: viewfinder.frameReport(), subject: this.subject }, true);
   }
 
   private async request(said: string, body: Record<string, unknown>, looking: boolean): Promise<Outcome> {
@@ -243,8 +250,12 @@ export class DirectorSystem extends createSystem({
       }
       this.pendingCamera = build.camera;
       this.pendingCameraLabels = build.labels;
-      // A new set, or a new frame, is looked at once it stands; a look is not looked at again.
-      if (!looking && build.camera != null && !build.camera.keep) this.lookFor = said;
+      // A new set, or a new frame, is looked at once it stands; a look that changed the frame is looked at once more.
+      const moved = build.camera != null && !build.camera.keep;
+      // The first frame's subject is the shot's subject; a look keeps to it.
+      if (!looking && moved) this.subject = build.camera!.look_at !== '' ? (build.labels.get(build.camera!.look_at) ?? build.camera!.look_at) : '';
+      if (looking) this.looks++;
+      if (moved && this.looks < MOST_LOOKS) this.lookFor = said;
       build.end(failed);
       return 'built';
     } catch {

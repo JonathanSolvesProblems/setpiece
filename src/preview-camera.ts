@@ -7,6 +7,7 @@
  * wall show only outside XR.
  */
 import {
+  Box3,
   BoxGeometry,
   CanvasTexture,
   createSystem,
@@ -21,7 +22,15 @@ import {
   Vector3,
   VisibilityState,
 } from '@iwsdk/core';
-import { SetPiece, StageAnchor } from './set-components.js';
+import type { Signal } from '@preact/signals-core';
+import { localBounds } from './bounds.js';
+import { SetPiece, SetRole, StageAnchor } from './set-components.js';
+
+/** How the view moves to a new frame: this much of the way each second, so it glides rather than jumps. */
+const GLIDE = 4;
+/** The page's camera never comes closer to the set than its own frame, nor further back than this. */
+const FURTHEST = 3.2;
+type Globals = { setsBuilt: Signal<number>; layoutChanged: Signal<number>; trayOn: Signal<string[]> };
 
 /** Table-eye height, close, looking across the set at the monitor and the figures. */
 const WIDE: [number, number, number] = [0.05, 0.93, 0.15];
@@ -86,10 +95,22 @@ function wallTexture(): CanvasTexture {
 
 export class PreviewCameraSystem extends createSystem({
   stages: { required: [SetPiece, StageAnchor] },
+  pieces: { required: [SetPiece] },
 }) {
   private lastAspect = 0;
   private room: Mesh[] | null = null;
   private position = new Vector3();
+  /** Where the view is going, and where it looks; and where it is looking now, as it glides. */
+  private goal = new Vector3();
+  private goalLook = new Vector3();
+  private look = new Vector3();
+  private gliding = false;
+  private refit = false;
+  private bounds = new Box3();
+  private part = new Box3();
+  private way = new Vector3();
+  private middle = new Vector3();
+  private size = new Vector3();
 
   init(): void {
     // Soft light from the room: chalk from above, wood from below, so the
@@ -97,24 +118,86 @@ export class PreviewCameraSystem extends createSystem({
     const fill = new HemisphereLight(0xf6f7ef, 0x64453e, 0.45);
     fill.name = 'RoomFill';
     this.world.createTransformEntity(fill);
+    const g = this.globals as Globals;
     this.cleanupFuncs.push(
       this.world.visibilityState.subscribe((state) => {
         const visible = state === VisibilityState.NonImmersive;
         for (const mesh of this.room ?? []) mesh.visible = visible;
       }),
+      // A set built from words, or moved about, is framed again.
+      g.setsBuilt.subscribe(() => {
+        this.refit = true;
+      }),
+      g.trayOn.subscribe(() => {
+        this.refit = true;
+      }),
     );
   }
 
-  update(): void {
+  update(delta: number): void {
     if (this.room == null) this.ensureRoom();
     if (this.world.visibilityState.peek() !== VisibilityState.NonImmersive) return;
     const aspect = this.camera.aspect;
-    if (Math.abs(aspect - this.lastAspect) < 0.01) return;
-    this.lastAspect = aspect;
-    const tall = aspect < 1;
+    if (Math.abs(aspect - this.lastAspect) >= 0.01) {
+      this.lastAspect = aspect;
+      this.refit = true;
+    }
+    if (this.refit) {
+      this.refit = false;
+      this.fit();
+    }
+    if (!this.gliding) return;
+    const k = Math.min(1, GLIDE * delta);
+    this.camera.position.lerp(this.goal, k);
+    this.look.lerp(this.goalLook, k);
+    this.camera.lookAt(this.look);
+    if (this.camera.position.distanceToSquared(this.goal) < 1e-8 && this.look.distanceToSquared(this.goalLook) < 1e-8) this.gliding = false;
+  }
+
+  /**
+   * The page's own frame for the set as it stands: the authored frame for a small set, and for a big one the
+   * same view backed off and raised until every piece on the set is in it.
+   */
+  private fit(): void {
+    const tall = this.lastAspect < 1;
     const p = tall ? TALL : WIDE;
-    this.camera.position.set(p[0], p[1], p[2]);
-    this.camera.lookAt(tall ? TALL_LOOK_AT : WIDE_LOOK_AT);
+    this.goal.set(p[0], p[1], p[2]);
+    this.goalLook.copy(tall ? TALL_LOOK_AT : WIDE_LOOK_AT);
+    this.bounds.makeEmpty();
+    for (const piece of this.queries.pieces.entities) {
+      const object = piece.object3D;
+      const role = piece.getValue(SetPiece, 'role');
+      if (object == null || !object.visible || role === SetRole.Stage || role === SetRole.Camera) continue;
+      this.part.copy(localBounds(object)).applyMatrix4(object.matrixWorld);
+      if (!this.part.isEmpty()) this.bounds.union(this.part);
+    }
+    if (!this.bounds.isEmpty()) {
+      this.bounds.getCenter(this.middle);
+      this.bounds.getSize(this.size);
+      // How far back the authored view must stand for the whole set to fit its height and its width.
+      const fov = (this.camera.fov * Math.PI) / 180;
+      const fitHeight = this.size.y / 2 / Math.tan(fov / 2);
+      const fitWidth = Math.max(this.size.x, this.size.z) / 2 / Math.tan(fov / 2) / Math.max(0.6, this.camera.aspect);
+      const need = Math.min(FURTHEST, Math.max(fitHeight, fitWidth) * 1.15 + this.size.z / 2);
+      this.way.copy(this.goal).sub(this.goalLook);
+      const have = this.way.length();
+      if (need > have) {
+        this.way.normalize();
+        // Rise as it backs off, so a tall piece is seen from above its middle, not from table height.
+        this.way.y = Math.max(this.way.y, 0.28);
+        this.way.normalize();
+        this.goalLook.set(this.goalLook.x, Math.max(this.goalLook.y, this.middle.y), this.goalLook.z);
+        this.goal.copy(this.goalLook).addScaledVector(this.way, need);
+      }
+    }
+    if (!this.gliding && this.look.lengthSq() === 0) {
+      // The first frame is put straight there.
+      this.camera.position.copy(this.goal);
+      this.look.copy(this.goalLook);
+      this.camera.lookAt(this.look);
+      return;
+    }
+    this.gliding = true;
   }
 
   /** A table under the authored stage and a wall behind it, for the page only. */

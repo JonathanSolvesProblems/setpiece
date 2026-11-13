@@ -140,6 +140,8 @@ export const MOST_THINGS = 40;
 /** How far from the middle of the stage anything is put, in real metres, and how high. */
 const REACH_X = 3.4;
 const REACH_Z = 2.4;
+const CAMERA_X = 3.5;
+const CAMERA_FRONT = 4;
 const HIGHEST = 9;
 
 const finite = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
@@ -212,8 +214,9 @@ export function cleanCamera(raw: unknown): CameraPlan | null {
   const nearest = LENSES.reduce((best, mm) => (Math.abs(mm - lens) < Math.abs(best - lens) ? mm : best), LENSES[0] as number);
   return {
     keep: c.keep === true,
-    x: clamp(finite(c.x, 0), -REACH_X, REACH_X),
-    z: clamp(finite(c.z, 1.8), -REACH_Z, REACH_Z),
+    // The camera may stand off the stage, on the table in front of it, as a camera stands outside a set.
+    x: clamp(finite(c.x, 0), -CAMERA_X, CAMERA_X),
+    z: clamp(finite(c.z, 1.8), -REACH_Z, CAMERA_FRONT),
     height: clamp(finite(c.height, 1.2), 0.2, 11),
     lens: nearest,
     look_at: typeof c.look_at === 'string' ? c.look_at.trim().slice(0, 40) : '',
