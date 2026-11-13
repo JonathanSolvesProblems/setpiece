@@ -43,6 +43,8 @@ const MOST_DROPS = 64;
 const FIRST_WORD_MS = 25000;
 const WHOLE_MS = 90000;
 const ENDPOINT = '/api/director';
+/** Long enough after the camera stands for the monitor to show what it sees. */
+const LOOK_AFTER_MS = 700;
 /** A server that said it has no key is asked again after this long. */
 const RECHECK_MS = 60000;
 
@@ -67,6 +69,10 @@ export class DirectorSystem extends createSystem({
   private pendingCameraLabels = new Map<string, string>();
   /** The new pieces' own keys ("new:tower" is "tower"), kept across replies, so a later one can ask for another. */
   private keys = new Map<string, MadeDef>();
+  /** The words of the set just built, until its lens has been looked through; and when to look. */
+  private lookFor = '';
+  private lookAt = 0;
+  private lensCanvas: HTMLCanvasElement | null = null;
   private point = new Vector3();
   private lensAt = new Vector3();
   private lensWay = new Vector3();
@@ -124,6 +130,14 @@ export class DirectorSystem extends createSystem({
       const plan = this.pendingCamera;
       this.pendingCamera = null;
       this.frame(plan, this.pendingCameraLabels);
+      // A set just built is looked at through its lens once the camera stands, and the frame put right.
+      if (this.lookFor !== '') this.lookAt = performance.now() + LOOK_AFTER_MS;
+    }
+    if (this.lookAt > 0 && performance.now() >= this.lookAt) {
+      this.lookAt = 0;
+      const said = this.lookFor;
+      this.lookFor = '';
+      void this.look(said);
     }
   }
 
@@ -132,21 +146,44 @@ export class DirectorSystem extends createSystem({
    * came back and went up, false when the words went to the library's reader instead.
    */
   async ask(said: string, heard: string[] = []): Promise<boolean> {
+    this.lookFor = '';
+    this.lookAt = 0;
+    return this.request(said, { said, heard, set: this.describe() }, false);
+  }
+
+  /**
+   * The designer looks through the lens: it is shown what the shot camera sees, and keeps the frame or puts
+   * it right. This is the second half of every new set, and it answers what the camera sees, not what it
+   * planned.
+   */
+  private async look(said: string): Promise<void> {
+    const viewfinder = this.world.getSystem(ViewfinderSystem);
+    if (viewfinder == null || this.asking != null) return;
+    this.lensCanvas ??= document.createElement('canvas');
+    viewfinder.copyMonitor(this.lensCanvas);
+    const image = this.lensCanvas.toDataURL('image/jpeg', 0.82).split(',')[1] ?? '';
+    if (image === '') return;
+    await this.request(said, { said, set: this.describe(), image }, true);
+  }
+
+  private async request(said: string, body: Record<string, unknown>, looking: boolean): Promise<boolean> {
     const g = this.globals as unknown as Globals;
     this.asking?.abort();
     const asking = new AbortController();
     this.asking = asking;
-    g.lastSpoken.value = said;
+    if (!looking) {
+      g.lastSpoken.value = said;
+      g.coachNote.value = 'DESIGNING THE SET | The pieces arrive in a moment.';
+    }
     g.designing.value = true;
-    g.coachNote.value = 'DESIGNING THE SET | The pieces arrive in a moment.';
     let timer = window.setTimeout(() => asking.abort(), FIRST_WORD_MS);
     const whole = window.setTimeout(() => asking.abort(), WHOLE_MS);
-    const build = new PlanBuild(this.world, (label) => this.entityOf(label), this.keys);
+    const build = new PlanBuild(this.world, (label) => this.entityOf(label), this.keys, looking);
     try {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ said, heard, set: this.describe() }),
+        body: JSON.stringify(body),
         signal: asking.signal,
       });
       if (response.body == null) throw new Error('no reply');
@@ -186,20 +223,24 @@ export class DirectorSystem extends createSystem({
       // Whatever arrived in pieces is checked against the whole reply once it is all in.
       build.finish(reader.whole);
       if (!build.begun) {
+        if (looking) return true;
         this.status = failed !== '' && /no key|cannot sign in/.test(failed) ? 'off' : this.status;
         this.fallback(said, failed || 'The set designer sent nothing back.');
         return false;
       }
       this.pendingCamera = build.camera;
       this.pendingCameraLabels = build.labels;
+      // A new set, or a new frame, is looked at once it stands; a look is not looked at again.
+      if (!looking && build.camera != null && !build.camera.keep) this.lookFor = said;
       build.end(failed);
       return true;
     } catch {
       if (asking !== this.asking) return true;
       if (build.begun) {
-        build.end('The set designer stopped partway; what arrived is on the set.');
+        build.end(looking ? '' : 'The set designer stopped partway; what arrived is on the set.');
         return true;
       }
+      if (looking) return true;
       this.fallback(said, asking.signal.aborted ? 'The set designer took too long.' : 'The set designer could not be reached.');
       return false;
     } finally {
@@ -331,14 +372,16 @@ class PlanBuild {
     private world: World,
     private entityOf: (label: string) => Entity | null,
     private keys: Map<string, MadeDef>,
+    /** A look through the lens: it changes the frame, and moves a piece only if one is in the way. */
+    private looking = false,
   ) {}
 
   value(key: string, value: unknown): void {
     if (key === 'title') this.title = plainLine(value, 40);
     else if (key === 'says') this.says = plainLine(value, 160);
     else if (key === 'next') this.next = plainLine(value, 60);
-    else if (key === 'fresh') this.begin(value === true);
-    else if (key === 'remove' && Array.isArray(value)) {
+    else if (key === 'fresh') this.begin(value === true && !this.looking);
+    else if (key === 'remove' && Array.isArray(value) && !this.looking) {
       this.begin(this.fresh);
       const labels = value.filter((id): id is string => typeof id === 'string').map((id) => this.labels.get(id) ?? id);
       this.removed.push(...labels);
@@ -451,6 +494,14 @@ class PlanBuild {
   /** Everything is down: the set is published, and what was built and what to try next is said. */
   end(problem: string): void {
     const g = this.world.globals as unknown as Globals;
+    if (this.looking) {
+      // A look that kept the frame says nothing; one that changed it says what it changed.
+      const changed = this.placed.size > 0 || (this.camera != null && !this.camera.keep);
+      if (!changed) return;
+      if (this.placed.size > 0) this.world.getSystem(TraySystem)?.planEnd(false);
+      g.coachNote.value = `THROUGH THE LENS | ${this.says || 'The frame is put right.'}`;
+      return;
+    }
     this.world.getSystem(TraySystem)?.planEnd(this.fresh);
     g.setsBuilt.value = g.setsBuilt.peek() + 1;
     const title = (this.title || 'THE SET').toUpperCase();

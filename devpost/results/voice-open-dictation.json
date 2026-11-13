@@ -1,0 +1,140 @@
+{
+ "measured": "2026-11-13",
+ "what": "Scene sentences of the kind the set designer is asked, read by two Windows text-to-speech voices (Microsoft David and Microsoft Zira, 16 kHz mono) into the app's own recogniser (Vosk small English model, in the browser) in open dictation, with no word list: public/voice-test.html?open, driven by tmp/voice-open.py on the desktop.",
+ "limit": "Synthetic voices from a clean file, not a person speaking in a room through the headset's microphone. That is still to be measured on the Quest.",
+ "summary": {
+  "sentences": 10,
+  "voices": 2,
+  "heard_exactly": 15,
+  "of": 20,
+  "slips": [
+   {
+    "said": "a car and a red dragon",
+    "voice": "Zira",
+    "heard": "a car in a red dragon"
+   },
+   {
+    "said": "a medieval castle gate with two guards and a horse",
+    "voice": "Zira",
+    "heard": "a medieval castle gate with two guards in a horse"
+   },
+   {
+    "said": "make the dragon bigger and put the camera low looking up at it",
+    "voice": "David",
+    "heard": "make the dragon vigor and put the camera low looking up at it"
+   },
+   {
+    "said": "make the dragon bigger and put the camera low looking up at it",
+    "voice": "Zira",
+    "heard": "make the dragon vigor and put the camera low looking up at it"
+   },
+   {
+    "said": "add rain",
+    "voice": "David",
+    "heard": "had rain"
+   }
+  ]
+ },
+ "runs": [
+  {
+   "said": "a dragon lands on a burning car at night",
+   "voice": "David",
+   "heard": "a dragon lands on a burning car at night"
+  },
+  {
+   "said": "a dragon lands on a burning car at night",
+   "voice": "Zira",
+   "heard": "a dragon lands on a burning car at night"
+  },
+  {
+   "said": "a car and a red dragon",
+   "voice": "David",
+   "heard": "a car and a red dragon"
+  },
+  {
+   "said": "a car and a red dragon",
+   "voice": "Zira",
+   "heard": "a car in a red dragon"
+  },
+  {
+   "said": "a medieval castle gate with two guards and a horse",
+   "voice": "David",
+   "heard": "a medieval castle gate with two guards and a horse"
+  },
+  {
+   "said": "a medieval castle gate with two guards and a horse",
+   "voice": "Zira",
+   "heard": "a medieval castle gate with two guards in a horse"
+  },
+  {
+   "said": "a spaceship landing in a desert canyon",
+   "voice": "David",
+   "heard": "a spaceship landing in a desert canyon"
+  },
+  {
+   "said": "a spaceship landing in a desert canyon",
+   "voice": "Zira",
+   "heard": "a spaceship landing in a desert canyon"
+  },
+  {
+   "said": "make the dragon bigger and put the camera low looking up at it",
+   "voice": "David",
+   "heard": "make the dragon vigor and put the camera low looking up at it"
+  },
+  {
+   "said": "make the dragon bigger and put the camera low looking up at it",
+   "voice": "Zira",
+   "heard": "make the dragon vigor and put the camera low looking up at it"
+  },
+  {
+   "said": "take me to the dragon",
+   "voice": "David",
+   "heard": "take me to the dragon"
+  },
+  {
+   "said": "take me to the dragon",
+   "voice": "Zira",
+   "heard": "take me to the dragon"
+  },
+  {
+   "said": "low angle on the dragon",
+   "voice": "David",
+   "heard": "low angle on the dragon"
+  },
+  {
+   "said": "low angle on the dragon",
+   "voice": "Zira",
+   "heard": "low angle on the dragon"
+  },
+  {
+   "said": "add rain",
+   "voice": "David",
+   "heard": "had rain"
+  },
+  {
+   "said": "add rain",
+   "voice": "Zira",
+   "heard": "add rain"
+  },
+  {
+   "said": "two cowboys facing each other on a dusty street at noon",
+   "voice": "David",
+   "heard": "two cowboys facing each other on a dusty street at noon"
+  },
+  {
+   "said": "two cowboys facing each other on a dusty street at noon",
+   "voice": "Zira",
+   "heard": "two cowboys facing each other on a dusty street at noon"
+  },
+  {
+   "said": "a robot chasing an actor through a city street",
+   "voice": "David",
+   "heard": "a robot chasing an actor through a city street"
+  },
+  {
+   "said": "a robot chasing an actor through a city street",
+   "voice": "Zira",
+   "heard": "a robot chasing an actor through a city street"
+  }
+ ]
+}

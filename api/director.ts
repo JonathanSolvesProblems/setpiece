@@ -19,6 +19,14 @@ const MAX_TOKENS = 8000;
 /** The longest sentence and set description taken in, in characters. */
 const LONGEST_SAID = 400;
 const LONGEST_SET = 6000;
+/** The camera's picture, when the designer is asked to look through the lens: a small JPEG, base64. */
+const LARGEST_IMAGE = 400_000;
+/** What the designer is asked when it is shown the camera's picture. */
+const LOOK = `This picture is what the shot camera sees now, through its lens. Look at it as the director of photography, against what the director asked for.
+- If the subject is cut off, too small, hidden behind something, or the angle does not match what was asked, set camera.keep to false and give a better camera. Move a piece only if it blocks the shot, and list only that piece.
+- If the frame already works, set camera.keep to true and list no things.
+- fresh is false. remove is empty.
+- In says, name what you changed in the frame in a few words, or say the frame holds.`;
 /** Per visitor: this many plans in this many minutes. A spend limit on the key is the real cap. */
 const PER_VISITOR = 30;
 const WINDOW_MS = 10 * 60 * 1000;
@@ -47,7 +55,7 @@ function tooMany(visitor: string): boolean {
 const refuse = (status: number, message: string): Response =>
   new Response(JSON.stringify({ t: 'error', m: message }) + '\n', { status, headers: { 'content-type': 'application/x-ndjson' } });
 
-type Asked = { said?: unknown; heard?: unknown; set?: unknown };
+type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown };
 
 /** What the designer is asked: the set as it stands, then the words, with the recogniser's other guesses. */
 function question(asked: Asked): string | null {
@@ -88,8 +96,19 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return refuse(400, 'The request could not be read.');
   }
-  const content = question(asked);
-  if (content == null) return refuse(400, 'Nothing was said.');
+  const text = question(asked);
+  if (text == null) return refuse(400, 'Nothing was said.');
+  // Shown the camera's picture, the designer looks through the lens and keeps or fixes the frame.
+  const image = typeof asked.image === 'string' && asked.image.length <= LARGEST_IMAGE && /^[A-Za-z0-9+/=]+$/.test(asked.image) ? asked.image : null;
+  const content: Anthropic.Beta.BetaContentBlockParam[] | string =
+    image == null
+      ? text
+      : [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
+          { type: 'text', text: `${text}
+
+${LOOK}` },
+        ];
 
   const client = new Anthropic();
   const started = Date.now();
