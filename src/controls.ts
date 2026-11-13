@@ -675,14 +675,9 @@ export class ControlsSystem extends createSystem({
         saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), keep });
         showKeep();
       });
-      // The first press says what it will cost; the listener is 40 MB, kept after that.
-      let warned = loadJson<{ voice?: boolean }>(StoreKey.Settings)?.voice === true;
+      // The first press fetches the listener (40 MB, once, kept on the headset) and says so while it comes: a
+      // press that only warned was one more step between a newcomer and their first sentence.
       wire('btn-voice', () => {
-        if (!warned) {
-          warned = true;
-          tell('A 40 MB download, once. It stays on the headset, and so does what you say. Press again to start.', 15000);
-          return;
-        }
         // Pressed between two sentences of a chain: that ends the chain.
         if (again != null) {
           clearTimeout(again);
