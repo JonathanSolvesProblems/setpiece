@@ -362,7 +362,8 @@ export class TakeSystem extends createSystem({
       for (let s = track.lastHeld + 1; s < written; s++) track.data[s * STRIDE + 1] = object.position.y;
     }
     // A pass in which the camera was cut is a pass worth keeping, and its cuts replace the old ones.
-    any = any || this.passManual;
+    // On a take that already exists; alone, a cut is a slip, and a slip is not a take to loop on the monitor.
+    any = any || (this.passManual && this.length > 0);
     if (this.passManual) this.cuts = this.passCuts;
     else if (this.cuts.length === 0) this.cuts = [0, this.liveIndex];
     if (this.length === 0) {
@@ -496,8 +497,8 @@ export class TakeSystem extends createSystem({
       track.recorded = true;
       any = true;
     }
-    // A take can be nothing but cuts between the cameras.
-    if (!any && cuts.length <= 2) return;
+    // A take is something carried. One that is nothing but cuts, kept by an older build, does not come back.
+    if (!any) return;
     this.cuts = cuts;
     this.length = length;
     this.rig = saved.rig ?? '';

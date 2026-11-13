@@ -84,6 +84,12 @@ export class LandingGuide {
     return this.hasHit && this.held >= STEADY_SECONDS;
   }
 
+  /** This hand is pointing at a surface now, whether or not the outline has had time to rest there. */
+  aimsAt(side: Side): boolean {
+    if (!this.hasHit || this.active == null) return false;
+    return this.active.side === 'head' || this.aims.some((aim) => aim.side === side && aim.valid);
+  }
+
   /** This hand can land the set: its own ray is on a surface, or only the head is aiming. */
   canLand(side: Side): boolean {
     if (!this.ready || this.active == null) return false;

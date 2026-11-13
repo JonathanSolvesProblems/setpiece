@@ -20,6 +20,7 @@ import { wordsToHear } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
 import { SetPiece, StageAnchor } from './set-components.js';
 import { SCENES } from './scenes.js';
+import { noteSeconds } from './coach.js';
 import { hear } from './spoken.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
@@ -36,7 +37,7 @@ const PANEL_OFFSET = new Vector3(-0.38, 0.33, -0.16);
  * and the tabs stay put when a page changes the panel's height. Metres per
  * panel unit is measured from the panel as it is scaled in the scene.
  */
-const PANEL_TOP = 0.71;
+const PANEL_TOP = 0.725;
 const LIFE_CONFIRM_MS = 3000;
 /** Search keeps the keys on the panel, so it shows fewer results at once. */
 const SEARCH_SLOTS = 4;
@@ -56,11 +57,46 @@ const OPTIC_YELLOW = '#d6e13c';
 /** The flag's black cloth, and the edge of a block that can be pressed. */
 const CLOTH = '#1b1411';
 const CHALK_HAZE = '#5a4b3d';
+const CHALK_DUST = '#c7c7b7';
+/** How long a change in where the set is keeps the panel's line: landed, moved by hand, back where it was left. */
+const STAGE_SAYS_MS = 4000;
+/** How long a first press stays armed, and its warning stays up. */
+const CONFIRM_MS = 4000;
+/** The panel's type is plain ASCII: the sheet's dot becomes a colon, a word the listener could not place becomes dots. */
+const plain = (text: string): string =>
+  text
+    .replace(/ \u00b7 /g, ': ')
+    .replace(/\[unk\]/g, '...')
+    .replace(/[^\x20-\x7e]/g, '');
+/**
+ * Roughly how wide words set in the panel's 13 px type are, in panel units: enough to keep what the block says
+ * inside its three lines. Capitals and figures are wide, the thin letters and the points are narrow.
+ */
+const NARROW = /[ .,:;'!|ilIjtfr]/;
+const WIDE = /[A-Z0-9mw%]/;
+const widthOf = (text: string): number => {
+  let width = 0;
+  for (let i = 0; i < text.length; i++) width += NARROW.test(text[i]) ? 3.7 : WIDE.test(text[i]) ? 8.6 : 6.7;
+  return width;
+};
+/** What three lines of the block hold, with room left for lines that break early at a word. */
+const SAYS_ROOM = 600;
+/** The least room what was heard is given, however long what came of it is. */
+const HEARD_LEAST = 100;
+/** The words, whole if they fit that width, cut short with three points if they do not. */
+const fit = (text: string, room: number): string => {
+  if (widthOf(text) <= room) return text;
+  let end = text.length;
+  while (end > 0 && widthOf(text.slice(0, end)) > room - 12) end--;
+  return `${text.slice(0, end).trimEnd()}...`;
+};
+const clip = (text: string): string => plain(text).trim();
 const PLACED_STATUSES = new Set<string>([
   StageStatus.Table,
   StageStatus.Touch,
   StageStatus.Restored,
   StageStatus.Manual,
+  StageStatus.Kept,
 ]);
 
 type Globals = {
@@ -100,6 +136,12 @@ type Globals = {
   cameraOn: Signal<string>;
   sceneRequest: Signal<Spoken | null>;
   coachNote: Signal<string>;
+  coachLine: Signal<string>;
+  shotFrames: Signal<unknown[]>;
+  takeClear: Signal<number>;
+  noteSaid: Signal<string>;
+  notesPosted: Signal<number>;
+  panelSays: Signal<string>;
   sceneStart: Signal<number>;
   castLine: Signal<string>;
   sensorIndex: Signal<number>;
@@ -149,6 +191,11 @@ export class ControlsSystem extends createSystem({
   private snapButton: { setProperties(properties: Record<string, unknown>): void } | null = null;
   private snapLit = false;
   private gateOpen = true;
+  /**
+   * A sentence the listener has written, acted on, with what was heard and what came of it said on the panel.
+   * The recogniser calls it, and so can a test, with typed words.
+   */
+  heard: (text: string) => void = (text) => hear(this.world, text);
   private gateOpenUntil = 0;
   private gateAt = new Vector3();
   private gateFrom = new Vector3();
@@ -298,21 +345,6 @@ export class ControlsSystem extends createSystem({
       }),
     );
 
-    const stageStatus = panel.getElementById<UIKit.Text>('stage-status');
-    this.cleanupFuncs.push(
-      g.stageStatus.subscribe((text) => {
-        stageStatus?.setProperties({
-          text,
-          borderColor: PLACED_STATUSES.has(text) ? OPTIC_YELLOW : CHALK_HAZE,
-        });
-      }),
-    );
-    const resetStage = panel.getElementById('btn-reset-stage');
-    const requestReset = () => {
-      if (meant()) g.resetStageRequested.value = g.resetStageRequested.value + 1;
-    };
-    resetStage?.addEventListener('click', requestReset);
-    this.cleanupFuncs.push(() => resetStage?.removeEventListener('click', requestReset));
 
     // Offered only while the set floats and the headset can scan the room for a table.
     const findTable = panel.getElementById('btn-find-table');
@@ -327,12 +359,6 @@ export class ControlsSystem extends createSystem({
       }),
     );
 
-    const newBoard = panel.getElementById('btn-new-board');
-    const requestNewBoard = () => {
-      if (meant()) g.newBoardRequested.value = g.newBoardRequested.value + 1;
-    };
-    newBoard?.addEventListener('click', requestNewBoard);
-    this.cleanupFuncs.push(() => newBoard?.removeEventListener('click', requestNewBoard));
 
     // Tabs keep a panel this size on the table: one page shows, Snap frame is always there.
     const wire = (id: string, run: () => void): void => {
@@ -342,6 +368,140 @@ export class ControlsSystem extends createSystem({
       };
       element?.addEventListener('click', press);
       this.cleanupFuncs.push(() => element?.removeEventListener('click', press));
+    };
+    // What the set last said, here where the pressing hand is looking, as well as on the call sheet above the
+    // monitor. A passing note keeps its place for as long as the sheet keeps it; the next step and the hints wait
+    // their turn. With nothing to say it reads where the set is. The block keeps its height, so nothing under it
+    // moves when the words change.
+    const saysBlock = panel.getElementById('says');
+    const saysLine = panel.getElementById<UIKit.Text>('voice-line');
+    let saysUntil = 0;
+    let saysWaiting: [string, string] | null = null;
+    let saysTimer: ReturnType<typeof setTimeout> | null = null;
+    /** Set while a spoken sentence is being acted on, so the note that comes of it carries what was heard. */
+    let heardNow = '';
+    const write = (label: string, text: string): void => {
+      const quiet = label === '' && text === '';
+      const title = plain(label);
+      const words = plain(text);
+      const shown = fit(quiet ? g.stageStatus.peek() : title === '' ? words : `${title}. ${words}`, SAYS_ROOM);
+      saysLine?.setProperties({ text: shown === '' ? ' ' : shown, color: quiet ? CHALK_DUST : CHALK });
+      g.panelSays.value = quiet ? '' : `${title} | ${words}`;
+    };
+    /** What the sheet shows now, unless that is a note whose time is up. */
+    const sheetNow = (): [string, string] => {
+      const line = g.coachLine.peek();
+      if (line === g.noteSaid.peek()) return ['', ''];
+      const [label = '', text = ''] = line.split(' | ');
+      return [label, text];
+    };
+    const says = (label: string, text: string, holdMs = 0, hint = false): void => {
+      const now = performance.now();
+      if (hint && now < saysUntil) {
+        saysWaiting = [label, text];
+        return;
+      }
+      saysWaiting = null;
+      if (saysTimer != null) clearTimeout(saysTimer);
+      saysTimer = null;
+      saysUntil = now + holdMs;
+      write(label, text);
+      if (holdMs <= 0) return;
+      saysTimer = setTimeout(() => {
+        saysTimer = null;
+        const [nextLabel, nextText] = saysWaiting ?? sheetNow();
+        saysWaiting = null;
+        write(nextLabel, nextText);
+      }, holdMs);
+    };
+    this.cleanupFuncs.push(
+      () => {
+        if (saysTimer != null) clearTimeout(saysTimer);
+      },
+      g.coachLine.subscribe((line) => {
+        // The sheet showing a note is that note again; the note itself arrives below.
+        if (line !== '' && line === g.noteSaid.peek()) return;
+        const [label = '', text = ''] = line.split(' | ');
+        says(label, text, 0, true);
+      }),
+      // Where the set is: the block's edge is yellow once it is placed, and a change is said once.
+      g.stageStatus.subscribe((text) => {
+        saysBlock?.setProperties({ borderColor: PLACED_STATUSES.has(text) ? OPTIC_YELLOW : CHALK_HAZE });
+        says('STAGE', text, STAGE_SAYS_MS);
+      }),
+      g.notesPosted.subscribe((count) => {
+        if (count === 0) return;
+        const note = g.noteSaid.peek();
+        const [label = '', text = ''] = note.split(' | ');
+        // What was heard goes in front of what came of it, cut to the room what came of it leaves.
+        const room = Math.max(HEARD_LEAST, SAYS_ROOM - widthOf(`${plain(label)}. Heard: . ${plain(text)}`));
+        says(label, heardNow === '' ? text : `Heard: ${fit(heardNow, room)}. ${text}`, noteSeconds(note) * 1000);
+      }),
+    );
+    // What cannot be taken back takes two presses. The first says, on the line above, what the second will cost.
+    const twice = (id: string, label: string, cost: () => string, run: () => void): void => {
+      const element = panel.getElementById<UIKit.Text>(id);
+      let armed: ReturnType<typeof setTimeout> | null = null;
+      const rest = (): void => {
+        if (armed != null) clearTimeout(armed);
+        armed = null;
+        element?.setProperties({ text: label, borderColor: CHALK_HAZE });
+      };
+      this.cleanupFuncs.push(() => {
+        if (armed != null) clearTimeout(armed);
+      });
+      wire(id, () => {
+        if (armed == null) {
+          element?.setProperties({ text: 'Press again', borderColor: OPTIC_YELLOW });
+          says('', cost(), CONFIRM_MS);
+          armed = setTimeout(rest, CONFIRM_MS);
+          return;
+        }
+        rest();
+        // What it warned of is being done: the warning goes, and whatever the doing says takes its place.
+        const [nowLabel, nowText] = sheetNow();
+        says(nowLabel, nowText);
+        run();
+      });
+    };
+    twice(
+      'btn-new-board',
+      'New board',
+      () => {
+        const frames = g.shotFrames.peek().length;
+        const lost = frames === 0 ? 'the set' : frames === 1 ? 'the frame and the set' : `${frames} frames and the set`;
+        return `New board clears ${lost}${g.takeLength.peek() > 0 ? ', and the take' : ''}. Press it again to go ahead.`;
+      },
+      () => {
+        g.newBoardRequested.value = g.newBoardRequested.value + 1;
+      },
+    );
+    twice(
+      'btn-reset-stage',
+      'Reset stage',
+      () => 'Reset lifts the set off the table so you can land it again. Press it again to go ahead.',
+      () => {
+        g.resetStageRequested.value = g.resetStageRequested.value + 1;
+      },
+    );
+    twice(
+      'btn-clear-take',
+      'Clear',
+      () => 'Clear takes the take away for good. Press it again to go ahead.',
+      () => {
+        g.takeClear.value = g.takeClear.peek() + 1;
+      },
+    );
+    this.heard = (text: string): void => {
+      const posted = g.notesPosted.peek();
+      heardNow = clip(text);
+      try {
+        hear(this.world, text);
+      } finally {
+        heardNow = '';
+      }
+      // A control that says nothing of its own (a lens, a snap) still shows it was heard.
+      if (g.notesPosted.peek() === posted) says('', `Heard: ${clip(text)}.`, 5000);
     };
     // Undo is on every tab: the set goes back to how it stood before the last change.
     wire('btn-undo', () => {
@@ -430,14 +590,11 @@ export class ControlsSystem extends createSystem({
     // Say what should be on the set. The listening runs on the headset itself, from files that
     // ship with the app, and it is fetched the first time the button is pressed.
     const voiceButton = panel.getElementById<UIKit.Text>('btn-voice');
-    const voiceLine = panel.getElementById<UIKit.Text>('voice-line');
     if (voiceButton != null && Voice.supported()) {
       voiceButton.setProperties({ display: 'flex' });
       let voice: Voice | null = null;
       let busy = false;
-      const tell = (text: string): void => {
-        voiceLine?.setProperties({ display: text === '' ? 'none' : 'flex', text });
-      };
+      const tell = (text: string, holdMs = 0, hint = false): void => says('', text, holdMs, hint);
       const WORDS: Record<VoiceState, string> = {
         idle: 'Say a scene',
         loading: 'Getting ready',
@@ -467,7 +624,7 @@ export class ControlsSystem extends createSystem({
       wire('btn-voice', () => {
         if (!warned) {
           warned = true;
-          tell('A 40 MB download, once. It stays on the headset, and what you say stays too. Press again to go ahead.');
+          tell('A 40 MB download, once. It stays on the headset, and so does what you say. Press again to start.', 15000);
           return;
         }
         // Pressed between two sentences of a chain: that ends the chain.
@@ -475,7 +632,7 @@ export class ControlsSystem extends createSystem({
           clearTimeout(again);
           again = null;
           chained = false;
-          tell('Listening stopped.');
+          tell('Listening stopped.', 4000);
           return;
         }
         saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), squirm: g.squirmOn.peek(), voice: true });
@@ -490,31 +647,32 @@ export class ControlsSystem extends createSystem({
             });
             if (state === 'loading' && !chained) tell('Waking the listener.');
             if (state === 'listening') {
-              tell(chained ? 'Still listening. Say the next thing, or stay quiet to stop.' : 'Say a scene, or a control: snap, eighty five, record, paint it red.');
+              // A hint: what came of the last sentence keeps its place until it has been read.
+              tell(chained ? 'Still listening. Say the next thing, or stay quiet to stop.' : 'Say a scene, or a control: snap, eighty five, record, paint it red.', 0, true);
             }
             if (state === 'error') {
               chained = false;
-              tell(detail ?? 'The microphone did not start.');
+              tell(detail ?? 'The microphone did not start.', 8000);
+            }
+            // Stopped, perhaps while it was still waking: its last line gives way to the sheet's, in its turn.
+            if (state === 'idle') {
+              const [nowLabel, nowText] = sheetNow();
+              says(nowLabel, nowText, 0, true);
             }
           },
           onProgress: (fraction) =>
             tell(fraction < 1 ? `Fetching the listener, ${Math.round(fraction * 100)}%. This happens once.` : 'Waking the listener.'),
           onText: (text, final) => {
-            if (text !== '') tell(`Heard: ${text}`);
+            if (text !== '') says('', `Heard: ${clip(text)}`);
             if (!final) return;
             if (text === '') {
-              tell(halted ? 'Listening stopped.' : chained ? 'Quiet, so the listening stopped. Press Say a scene to start again.' : 'Heard nothing. Press it and try again.');
+              tell(halted ? 'Listening stopped.' : chained ? 'Quiet, so the listening stopped. Press Say a scene to start again.' : 'Heard nothing. Press it and try again.', 6000);
               chained = false;
               return;
             }
-            // What came of it is said here too, on the panel, where the hand that pressed is looking.
-            const before = g.coachNote.peek();
-            hear(this.world, text);
-            const after = g.coachNote.peek();
-            if (after !== '' && after !== before) {
-              const [title, words] = after.split(' | ');
-              tell(`Heard: ${text}. ${title.charAt(0)}${title.slice(1).toLowerCase()}${words ? `: ${words}` : ''}`);
-            }
+            // What came of it is said here too, on the panel, where the hand that pressed is looking: the note
+            // the sentence posts arrives with what was heard in front of it.
+            this.heard(text);
             if (!keep || halted) {
               chained = false;
               return;
@@ -747,7 +905,7 @@ export class ControlsSystem extends createSystem({
       const recording = state === 'recording';
       const playing = state === 'playing';
       record?.setProperties({
-        text: recording ? 'Stop' : has ? 'Record over' : 'Record',
+        text: recording ? 'Stop' : has ? 'Record more' : 'Record',
         borderColor: recording ? TALLY_RED : CHALK_HAZE,
         backgroundColor: recording ? TALLY_RED : undefined,
       });
@@ -756,6 +914,8 @@ export class ControlsSystem extends createSystem({
         text: playing ? 'Stop' : 'Play',
         borderColor: playing ? OPTIC_YELLOW : CHALK_HAZE,
       });
+      // A take made by a slip can be cleared, once it is not running.
+      panel.getElementById('btn-clear-take')?.setProperties({ display: has && state === 'idle' ? 'flex' : 'none' });
     };
     this.cleanupFuncs.push(
       () => record?.removeEventListener('click', requestRecord),

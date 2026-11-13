@@ -92,8 +92,8 @@ const INPUT_GUARD_SECONDS = 0.8;
 /** The set turns a little less eagerly than a piece: it is the whole table. */
 const STAGE_TURN_GAIN = 1.5;
 /** A hold that carried the set less than this and turned it less than this was not a move. */
-const MOVED_DISTANCE = 0.015;
-const MOVED_TURN = 0.05;
+const MOVED_DISTANCE = 0.03;
+const MOVED_TURN = 0.08;
 /** The parts of the slate that a hand can hold. Everything else on it lets a ray through. */
 const HANDLE_NAMES = new Set(['ClapperStripe', 'StageHandle', 'StoryboardCard']);
 /**
@@ -128,7 +128,8 @@ export const StageStatus = {
   Floating: 'Floating. Not on your table yet.',
   Table: 'On your table.',
   Touch: 'On your table, where you chose.',
-  Manual: 'Moved by hand. Position saved.',
+  Manual: 'Moved by hand. Undo puts it back.',
+  Kept: 'Moved by hand. Position saved.',
   Restored: 'Back where you left it.',
 } as const;
 
@@ -201,6 +202,20 @@ export class PlacementSystem extends createSystem({
   private holding = false;
   private holdEnded = false;
   private holdStart = new Vector3();
+  /** Where the set stood, under its parent, when its edge was taken: a twitch goes back there, and so does Undo. */
+  private holdPosition = new Vector3();
+  private holdQuaternion = new Quaternion();
+  private backPosition = new Vector3();
+  private backQuaternion = new Quaternion();
+  private backPlacement: string = Placement.Floating;
+  private backStatus: string = StageStatus.Floating;
+  /** When the set was last moved by hand, by performance.now; zero once that move has been undone. */
+  private movedAt = 0;
+  /** Where the drag left the set, and under what: Undo only puts back a set that is still there. */
+  private leftPosition = new Vector3();
+  private leftQuaternion = new Quaternion();
+  private leftParent: Object3D | null = null;
+  private undoHooked = false;
   /** Counts landings, so a hold can tell that the set was landed while it was held. */
   private landings = 0;
   private landingsAtHold = 0;
@@ -273,6 +288,10 @@ export class PlacementSystem extends createSystem({
         this.turn.total = 0;
         this.landingsAtHold = this.landings;
         stage.object3D?.getWorldPosition(this.holdStart);
+        if (stage.object3D != null) {
+          this.holdPosition.copy(stage.object3D.position);
+          this.holdQuaternion.copy(stage.object3D.quaternion);
+        }
       }),
       // Whether the hold moved the set is decided in update, after a touch landing has had its say.
       this.queries.heldStages.subscribe('disqualify', () => {
@@ -312,6 +331,14 @@ export class PlacementSystem extends createSystem({
     const stage = this.firstStage();
     const object = stage?.object3D;
     if (stage == null || object == null) return;
+    if (!this.undoHooked) {
+      // Undo asks here first, once the camera system exists to ask.
+      const viewfinder = this.world.getSystem(ViewfinderSystem);
+      if (viewfinder != null) {
+        viewfinder.stageBack = (since) => this.putBack(since);
+        this.undoHooked = true;
+      }
+    }
     if (!this.stageReady) {
       // The qualify event fires before the entity's object exists, so set up here.
       this.stageReady = true;
@@ -468,6 +495,32 @@ export class PlacementSystem extends createSystem({
     (this.globals as Globals).stageStatus.value = text;
   }
 
+  /** Undo, when the last thing that changed was the whole set moved by its edge: back where it stood. */
+  putBack(since: number): boolean {
+    const stage = this.firstStage();
+    const object = stage?.object3D;
+    if (stage == null || object == null || this.holding || this.aiming || this.movedAt <= since) return false;
+    this.movedAt = 0;
+    // Landed again, reset, glided back to its wearer, grown to full size or parked under its anchor since:
+    // the place it was dragged from is no longer the place to put it.
+    if (
+      object.parent !== this.leftParent ||
+      object.position.distanceToSquared(this.leftPosition) > 1e-8 ||
+      object.quaternion.angleTo(this.leftQuaternion) > 1e-3
+    ) {
+      return false;
+    }
+    object.position.copy(this.backPosition);
+    object.quaternion.copy(this.backQuaternion);
+    stage.setValue(StageAnchor, 'placement', this.backPlacement);
+    // A set that was itself a hand's move before this one says so, without promising an Undo that is spent.
+    this.status(this.backStatus === StageStatus.Manual ? StageStatus.Kept : this.backStatus);
+    // A floating set has no place worth keeping for next time.
+    if (this.backPlacement === Placement.Floating) clearKey(StoreKey.Stage);
+    else this.save(stage);
+    return true;
+  }
+
   /** A hold on the striped edge has ended: if it carried or turned the set, that is where the set now lives. */
   private finishHold(stage: Entity): void {
     this.turn.end();
@@ -475,7 +528,23 @@ export class PlacementSystem extends createSystem({
     // Landed by touch while it was held: the landing stands.
     if (object == null || this.landings !== this.landingsAtHold) return;
     object.getWorldPosition(this.corner);
-    if (this.corner.distanceTo(this.holdStart) < MOVED_DISTANCE && Math.abs(this.turn.total) < MOVED_TURN) return;
+    if (this.corner.distanceTo(this.holdStart) < MOVED_DISTANCE && Math.abs(this.turn.total) < MOVED_TURN) {
+      // A twitch on the edge, most often a pinch meant for a piece: the set stays where it stood.
+      object.position.copy(this.holdPosition);
+      object.quaternion.copy(this.holdQuaternion);
+      return;
+    }
+    // A real move is kept, and what it replaced is kept beside it for Undo.
+    this.backPosition.copy(this.holdPosition);
+    this.backQuaternion.copy(this.holdQuaternion);
+    this.backPlacement = String(stage.getValue(StageAnchor, 'placement'));
+    this.backStatus = (this.globals as Globals).stageStatus.peek();
+    this.leftPosition.copy(object.position);
+    this.leftQuaternion.copy(object.quaternion);
+    this.leftParent = object.parent;
+    // The pieces as they stand are kept first, so Undo knows this move came after them.
+    this.world.getSystem(ViewfinderSystem)?.rememberNow();
+    this.movedAt = performance.now();
     stage.setValue(StageAnchor, 'placement', Placement.Manual);
     this.floatPending = false;
     this.status(StageStatus.Manual);
@@ -604,6 +673,8 @@ export class PlacementSystem extends createSystem({
       pinch.begun = false;
       (byHand ? this.player.indexTipSpaces[side] : this.player.raySpaces[side]).getWorldPosition(pinch.start);
       handSpace.getWorldPosition(pinch.hand);
+      // The pinch that answered the way in is not a pinch for the set.
+      if (this.guard > 0) pinch.claimed = true;
       // The outline is on a surface: this pinch sets the set down there.
       if (this.aiming && this.landing?.canLand(side) && this.guard <= 0) {
         const point = this.landing.pointFor(side);
@@ -622,6 +693,13 @@ export class PlacementSystem extends createSystem({
     if (stage.getValue(StageAnchor, 'placement') !== Placement.Floating) return;
     handSpace.getWorldPosition(this.tip);
     if (this.tip.distanceTo(pinch.hand) > TOUCH_MAX_DRIFT) return;
+    // The outline is on a surface and its sign says to pinch: a pinch quicker than the outline's rest lands the
+    // set there too, not at the fingertip in mid-air.
+    if (this.aiming && this.landing?.aimsAt(side) === true) {
+      const point = this.landing.pointFor(side);
+      this.placeAt(stage, point.x, point.y, point.z, Placement.Touch, StageStatus.Touch);
+      return;
+    }
     this.placeAtFingertip(stage, pinch.start, byHand ? FINGER_PAD : CONTROLLER_PAD);
   }
 

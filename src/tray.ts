@@ -505,6 +505,12 @@ export class TraySystem extends createSystem({
       g.coachNote.value = 'DID NOT CATCH THAT | Name pieces from the library: a dragon, two actors, a red car.';
       return;
     }
+    // Everything named was already standing there, unchanged: say so, and say how to take a piece off, which is
+    // what "get the truck out of the way" was asking for.
+    if (names.length > 0 && placed.length === 0 && refinished.length === 0 && request.remove.length === 0 && !request.clear && !onlyOne && request.unknown.length === 0) {
+      g.coachNote.value = `ALREADY ON THE SET | ${listed}. To take one off, say remove and its name, or press Remove.`;
+      return;
+    }
     const nothingDone = names.length === 0 && request.remove.length === 0 && !request.clear;
     g.coachNote.value = `${nothingDone ? 'NOT IN THE KIT' : 'SET FROM YOUR WORDS'} | ${parts.join(' ')}`;
   }
@@ -632,8 +638,8 @@ export class TraySystem extends createSystem({
     if (this.toldChanges || asset == null || asset.shelf === 'Kit' || /^\d OF \d/.test(g.coachLine.peek())) return;
     this.toldChanges = true;
     const actor = piece.getValue(SetPiece, 'role') === SetRole.Actor;
-    const what = actor ? 'pose, look and size are' : asset.paint === true ? 'paint, size and fitting are' : 'size is';
-    g.coachNote.value = `${assetTitle(key).toUpperCase()} | Its ${what} on the panel, on any tab. Pinch it with your other hand to stretch it.`;
+    const what = actor ? 'Pose, look, size' : asset.paint === true ? 'Paint, size, fitting' : 'Size';
+    g.coachNote.value = `${assetTitle(key).toUpperCase()} | ${what} and Remove are on the panel under PIECE. Undo takes back a slip.`;
   }
 
   private resize(label: string, scale: number): void {

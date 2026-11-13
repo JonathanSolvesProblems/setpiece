@@ -34,6 +34,18 @@ expect(`README says a take runs ${WORDS[takeSeconds]} seconds`, readme.includes(
 expect(`README says ${WORDS[formats]} formats`, new RegExp(`\\b${WORDS[formats]} formats\\b`, 'i').test(readme) || formats === count(readme, /Full frame|full frame|Super 35|Super 16|65 mm/g));
 expect(`README says ${WORDS[sounds]} sounds, as on disk`, readme.includes(`${WORDS[sounds]} sounds`));
 
+// The forgiving parts the README quotes in numbers: the sizing's dead zone and its cap, how far back Undo goes,
+// and how long a first press stays armed.
+const piecesSource = read('src/pieces.ts');
+const stretchDead = Math.round(Number(/STRETCH_DEAD = ([\d.]+)/.exec(piecesSource)[1]) * 100);
+const stretchLongest = Math.round(Number(/STRETCH_LONGEST = ([\d.]+)/.exec(piecesSource)[1]) * 100);
+const undoDeep = Number(/HISTORY_MOST = (\d+)/.exec(read('src/viewfinder.ts'))[1]);
+const confirmSeconds = Number(/const CONFIRM_MS = (\d+)/.exec(read('src/controls.ts'))[1]) / 1000;
+expect(`README says the first ${stretchDead} cm of a pull do nothing`, readme.includes(`the first ${stretchDead} cm of a pull do nothing`));
+expect(`README says no piece is stretched longer than ${stretchLongest} cm`, readme.includes(`no piece is stretched longer than ${stretchLongest} cm`));
+expect(`README says Undo goes back ${undoDeep} changes`, readme.includes(`the last ${undoDeep} changes`));
+expect(`README says a second press has ${WORDS[confirmSeconds]} seconds`, readme.includes(`within ${WORDS[confirmSeconds]} seconds`));
+
 // The submission form and the sources file, against the results they quote.
 const submission = read('devpost/submission.md');
 const sources = read('devpost/sources.md');

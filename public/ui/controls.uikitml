@@ -215,16 +215,22 @@
     color: #f6f7ef;
   }
   .muted { color: #c7c7b7; }
+  .says {
+    flex-direction: column;
+    min-height: 51px;
+    height: 51px;
+    padding-left: 8px;
+    border-left-width: 3px;
+    border-color: #5a4b3d;
+  }
 </style>
 <div id="panel-root" class="slate">
   <div class="field">
     <div id="panel-title" class="title">SETPIECE</div>
     <div id="btn-voice" class="word" style="display: none">Say a scene</div>
   </div>
-  <div id="voice-line" class="line muted" style="display: none"> </div>
-  <div class="field">
-    <div class="label short">STAGE</div>
-    <div id="stage-status" class="status">Floating. Not on your table yet.</div>
+  <div id="says" class="says">
+    <div id="voice-line" class="line muted">Floating. Not on your table yet.</div>
   </div>
   <div id="btn-snap" class="primary">Snap frame</div>
   <div id="btn-back" class="primary" style="display: none">Back to the table</div>
@@ -256,6 +262,7 @@
       <div class="takes">
         <div id="btn-record" class="takebutton">Record</div>
         <div id="btn-play" class="takebutton" style="display: none">Play</div>
+        <div id="btn-clear-take" class="takebutton" style="display: none">Clear</div>
       </div>
     </div>
     <div class="field">

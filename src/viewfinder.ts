@@ -247,7 +247,12 @@ export class ViewfinderSystem extends createSystem({
   private lastSignature = Number.NaN;
   private shadowTick = false;
   /** The set at each quiet moment, oldest first, for Undo; and what was seen at the last look, waiting to hold. */
-  private history: { setup: Setup; key: string }[] = [];
+  private history: { setup: Setup; key: string; at: number }[] = [];
+  /**
+   * Puts the whole set back where it stood if it was dragged by its edge after the given moment. The placement
+   * system fills this in: the set's own position is its business, and Undo only needs to ask.
+   */
+  stageBack: ((since: number) => boolean) | null = null;
   private historyClock = 0;
   private historyPending = '';
   private effectTick = 0;
@@ -583,7 +588,11 @@ export class ViewfinderSystem extends createSystem({
   recall(shot: Shot): boolean {
     const setup = shot.setup;
     const g = this.globals as Globals;
-    if (setup == null || g.takeState.peek() !== 'idle') return false;
+    if (setup == null) return false;
+    if (g.takeState.peek() !== 'idle') {
+      g.coachNote.value = 'A TAKE IS RUNNING | Stop the take, then pinch the frame again to go back to its setup.';
+      return false;
+    }
     this.restore(setup);
     this.recalledIndex = shot.index;
     this.recalledSignature = Number.NaN;
@@ -629,7 +638,23 @@ export class ViewfinderSystem extends createSystem({
     const held = key === this.historyPending;
     this.historyPending = key;
     if (!held || this.history[this.history.length - 1]?.key === key) return;
-    this.history.push({ setup, key });
+    this.history.push({ setup, key, at: performance.now() });
+    if (this.history.length > HISTORY_MOST) this.history.shift();
+  }
+
+  /**
+   * Keeps the set as it stands this moment, without waiting for it to hold still. Called when something
+   * beside the pieces is about to change (the whole set moved by its edge), so Undo takes things back in the
+   * order they happened.
+   */
+  rememberNow(): void {
+    const cam = this.cameraEntity();
+    if (cam?.object3D == null || (this.globals as Globals).takeState.peek() !== 'idle') return;
+    const setup = this.readSetup(cam);
+    const key = JSON.stringify(setup);
+    this.historyPending = key;
+    if (this.history[this.history.length - 1]?.key === key) return;
+    this.history.push({ setup, key, at: performance.now() });
     if (this.history.length > HISTORY_MOST) this.history.shift();
   }
 
@@ -646,6 +671,12 @@ export class ViewfinderSystem extends createSystem({
     const pieces = this.pieceList();
     for (let i = 0; i < pieces.length; i++) if (pieces[i].hasComponent(Held)) return 'LET GO FIRST | Put down what you are holding, then undo.';
     const now = JSON.stringify(this.readSetup(cam));
+    // The whole set dragged by its edge since the last change to a piece: that is the slip to take back. A change
+    // to a piece that has not been kept yet is newer than any drag, so it goes first.
+    const newest = this.history[this.history.length - 1];
+    if ((newest == null || newest.key === now) && this.stageBack?.(newest?.at ?? 0) === true) {
+      return 'UNDONE | The set is back where it stood before it was moved.';
+    }
     // The newest one kept is usually the set as it stands; the one wanted is the one before it.
     while (this.history.length > 1 && this.history[this.history.length - 1].key === now) this.history.pop();
     const back = this.history[this.history.length - 1];
@@ -744,25 +775,27 @@ export class ViewfinderSystem extends createSystem({
     };
   }
 
-  /** The current brief, judged on this frame. A frame is kept either way; only a pass is stamped. */
-  private judge(measured: Measure, shot: Shot): void {
+  /** The current brief, judged on this frame. A frame is kept either way; only a pass is stamped. Returns the sheet's line. */
+  private judge(measured: Measure, shot: Shot): string {
     const g = this.globals as Globals;
     const index = g.briefIndex.peek();
     const brief = BRIEFS[index];
-    if (brief == null) return;
+    if (brief == null) return '';
     const reason = brief.test(measured);
     if (reason != null) {
-      g.coachNote.value = `NOT YET: ${brief.title.toUpperCase()} | ${reason}`;
-      return;
+      // The frame is kept either way, and that is said first: "not yet" alone reads as a snap that failed.
+      return `FRAME ${shot.index} IS ON THE BOARD | Not the ${brief.title} brief yet: ${reason}`;
     }
     shot.printed = brief.title;
     this.printed.push(brief.title);
     g.briefPrinted.value = this.printed.length;
     const next = BRIEFS[index + 1];
-    g.coachNote.value = next
-      ? `PRINT IT · ${this.printed.length} OF ${BRIEFS.length} | Next: ${next.title}. ${next.ask}`
+    // What the next shot asks for is the sheet's own line from here on, so the note only names it.
+    const note = next
+      ? `PRINT IT · ${this.printed.length} OF ${BRIEFS.length} | That shot is printed. Next: ${next.title}.`
       : `THAT'S A WRAP | All ${BRIEFS.length} shots printed. Your coverage is complete.`;
     this.setBrief(index + 1);
+    return note;
   }
 
   private setBrief(index: number): void {
@@ -1350,16 +1383,24 @@ export class ViewfinderSystem extends createSystem({
     };
     const sensor = SENSORS[sensorIndex];
     if (sensor && sensorIndex !== 0) shot.format = sensor.short;
-    this.judge(measured, shot);
+    const verdict = this.judge(measured, shot);
     // A new frame is where the set is now.
     this.recalledIndex = shot.index;
     this.recalledSignature = Number.NaN;
     this.shots.push(shot);
     this.thumbs.push(canvas);
+    // One note for the frame: what the brief made of it, and what it cost the board. The card holds six, and
+    // the oldest making room is said rather than left to be found out.
+    let note = verdict;
     if (this.shots.length > MAX_FRAMES) {
-      this.shots.shift();
+      const gone = this.shots.shift();
       this.thumbs.shift();
+      if (gone != null) {
+        const words = verdict.split(' | ')[1] ?? 'The oldest made room.';
+        note = `FRAME ${shot.index} ON, FRAME ${gone.index} OFF THE BOARD | The card holds six. ${words}`;
+      }
     }
+    if (note !== '') (this.globals as Globals).coachNote.value = note;
     this.drawBoard();
     AudioUtils.play(cam);
     if (this.tally) {

@@ -178,6 +178,7 @@ type Globals = {
   coachTarget: Signal<string>;
   setupRecalled: Signal<number>;
   coachNote: Signal<string>;
+  selectedLabel: Signal<string>;
   cameraRig: Signal<string>;
   takeState: Signal<string>;
   trayOn: Signal<string[]>;
@@ -196,7 +197,12 @@ const STRETCH_REACH = 0.07;
 const STRETCH_MIN = 0.5;
 const STRETCH_MAX = 2.2;
 const STRETCH_SPAN = 0.2;
-const STRETCH_LONGEST = 0.9;
+/** The first centimetres of a pull do nothing: a second hand that came to help carry has not asked for a size. */
+const STRETCH_DEAD = 0.04;
+/** About as wide as the slate. */
+const STRETCH_LONGEST = 0.6;
+/** The piece the panel is about to change keeps its ring, a little tighter than when a hand is on it. */
+const CHOSEN_RING = 0.8;
 const STRETCH_STOPS = [0.7, 1, 1.5, 2.2];
 const STRETCH_SNAP = 0.06;
 /** A flown camera stays where it is let go, between these heights. */
@@ -243,6 +249,10 @@ export class PiecesSystem extends createSystem({
   /** How far the last point given to nearestTo was from the piece it found, in metres. */
   private nearestGap = 0;
   private rings: Mesh[] = [];
+  /** The piece last picked up, which the panel's PIECE rows act on: its label, and its place in `dressed`. */
+  private chosenLabel = '';
+  private chosen = -1;
+  private chosenStale = false;
   private turns: HandTurn[] = [];
   /** Grabs that began inside the guard window and were let go at once. */
   private ignored = new Set<Entity>();
@@ -286,6 +296,10 @@ export class PiecesSystem extends createSystem({
     this.cleanupFuncs.push(
       this.world.visibilityState.subscribe((state) => {
         if (state === VisibilityState.Visible) this.guard = INPUT_GUARD_SECONDS;
+      }),
+      g.selectedLabel.subscribe((label) => {
+        this.chosenLabel = label;
+        this.chosenStale = true;
       }),
       this.queries.grabbed.subscribe('qualify', (piece) => {
         if (this.isStage(piece)) return;
@@ -501,7 +515,7 @@ export class PiecesSystem extends createSystem({
       this.setRayAside(side, true);
       if (pad?.getSelectStart() === true || (byHand && reading.fistStart) || (!byHand && pad?.getButtonDown(InputComponent.Squeeze) === true)) {
         const scale = held.piece.object3D!.scale.x;
-        // No piece is stretched longer than a slate and a half, whatever the kit's sizes allow.
+        // No piece is stretched longer than the slate is wide, whatever the kit's sizes allow.
         const shape = this.bounds[this.dressed.indexOf(held.piece)];
         const longest = shape == null ? 0 : Math.max(shape.max.x - shape.min.x, shape.max.y - shape.min.y, shape.max.z - shape.min.z);
         const most = Math.max(1, Math.min(STRETCH_MAX, longest > 0 ? STRETCH_LONGEST / longest : STRETCH_MAX));
@@ -583,7 +597,9 @@ export class PiecesSystem extends createSystem({
     if (!live) return;
     // The same pull of the hands is the same change in size, however close together they began.
     const span = Math.max(STRETCH_SPAN, stretch.from);
-    let scale = stretch.scale * (1 + (first.at.distanceTo(point) - stretch.from) / span);
+    const pull = first.at.distanceTo(point) - stretch.from;
+    const asked = Math.sign(pull) * Math.max(0, Math.abs(pull) - STRETCH_DEAD);
+    let scale = stretch.scale * (1 + asked / span);
     scale = Math.max(Math.min(STRETCH_MIN, stretch.scale), Math.min(Math.max(stretch.most, stretch.scale), scale));
     for (let i = 0; i < STRETCH_STOPS.length; i++) {
       if (Math.abs(scale - STRETCH_STOPS[i]) <= STRETCH_SNAP * STRETCH_STOPS[i]) scale = STRETCH_STOPS[i];
@@ -893,6 +909,15 @@ export class PiecesSystem extends createSystem({
     const wanted = (this.globals as Globals).coachTarget.peek();
     let beckoned = false;
     if (this.ghost != null) this.ghost.visible = false;
+    // The piece the panel's PIECE rows will change wears its ring, in a session, so a paint or Remove is never a guess.
+    if (this.chosenStale) {
+      this.chosenStale = false;
+      this.chosen = -1;
+      for (let i = 0; i < this.dressed.length && this.chosenLabel !== ''; i++) {
+        if (String(this.dressed[i].getValue(SetPiece, 'label')) === this.chosenLabel) this.chosen = i;
+      }
+    }
+    const chosen = this.world.visibilityState.peek() === VisibilityState.NonImmersive ? -1 : this.chosen;
     for (let i = 0; i < this.dressed.length; i++) {
       const piece = this.dressed[i];
       const held = piece.hasComponent(Held);
@@ -903,8 +928,8 @@ export class PiecesSystem extends createSystem({
         this.showGhost(i, time);
       }
       const ring = this.rings[i];
-      ring.visible = touched || beckon;
-      ring.scale.setScalar(beckon && !touched ? 1 + BECKON_SWELL * (0.5 + 0.5 * Math.sin(time * BECKON_RATE)) : 1);
+      ring.visible = touched || beckon || i === chosen;
+      ring.scale.setScalar(beckon && !touched ? 1 + BECKON_SWELL * (0.5 + 0.5 * Math.sin(time * BECKON_RATE)) : touched || i !== chosen ? 1 : CHOSEN_RING);
       const turn = this.turns[i];
       if (!held) {
         if (turn.active) turn.end();
@@ -1006,6 +1031,7 @@ export class PiecesSystem extends createSystem({
     this.heldLast.push(new Vector3());
     this.heldSeen.push(false);
     this.rings.push(ring);
+    this.chosenStale = true;
     this.turns.push(new HandTurn());
   }
 
@@ -1094,6 +1120,7 @@ export class PiecesSystem extends createSystem({
     if (authored && Math.hypot(object.position.x, object.position.z) > MAX_FROM_CENTRE) {
       this.apply(piece, authored);
       this.knock(Cue.Place, piece);
+      (this.globals as Globals).coachNote.value = 'BACK ON ITS MARK | Too far from the slate to stay. To take a piece off, press Remove under PIECE.';
       return;
     }
     this.forward.set(0, 0, 1).applyQuaternion(object.quaternion);

@@ -12,11 +12,13 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  Quaternion,
   SRGBColorSpace,
+  Vector3,
   VisibilityState,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { Placement, Held, SetPiece, SetRole, StageAnchor } from './set-components.js';
+import { Placement, Held, SetPiece, SetRole, ShotCamera, StageAnchor } from './set-components.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { BRIEFS } from './briefs.js';
 import { TAKE_MAX_SECONDS, TakeState } from './take.js';
@@ -59,10 +61,19 @@ type Globals = {
   takeLength: Signal<number>;
   roomScanOffered: Signal<boolean>;
   coachNote: Signal<string>;
+  noteSaid: Signal<string>;
+  notesPosted: Signal<number>;
   briefIndex: Signal<number>;
+  startOver: Signal<number>;
 };
 /** Seconds a passing note stays on the sheet: long enough to read a reason and act on it. */
 const NOTE_SECONDS = 6;
+const NOTE_LONGEST = 12;
+/** A step is done when the piece went somewhere: this far carried, or this far turned or tipped. A brush is neither. */
+const CARRIED = 0.03;
+const AIMED = 0.15;
+/** A longer note takes longer to read: about nine letters a second, never under six seconds or over twelve. */
+export const noteSeconds = (note: string): number => Math.min(NOTE_LONGEST, Math.max(NOTE_SECONDS, note.length / 9));
 /** The thing each step asks the wearer to put a hand on; it is marked on the set while the step is up. */
 const TARGET: Partial<Record<StepId, string>> = { [Step.Move]: 'actor', [Step.Frame]: 'camera', [Step.Snap]: 'snap' };
 type CoachState = { done: boolean };
@@ -85,7 +96,11 @@ export class CoachSystem extends createSystem({
   private seasoned = false;
   private moved = false;
   private framed = false;
-  private cameraHeld = false;
+  /** Up to two pieces in two hands: where each stood, and how it was turned and tipped, when it was picked up. */
+  private watched: (Entity | null)[] = [null, null];
+  private watchedFrom = [new Vector3(), new Vector3()];
+  private watchedTurn = [new Quaternion(), new Quaternion()];
+  private watchedTilt = [0, 0];
   private shots = 0;
   private hold = 0;
   /** Seconds in the session since the board was last empty; the time a full board took. */
@@ -122,8 +137,10 @@ export class CoachSystem extends createSystem({
       g.coachNote.subscribe((note) => {
         if (note === '') return;
         this.note = note;
-        this.noteLeft = NOTE_SECONDS;
+        this.noteLeft = noteSeconds(note);
         g.coachNote.value = '';
+        g.noteSaid.value = note;
+        g.notesPosted.value = g.notesPosted.peek() + 1;
       }),
       g.shotFrames.subscribe((frames) => {
         const before = this.shots;
@@ -136,14 +153,42 @@ export class CoachSystem extends createSystem({
       }),
       this.queries.held.subscribe('qualify', (piece) => {
         const role = piece.getValue(SetPiece, 'role');
-        if (role === SetRole.Actor || role === SetRole.Creature) this.moved = true;
-        if (role === SetRole.Camera) this.cameraHeld = true;
-      }),
-      this.queries.held.subscribe('disqualify', (piece) => {
-        if (piece.getValue(SetPiece, 'role') === SetRole.Camera && this.cameraHeld) {
-          this.cameraHeld = false;
-          this.framed = true;
+        const object = piece.object3D;
+        if (object == null || (role !== SetRole.Actor && role !== SetRole.Creature && role !== SetRole.Camera)) return;
+        // A place for it among the two being watched; one whose piece is no longer in a hand is free.
+        let slot = -1;
+        for (let i = 0; i < this.watched.length && slot < 0; i++) {
+          const other = this.watched[i];
+          if (other == null || other === piece || !other.hasComponent(Held)) slot = i;
         }
+        if (slot < 0) return;
+        this.watched[slot] = piece;
+        this.watchedFrom[slot].copy(object.position);
+        this.watchedTurn[slot].copy(object.quaternion);
+        this.watchedTilt[slot] = role === SetRole.Camera ? Number(piece.getValue(ShotCamera, 'tilt') ?? 0) : 0;
+      }),
+      // A step is ticked off when the piece is put down somewhere else, or the camera aimed somewhere else:
+      // on the headset a camera brushed for a second took the sheet from step 2 to step 4.
+      this.queries.held.subscribe('disqualify', (piece) => {
+        const slot = this.watched[0] === piece ? 0 : this.watched[1] === piece ? 1 : -1;
+        if (slot < 0) return;
+        this.watched[slot] = null;
+        const object = piece.object3D;
+        if (object == null) return;
+        const carried = object.position.distanceTo(this.watchedFrom[slot]) >= CARRIED;
+        if (piece.getValue(SetPiece, 'role') !== SetRole.Camera) {
+          if (carried) this.moved = true;
+          return;
+        }
+        const tipped = Math.abs(Number(piece.getValue(ShotCamera, 'tilt') ?? 0) - this.watchedTilt[slot]);
+        if (carried || object.quaternion.angleTo(this.watchedTurn[slot]) >= AIMED || tipped >= AIMED) this.framed = true;
+      }),
+      // Start over, on the page: the next person in the headset is shown every step.
+      g.startOver.subscribe((n) => {
+        if (n === 0) return;
+        this.seasoned = false;
+        this.moved = false;
+        this.framed = false;
       }),
       () => this.texture.dispose(),
     );
@@ -182,7 +227,17 @@ export class CoachSystem extends createSystem({
     const target = onTake ? '' : (TARGET[this.step] ?? '');
     if (g.coachTarget.peek() !== target) g.coachTarget.value = target;
     sheet.visible = this.step !== Step.Hidden || onTake || this.note !== '';
-    if (!sheet.visible || !this.fontsReady) return;
+    if (!sheet.visible) {
+      // Nothing is being said: the words kept for the panel and the tests say so too, and the next showing draws afresh.
+      if (g.coachLine.peek() !== '') {
+        g.coachLine.value = '';
+        this.drawnStep = Step.Hidden;
+        this.drawnNote = '';
+        this.drawnTake = TakeState.Idle;
+      }
+      return;
+    }
+    if (!this.fontsReady) return;
     const xr = this.input.xr;
     this.controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
     if (
@@ -380,17 +435,46 @@ export class CoachSystem extends createSystem({
     ctx.fillStyle = OPTIC_YELLOW;
     ctx.fillRect(0, 0, 18, H);
     ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = CHALK_DUST;
+    // A passing note is news, so its label is as bright as its words.
+    ctx.fillStyle = this.note !== '' ? CHALK : CHALK_DUST;
     ctx.font = `700 58px ${STENCIL}`;
     ctx.fillText(label, 60, 96);
+    const room = W - 110;
     let px = 112;
     ctx.font = `700 ${px}px ${TEXT}`;
-    while (px > 52 && ctx.measureText(line).width > W - 110) {
+    while (px > 52 && ctx.measureText(line).width > room) {
       px -= 4;
       ctx.font = `700 ${px}px ${TEXT}`;
     }
     ctx.fillStyle = CHALK;
-    ctx.fillText(line, 60, 232);
+    if (ctx.measureText(line).width <= room) {
+      ctx.fillText(line, 60, 232);
+    } else {
+      // Too long for one line at its smallest: two lines, broken at the space nearest the middle.
+      const middle = line.length >> 1;
+      let at = middle;
+      for (let i = 0; i < middle; i++) {
+        if (line[middle - i] === ' ') {
+          at = middle - i;
+          break;
+        }
+        if (line[middle + i] === ' ') {
+          at = middle + i;
+          break;
+        }
+      }
+      const first = line.slice(0, at);
+      const second = line.slice(at + 1);
+      px = 84;
+      ctx.font = `700 ${px}px ${TEXT}`;
+      while (px > 44 && Math.max(ctx.measureText(first).width, ctx.measureText(second).width) > room) {
+        px -= 4;
+        ctx.font = `700 ${px}px ${TEXT}`;
+      }
+      const top = 112 + px * 0.8;
+      ctx.fillText(first, 60, top);
+      ctx.fillText(second, 60, top + px * 1.08);
+    }
     this.texture.needsUpdate = true;
   }
 }

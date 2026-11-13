@@ -19,7 +19,7 @@ import { ReactionsSystem } from './reactions.js';
 import { hear } from './spoken.js';
 import type { Spoken } from './scene-request.js';
 import { SquirmSystem } from './squirm.js';
-import { loadJson, StoreKey } from './store.js';
+import { clearKey, loadJson, StoreKey } from './store.js';
 import { TraySystem } from './tray.js';
 import { CAMERAS, Rig } from './camera-formats.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -60,6 +60,13 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.coachTarget = signal('');
   // A line the call sheet shows for a few seconds, as "LABEL | words"; and a count of setups recalled from the card.
   globals.coachNote = signal('');
+  // Start over, pressed on the page: the next person is shown every step again.
+  globals.startOver = signal(0);
+  // The last note the sheet took, and how many it has taken: the panel repeats each one where the hand is.
+  globals.noteSaid = signal('');
+  globals.notesPosted = signal(0);
+  // What the panel's own line says right now, as "LABEL | words", so a test can read it without reading pixels.
+  globals.panelSays = signal('');
   // The tray, the cast and the camera kit.
   globals.trayToggle = signal('');
   globals.trayOn = signal<string[]>([]);
@@ -223,6 +230,9 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   // On the page the stage never moves, so starting over means the board and the blocking.
   document.getElementById('page-reset')?.addEventListener('click', () => {
     newBoardRequested.value += 1;
+    clearKey(StoreKey.Stage);
+    clearKey(StoreKey.Coach);
+    (globals.startOver as Signal<number>).value += 1;
   });
   // A take on the page: drag a figure or the camera with the mouse while it records.
   const takeState = globals.takeState as Signal<string>;
@@ -386,5 +396,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     viewfinder: world.getSystem(ViewfinderSystem),
     // The same thing the voice button does, from typed words.
     say: (text: string) => hear(world, String(text)),
+    // The same again as the listener does it: the panel says what was heard and what came of it.
+    heard: (text: string) => world.getSystem(ControlsSystem)?.heard(String(text)),
   };
 }).catch(setFailed);
