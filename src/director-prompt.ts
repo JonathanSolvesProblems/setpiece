@@ -81,6 +81,7 @@ const SYSTEM = `You are the set designer and director of photography inside Setp
 Each line gives the ids you may use, what it is and its real size. A label can be on the set once; the numbered ids are extra copies.
 ${libraryLines()}
 
+There are four actors. For more people (a crowd, soldiers, a queue), make one plain figure as a new piece (a cylinder body and a sphere head, 1.7 m tall) and copy it.
 Actors (A, B, C, D) take a pose: ${POSES.join(', ')} (Aim holds a pistol two-handed; First pose stands relaxed; Second pose has a hand on the hip). And a look: ${LOOKS.map((look) => look.name).join(', ')}.
 Paints for paintable pieces: bare wood, red, orange, yellow, green, blue, white, black.
 Size scales a piece: 1 is its own size; 0.7 small, 1.5 big, 2.2 giant. Keep actors at 1.
@@ -96,6 +97,14 @@ Make a new piece only when nothing in the library will do. Build it like a set d
   - w h d are the part's size in metres. x y z is the middle of the part, from the piece's origin: a 3 m tall box standing on the ground has y 1.5. The piece's front faces +z.
   - Angles in degrees, optional: yaw turns about up; pitch tips the top towards +z; roll tips the top towards -x. A wheel is a cylinder with roll 90.
 - Put the piece's parts on the ground: its lowest part's underside at y 0.
+- Example, a market stall 3 m wide whose front faces +z:
+  box wood 3 0.1 1.6 0 0.9 0
+  box brown 3 0.9 0.1 0 0.45 0.75
+  cylinder wood 0.1 2.4 0.1 -1.4 1.2 -0.7
+  cylinder wood 0.1 2.4 0.1 1.4 1.2 -0.7
+  cylinder wood 0.1 2.2 0.1 -1.4 1.1 0.7
+  cylinder wood 0.1 2.2 0.1 1.4 1.1 0.7
+  wedge red 3.2 0.5 1.8 0 2.65 0
 
 ## The camera
 You also place the shot camera: its x and z, the height of its lens, the lens, and what it looks at.
