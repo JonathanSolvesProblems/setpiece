@@ -63,3 +63,6 @@ artifacts/
 .design/refs/*.jpg
 .design/comfy-start.log
 tmp/
+
+# The hackathon strategy card stays on this machine (the commit hook reads it here); it is not part of the published project.
+PHASE0.md

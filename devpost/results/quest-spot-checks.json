@@ -1,0 +1,17 @@
+{
+ "what": "Spot measurements made on a Meta Quest 3S in the Quest Browser during the first headset sessions, on 5 November 2026, and written into the build log the same day. They were taken over the Chrome DevTools Protocol while the wearer used the app; the builds were those of that day, not the one submitted.",
+ "measured": "2026-11-05",
+ "frame_rate": {
+  "method": "requestAnimationFrame timing in the running immersive session (tmp/quest-check.py fps)",
+  "set_standing_still": { "frames_per_second": 90, "median_frame_ms": 11.1, "p95_frame_ms": 13.1, "frames_over_20_ms": 0, "frames": 720 },
+  "two_pieces_carried": { "frames_per_second": 78, "median_frame_ms": 12.7, "frames_over_20_ms": 2, "frames": 392, "note": "before the key light's six-pass shadow was moved to alternate frames" },
+  "draw_calls": 109,
+  "triangles_about": 11500,
+  "with_car_and_three_effects": { "frames_per_second": 74, "just_before_they_were_added": 76 }
+ },
+ "hit_test_without_room_scan": {
+  "method": "a probe evaluated inside the running session (tmp/q-hit2.js), in a room with no Space Setup",
+  "frames_answered_along_each_hand": "1080 of 1080",
+  "frames_answered_along_the_head": "589 of 892"
+ }
+}
