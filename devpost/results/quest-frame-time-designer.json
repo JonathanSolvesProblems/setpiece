@@ -1,0 +1,134 @@
+{
+ "what": "Frame cost of the set designer's sets on a Meta Quest 3S in the Quest Browser, measured on 14 November 2026 in an immersive session on the development server, build bcc6e32 (with the limit of things a reply may hold still at 40). Each set was replayed from a saved designer reply (no model was called), with the same page code as the emulator runs (tmp/t-perf.mjs through tmp/q-perf-sets.py): three seconds idle, three seconds with one piece moved every frame, and the build itself. Both hands were tracked throughout. The budget at 90 Hz is 11.1 ms a frame; the competition's floor is 60 fps (16.7 ms).",
+ "measured": "2026-11-14",
+ "build": "bcc6e32",
+ "second_run_hands_open": {
+  "condition": "Hands held open above the table edge, not touching or pointing at pieces.",
+  "night_chase": {
+   "pieces_on_the_set": 8,
+   "made_pieces": 1,
+   "javascript_ms_per_frame": {
+    "idle_median": 7.2,
+    "idle_p95": 12.4,
+    "moving_median": 9.8
+   },
+   "shaders_compiled_during_the_build": 0,
+   "frame_interval_ms": {
+    "idle_median": 11.2,
+    "idle_p95": 17,
+    "moving_median": 13.9,
+    "moving_p95": 16.8
+   },
+   "frames_per_second": {
+    "idle": 89.3,
+    "one_piece_moving": 71.9
+   }
+  },
+  "funeral_in_the_rain": {
+   "pieces_on_the_set": 14,
+   "made_pieces": 6,
+   "javascript_ms_per_frame": {
+    "idle_median": 7.4,
+    "idle_p95": 12.8,
+    "moving_median": 9.7
+   },
+   "shaders_compiled_during_the_build": 0,
+   "frame_interval_ms": {
+    "idle_median": 11.5,
+    "idle_p95": 17.4,
+    "moving_median": 14.1,
+    "moving_p95": 17.8
+   },
+   "frames_per_second": {
+    "idle": 87.0,
+    "one_piece_moving": 70.9
+   }
+  },
+  "gas_station": {
+   "pieces_on_the_set": 11,
+   "made_pieces": 5,
+   "javascript_ms_per_frame": {
+    "idle_median": 7,
+    "idle_p95": 12.5,
+    "moving_median": 9.1
+   },
+   "shaders_compiled_during_the_build": 0,
+   "note": "Frame intervals not used: the session logger's own frame sampling ran during these seconds and split them."
+  }
+ },
+ "first_run_hands_pointing": {
+  "condition": "Hands pointing at the set; at times they closed on pieces and carried them, so 'moving' includes real carrying. The funeral and the gas station were refused (a piece was held) and are left out.",
+  "castle_gate": {
+   "pieces_on_the_set": 6,
+   "made_pieces": 3,
+   "javascript_ms_per_frame": {
+    "idle_median": 6.9,
+    "idle_p95": 10.5,
+    "moving_median": 7.6
+   },
+   "shaders_compiled_during_the_build": 0,
+   "frame_interval_ms": {
+    "idle_median": 11.5,
+    "idle_p95": 15.4,
+    "moving_median": 12.1,
+    "moving_p95": 14.9
+   },
+   "frames_per_second": {
+    "idle": 87.0,
+    "one_piece_moving": 82.6
+   }
+  },
+  "twenty_four_things": {
+   "pieces_on_the_set": 24,
+   "made_pieces": 6,
+   "javascript_ms_per_frame": {
+    "idle_median": 11.1,
+    "idle_p95": 14.8,
+    "moving_median": 11.7
+   },
+   "shaders_compiled_during_the_build": 0,
+   "frame_interval_ms": {
+    "idle_median": 15.6,
+    "idle_p95": 20.6,
+    "moving_median": 15.8,
+    "moving_p95": 19.5
+   },
+   "frames_per_second": {
+    "idle": 64.1,
+    "one_piece_moving": 63.3
+   }
+  },
+  "forty_things": {
+   "pieces_on_the_set": 40,
+   "made_pieces": 8,
+   "javascript_ms_per_frame": {
+    "idle_median": 10.8,
+    "idle_p95": 21.1,
+    "moving_median": 16.3
+   },
+   "shaders_compiled_during_the_build": 0,
+   "frame_interval_ms": {
+    "idle_median": 14.4,
+    "idle_p95": 25.8,
+    "moving_median": 20.4,
+    "moving_p95": 25
+   },
+   "frames_per_second": {
+    "idle": 69.4,
+    "one_piece_moving": 49.0
+   }
+  },
+  "step_inside_the_night_chase": {
+   "frame_interval_ms_median": 11.1,
+   "frames_per_second": 90.1,
+   "first_frame_inside_ms": 33.4,
+   "shaders_compiled": 0
+  }
+ },
+ "shader_programs_compiled_before_the_set_landed": 104,
+ "found": [
+  "Sets the real model writes (6 to 14 pieces, up to 6 made) held 87 to 90 fps standing and 71 to 83 with a piece moving.",
+  "No shader was compiled while any set was built: the warm-up at the start of the session had made all 104 programs.",
+  "40 things at once fell to 49 fps with a piece moving, and 24 ran 63 to 64; the limit of things in one reply is lowered to 20 in the next build."
+ ]
+}

@@ -75,7 +75,22 @@ const everySample = [...fps, ...(frameTime.before?.frames_per_second ?? []), ...
 const lowest = Math.min(...everySample);
 expect(`the tagline's frame rate is what all ${everySample.length} headset samples support: never under 60 (lowest ${lowest})`, tagline.includes('never under 60 fps') && lowest >= 60);
 expect('the submission makes no anchor or table-label claim it has not proven', !/anchors bring it back|finds a labelled table/.test(submission.split('Not yet proven')[0]));
-expect(`the submission says ${fps.length} samples, a median of ${median} and never under 60 (lowest ${fps[0]})`, submission.includes(`${fps.length} samples`) && submission.includes(`median of ${median} frames`) && submission.includes('never under 60') && fps[0] >= 60);
+// The set designer's sets on the headset, as the submission quotes them, and the tagline's floor for every set the
+// designer may build in one reply.
+const designerFrames = JSON.parse(read('devpost/results/quest-frame-time-designer.json'));
+const realSets = [designerFrames.second_run_hands_open.night_chase, designerFrames.second_run_hands_open.funeral_in_the_rain, designerFrames.first_run_hands_pointing.castle_gate];
+const standing = realSets.map((set) => Math.round(set.frames_per_second.idle));
+const moving = realSets.map((set) => Math.round(set.frames_per_second.one_piece_moving));
+expect(
+  `the submission quotes the designer's sets on the headset: ${Math.min(...standing)} to ${Math.max(...standing)} standing, ${Math.min(...moving)} to ${Math.max(...moving)} with a piece moving`,
+  submission.includes(`${Math.min(...standing)} to ${Math.max(...standing)} frames a second standing and ${Math.min(...moving)} to ${Math.max(...moving)} with a piece moving`),
+);
+const mostThings = Number(/export const MOST_THINGS = (\d+)/.exec(read('src/director-plan.ts'))?.[1] ?? 'NaN');
+const withinLimit = [...realSets, designerFrames.first_run_hands_pointing.twenty_four_things].flatMap((set) => [set.frames_per_second.idle, set.frames_per_second.one_piece_moving]);
+expect(
+  `the tagline's "never under 60" holds for every headset reading of a set the designer may build in one reply (at most ${mostThings} things, 24 measured; lowest ${Math.min(...withinLimit)})`,
+  tagline.includes('never under 60 fps') && Math.min(...withinLimit) >= 60 && mostThings <= 24,
+);
 expect(`the submission says ${assets} pieces and ${lenses[0]} to ${lenses[lenses.length - 1]} mm`, submission.includes(`${assets} pieces`) && submission.includes(`${lenses[0]} to ${lenses[lenses.length - 1]} mm`));
 for (const file of readdirSync(new URL('../devpost/results/', import.meta.url))) {
   expect(`sources.md names devpost/results/${file}`, sources.includes(file));

@@ -11,7 +11,7 @@ import { localBounds } from './bounds.js';
 import { assetByLabel, assetTitle, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf } from './catalog.js';
 import type { Asset } from './catalog.js';
 import { LENSES } from './camera-formats.js';
-import { cleanCamera, cleanThing, plainLine, PlanReader, readPart } from './director-plan.js';
+import { cleanCamera, cleanThing, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
 import type { CameraPlan, Thing } from './director-plan.js';
 import { MadeSystem } from './made.js';
 import type { MadeDef } from './made.js';
@@ -483,7 +483,9 @@ class PlanBuild {
     const thing = cleanThing(raw);
     if (thing == null) return;
     this.things++;
-    const label = this.labelFor(thing);
+    // The headset holds its frame rate up to this many things a reply (src/director-plan.ts); more are not built,
+    // and the note says how many were left out.
+    const label = this.things > MOST_THINGS ? null : this.labelFor(thing);
     if (label == null) {
       this.skipped++;
       return;

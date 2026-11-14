@@ -136,7 +136,9 @@ export const PLAN_SCHEMA = {
 /** The most a reply may ask for: parts in one new piece, new pieces in one reply, and things in one reply. */
 export const MOST_PARTS = 32;
 export const MOST_NEW = 8;
-export const MOST_THINGS = 40;
+// Measured on a Quest 3S on Nov 14 with both hands tracked: 24 things at once ran 63 to 64 fps and 40 things fell to
+// 49 while a piece moved, while the real model's largest set so far (14 things) held 87 idle and 71 moving.
+export const MOST_THINGS = 20;
 /** How far from the middle of the stage anything is put, in real metres, and how high. */
 const REACH_X = 3.4;
 const REACH_Z = 2.4;

@@ -39,7 +39,7 @@ Then it's yours. Pick up any piece with your fingers, or say what to change: "ma
 
 You leave with a board image, a shot list and a short animatic, every number measured from where the pieces stood. Your voice becomes text on the headset: the designer is sent the words, the list of pieces on the set and, for its look, the camera's picture, never your voice. If it can't be reached, a reader built into the app builds from the library's 51 pieces, and nothing else depends on it.
 
-How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage, hit testing lands the set where you point with no room scan, and hands do everything. The designer is a server function giving Claude the catalog and a strict reply format; each piece lands as soon as its line is complete. On a Quest 3S the app ran at a median of 89.9 frames a second in normal use, never under 60 (48 samples over three days). [X, the number on the submitted build.]
+How I built it: Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage, hit testing lands the set where you point with no room scan, and hands do everything. The designer is a server function giving Claude the catalog and a strict reply format; each piece lands as soon as its line is complete. On a Quest 3S, with both hands tracked, the designer's sets (6 to 14 pieces) ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving, and no shader is compiled while a set goes up.
 
 Not yet proven on the headset: the designer's time there, a real voice heard with no word list, and the set returning to the same spot after a relaunch. [X, update after the next headset session.]
 
