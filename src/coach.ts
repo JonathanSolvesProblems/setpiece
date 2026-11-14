@@ -383,8 +383,8 @@ export class CoachSystem extends createSystem({
           this.controllers
             ? 'Rest a controller on your table and pull the trigger.'
             : this.scanOffered
-              ? 'Touch your table and pinch. Or pinch Find my table.'
-              : 'Touch your table and pinch.',
+              ? 'Point at your table and pinch. Or pinch Find my table.'
+              : 'Point at your table and pinch.',
         ];
       case Step.Say:
         return [
