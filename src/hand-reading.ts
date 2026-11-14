@@ -19,6 +19,12 @@ const JOINTS: XRHandJoint[] = [
 const STRIDE = 16;
 const FIST_SHUT = 1;
 const FIST_OPEN = 1.2;
+/**
+ * A fist has the index curled too, a little less tightly than the other three: a hand pointing at a piece has its
+ * other fingers curled and its index straight (as far out as an open hand's), and it is pointing, not grabbing.
+ * On the headset on Nov 14 a hand pointing at the set from close by picked pieces up.
+ */
+const INDEX_SHUT = 1.25;
 /** Past the knuckles, towards the fingers: the middle of a closed hand. */
 const PALM_REACH = 1.25;
 
@@ -89,7 +95,8 @@ export class HandReading {
     const palm = dist(p, 0, 1);
     if (palm < 0.01) return;
     const curl = (dist(p, 4, 0) + dist(p, 5, 0) + dist(p, 6, 0)) / 3 / palm;
-    if (!this.shut && curl <= FIST_SHUT) {
+    const index = dist(p, 3, 0) / palm;
+    if (!this.shut && curl <= FIST_SHUT && index <= INDEX_SHUT) {
       this.shut = true;
       this.fistStart = true;
     } else if (this.shut && curl >= FIST_OPEN) {
