@@ -6,12 +6,13 @@
  * what is left is the blocking in the room.
  */
 import {
+  AudioSource,
+  AudioUtils,
   createSystem,
   Entity,
   Mesh,
   MeshBasicMaterial,
   Object3D,
-  PointLight,
   Quaternion,
   RingGeometry,
   setWorldPosition,
@@ -27,8 +28,8 @@ import { ControlsSystem } from './controls.js';
 
 /** The set is 1:10, so this is true scale. */
 const LIFE_SCALE = 10;
-/** A point light's reach and output have to grow with the room it lights. */
-const LIGHT_POWER = LIFE_SCALE * LIFE_SCALE;
+/** How long the set takes to come off the table and grow to full size around the wearer. */
+const GROW_SECONDS = 1.2;
 const UP = new Vector3(0, 1, 0);
 /** Where the lens is on the rig: this far along its forward, -Z. */
 const LENS_AHEAD = -0.06;
@@ -59,9 +60,10 @@ export class LifeSizeSystem extends createSystem({
   private savedPosition = new Vector3();
   private savedQuaternion = new Quaternion();
   private hidden: Object3D[] = [];
-  private light: PointLight | null = null;
-  private lightIntensity = 0;
-  private lightDistance = 0;
+  /** Where the growing set ends up, in its parent's space, and how far along it is (below 0 when not growing). */
+  private growTo = new Vector3();
+  private growTurn = new Quaternion();
+  private growT = -1;
   private head = new Vector3();
   private forward = new Vector3();
   private offset = new Vector3();
@@ -98,7 +100,8 @@ export class LifeSizeSystem extends createSystem({
    * At full size, a hand pointing down at the floor marks where it would stand the wearer, and a pinch there
    * takes them: the set slides so that spot is under their feet. A hand at the panel is the panel's.
    */
-  update(): void {
+  update(delta: number): void {
+    if (this.growT >= 0) this.grow(delta);
     const g = this.globals as Globals;
     const object = this.stage()?.object3D;
     const life = g.lifeSize.peek() && object != null && this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
@@ -189,7 +192,8 @@ export class LifeSizeSystem extends createSystem({
     }
     const target = piece?.object3D;
     if (target == null) return `NO ${assetTitle(label).toUpperCase()} ON THE SET | Name it first and it goes on.`;
-    if (!g.lifeSize.peek()) this.enter();
+    // Straight there: the walk below moves the set again at once, so it does not grow in first.
+    if (!g.lifeSize.peek()) this.enter(false);
     const object = this.stage()?.object3D;
     if (object == null || !g.lifeSize.peek()) return '';
     // A step in front of it, facing it: its own reach and half a metre more, in slate metres.
@@ -231,7 +235,33 @@ export class LifeSizeSystem extends createSystem({
     return this.stageEntity;
   }
 
-  private enter(): void {
+  /**
+   * One step of the set coming to the wearer: from where it stood on the table to where it stands around them,
+   * eased at both ends, its size growing evenly by eye (ten times over), the lens landing at their feet.
+   */
+  private grow(delta: number): void {
+    const object = this.stage()?.object3D;
+    if (object == null || !(this.globals as Globals).lifeSize.peek()) {
+      this.growT = -1;
+      return;
+    }
+    this.growT = Math.min(1, this.growT + delta / GROW_SECONDS);
+    const t = this.growT;
+    const e = t * t * (3 - 2 * t);
+    object.position.lerpVectors(this.savedPosition, this.growTo, e);
+    object.quaternion.slerpQuaternions(this.savedQuaternion, this.growTurn, e);
+    object.scale.setScalar(Math.pow(LIFE_SCALE, e));
+    if (t < 1) return;
+    this.growT = -1;
+    object.position.copy(this.growTo);
+    object.quaternion.copy(this.growTurn);
+    object.scale.setScalar(LIFE_SCALE);
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    const stage = this.stage();
+    if (stage != null && stage.hasComponent(AudioSource)) AudioUtils.play(stage);
+  }
+
+  private enter(animate = true): void {
     const g = this.globals as Globals;
     const stage = this.stage();
     // Stand at the camera that is live.
@@ -260,15 +290,21 @@ export class LifeSizeSystem extends createSystem({
     object.scale.setScalar(LIFE_SCALE);
     setWorldQuaternion(object, this.turn);
     setWorldPosition(object, this.head);
+    // Where it ends up; it starts from the table and grows in, unless asked to be there at once.
+    this.growTo.copy(object.position);
+    this.growTurn.copy(object.quaternion);
+    if (animate) {
+      object.position.copy(this.savedPosition);
+      object.quaternion.copy(this.savedQuaternion);
+      object.scale.setScalar(1);
+      this.growT = 0;
+    }
 
     this.hidden.length = 0;
     object.traverse((child) => {
       if (LEFT_BEHIND.has(child.name) && child.visible) {
         child.visible = false;
         this.hidden.push(child);
-      }
-      if (child instanceof PointLight && child.name !== 'MonitorGlow' && this.light == null && child.parent?.name !== 'Viewfinder') {
-        this.light = child;
       }
     });
     // Nothing on a full-size set is within reach: the blocking is to be walked, not moved.
@@ -277,18 +313,13 @@ export class LifeSizeSystem extends createSystem({
     }
     const card = this.scene.getObjectByName('StoryboardCard');
     if (card != null) card.pointerEvents = 'none';
-    if (this.light != null) {
-      this.lightIntensity = this.light.intensity;
-      this.lightDistance = this.light.distance;
-      this.light.intensity *= LIGHT_POWER;
-      this.light.distance *= LIFE_SCALE;
-    }
     this.world.getSystem(ViewfinderSystem)?.refresh();
     g.lifeSize.value = true;
   }
 
   private leave(restorePose = true): void {
     const g = this.globals as Globals;
+    this.growT = -1;
     const object = this.stage()?.object3D;
     if (object == null) return;
     object.scale.setScalar(1);
@@ -305,10 +336,6 @@ export class LifeSizeSystem extends createSystem({
     }
     const card = this.scene.getObjectByName('StoryboardCard');
     if (card != null) card.pointerEvents = 'auto';
-    if (this.light != null) {
-      this.light.intensity = this.lightIntensity;
-      this.light.distance = this.lightDistance;
-    }
     this.world.getSystem(ViewfinderSystem)?.refresh();
     g.lifeSize.value = false;
   }

@@ -11,7 +11,7 @@ import { localBounds } from './bounds.js';
 import { assetByLabel, assetTitle, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf } from './catalog.js';
 import type { Asset } from './catalog.js';
 import { LENSES } from './camera-formats.js';
-import { cleanCamera, cleanThing, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
+import { cleanCamera, cleanThing, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
 import type { CameraPlan, Thing } from './director-plan.js';
 import { MadeSystem } from './made.js';
 import type { MadeDef } from './made.js';
@@ -406,6 +406,8 @@ export class DirectorSystem extends createSystem({
         `Camera: at x ${one(this.lensAt.x * REAL)}, z ${one(this.lensAt.z * REAL)}, lens ${one(this.lensAt.y * REAL)} m high, ${g.lensMm.peek()} mm, looking towards x ${one(ahead.x * REAL)}, y ${one(ahead.y * REAL)}, z ${one(ahead.z * REAL)}.`,
       );
     }
+    const light = (this.globals as unknown as { setLight?: Signal<string> }).setLight?.peek();
+    if (light) lines.push(`Light: ${light}.`);
     const selected = tray.selectedLabel();
     if (selected !== '') lines.push(`Selected: ${selected} (${assetTitle(selected)}).`);
     return lines.join('\n');
@@ -457,6 +459,8 @@ class PlanBuild {
     else if (key === 'says') this.says = plainLine(value, 160);
     else if (key === 'next') this.next = plainLine(value, 60);
     else if (key === 'fresh') this.begin(value === true && !this.looking);
+    // The light the scene is in; "" keeps it. A look does not change it, and a plan that could not begin does not either.
+    else if (key === 'light' && isLight(value) && !this.looking && this.begun) (this.world.globals as unknown as { setLight: Signal<string> }).setLight.value = value;
     else if (key === 'remove' && Array.isArray(value) && !this.looking) {
       this.begin(this.fresh);
       const labels = value.filter((id): id is string => typeof id === 'string').map((id) => this.labels.get(id) ?? id);

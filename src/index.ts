@@ -13,6 +13,7 @@ import { MarksSystem } from './marks.js';
 import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
+import { SetLightSystem } from './set-light.js';
 import { SlateSystem } from './slate.js';
 import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
 import { LifeSizeSystem } from './life-size.js';
@@ -102,6 +103,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.lookRequested = signal(0);
   globals.castLine = signal('');
   globals.lifeSize = signal(false);
+  // The light the set is in, kept from the last visit (src/set-light.ts).
+  globals.setLight = signal<string>(loadJson<string>(StoreKey.Light) ?? 'studio');
   globals.lifeSizeRequested = signal(0);
   globals.removeSelected = signal(0);
   globals.clearSet = signal(0);
@@ -139,6 +142,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(MadeSystem, { priority: 21 })
     .registerSystem(DirectorSystem, { priority: 22 })
+    .registerSystem(SetLightSystem, { priority: 24 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })
     .registerSystem(CoachSystem, { priority: 28 })
@@ -276,6 +280,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     newBoardRequested.value += 1;
     clearKey(StoreKey.Stage);
     clearKey(StoreKey.Coach);
+    clearKey(StoreKey.Light);
+    (globals.setLight as Signal<string>).value = 'studio';
     (globals.startOver as Signal<number>).value += 1;
   });
   // A take on the page: drag a figure or the camera with the mouse while it records.

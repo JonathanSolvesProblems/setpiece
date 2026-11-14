@@ -144,6 +144,8 @@ export interface Setup {
   made?: Record<string, string>;
   /** How long the live camera's legs were: 1 is the full tripod, less is baby legs. */
   legs?: number;
+  /** The light the set was in (src/set-light.ts). */
+  light?: string;
 }
 
 /** The board as it is kept between visits: the frames on the card and how many were ever taken. */
@@ -163,6 +165,8 @@ type Globals = {
   coachNote: Signal<string>;
   sensorIndex: Signal<number>;
   cameraRig: Signal<string>;
+  /** The light the set is in (src/set-light.ts). */
+  setLight: Signal<string>;
   effectsOn: Signal<number>;
   trayOn: Signal<string[]>;
   trayRestore: Signal<string[] | null>;
@@ -693,6 +697,7 @@ export class ViewfinderSystem extends createSystem({
     if (setup.made != null) this.madeState?.apply(setup.made);
     if (setup.rig) g.cameraRig.value = setup.rig;
     this.setLegs(setup.legs ?? 1);
+    if (setup.light) g.setLight.value = setup.light;
     if (setup.on) g.trayRestore.value = setup.on;
     if (setup.dress) g.trayDressRestore.value = setup.dress;
     for (const piece of this.queries.pieces.entities) {
@@ -798,6 +803,7 @@ export class ViewfinderSystem extends createSystem({
       cam: (this.globals as Globals).cameraOn.peek(),
       made: this.madeState?.read(),
       legs: this.legs(),
+      light: (this.globals as Globals).setLight.peek(),
     };
   }
 

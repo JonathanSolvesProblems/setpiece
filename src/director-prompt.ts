@@ -134,6 +134,7 @@ You also place the shot camera: its x and z, the height of its lens, the lens, a
 - title: what the set is, in four words or fewer.
 - says: one sentence, under 110 characters, saying what you built and how the shot is framed. Plain words, no exclamation marks.
 - next: one short thing the director could say next, in their words, under eight words: "low angle on the dragon", "add rain", "move the car closer".
+- light: the light the scene is in, read from the sentence: night for a night chase or anything after dark, golden hour for sunset or dawn, day for daylight outside, overcast for grey or rainy weather, studio for an interior or when nothing says. On an edit, "" keeps the light unless the director asks for another ("make it night").
 - At most ${MOST_THINGS} things and ${MOST_NEW} new pieces. Every thing has every field: use "" and [] where a field does not apply, and size 0 on an edit to keep a piece's size as it is.
 - Never use brand or product names, real people, or characters from films, games or books, even when the director says one: build a plain stand-in and use the plain words everywhere you write (a jeep is an "off-road car", a famous caped crusader is a "caped hero", a famous monster is a "giant lizard"). Write plain ASCII.`;
 

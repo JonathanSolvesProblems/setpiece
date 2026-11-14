@@ -82,14 +82,23 @@ const string = { type: 'string' } as const;
 const number = { type: 'number' } as const;
 
 /** The reply's shape, for the API's structured output. Property order is the order the reply streams in. */
+/**
+ * The light a set is in, chosen by the designer from the sentence: studio is the look of an interior or a sound
+ * stage, and the default. "" in a reply keeps the light as it is.
+ */
+export const LIGHTS = ['studio', 'day', 'golden hour', 'night', 'overcast'] as const;
+export type LightName = (typeof LIGHTS)[number];
+export const isLight = (value: unknown): value is LightName => typeof value === 'string' && (LIGHTS as readonly string[]).includes(value);
+
 export const PLAN_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['title', 'says', 'fresh', 'remove', 'things', 'camera', 'next'],
+  required: ['title', 'says', 'fresh', 'light', 'remove', 'things', 'camera', 'next'],
   properties: {
     title: string,
     says: string,
     fresh: { type: 'boolean' },
+    light: { type: 'string', enum: ['', ...LIGHTS] },
     remove: { type: 'array', items: string },
     things: {
       type: 'array',

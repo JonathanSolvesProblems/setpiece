@@ -1,0 +1,250 @@
+/**
+ * The light the set is in: studio, day, golden hour, night or overcast, chosen by the set designer from the
+ * sentence ("a night chase" is night) or kept from the set before. It sets the key light's colour and strength,
+ * the room's fill, the sky behind the shot in the lens (and so in every frame on the board), and the world around
+ * a set stepped inside: a sky and a ground in that light, through which the real room still shows faintly, so a
+ * wearer walking the set at full size can still see where the furniture is.
+ */
+import {
+  BackSide,
+  CanvasTexture,
+  CircleGeometry,
+  createSystem,
+  HemisphereLight,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  PointLight,
+  SphereGeometry,
+  SRGBColorSpace,
+  Vector3,
+  VisibilityState,
+} from '@iwsdk/core';
+import type { Signal } from '@preact/signals-core';
+import { isLight } from './director-plan.js';
+import type { LightName } from './director-plan.js';
+import { saveJson, StoreKey } from './store.js';
+import { ViewfinderSystem } from './viewfinder.js';
+
+/** The set is 1:10, so a light's output grows by a hundred and its reach by ten at full size. */
+const LIFE_SCALE = 10;
+/** How much of the world around a set stepped inside covers the room: the rest of the room shows through. */
+const WORLD_COVER = 0.9;
+const WORLD_RADIUS = 60;
+
+interface Look {
+  /** The key light's colour, and its strength against the strength it was authored at. */
+  key: number;
+  keyPower: number;
+  /** The room's fill: sky colour, ground colour, strength. */
+  sky: number;
+  ground: number;
+  fill: number;
+  /** The sky behind the set, top to bottom: high sky, just above the horizon, the horizon, the ground. */
+  top: string;
+  upper: string;
+  horizon: string;
+  floor: string;
+}
+
+/** Studio is the look the set always had: a dark stage behind the lens, the authored key light. */
+const LOOKS: Record<LightName, Look> = {
+  studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25' },
+  day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a' },
+  'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f' },
+  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x3a4a7a, ground: 0x151219, fill: 0.3, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217' },
+  overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66' },
+};
+
+type Globals = { setLight: Signal<string>; lifeSize: Signal<boolean> };
+
+/** A sky, top to bottom, on a canvas a sphere's texture is drawn from. */
+function paintSky(canvas: HTMLCanvasElement, look: Look): void {
+  const g = canvas.getContext('2d');
+  if (g == null) return;
+  const gradient = g.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, look.top);
+  gradient.addColorStop(0.46, look.upper);
+  gradient.addColorStop(0.5, look.horizon);
+  gradient.addColorStop(1, look.floor);
+  g.fillStyle = gradient;
+  g.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+/** The ground, its own colour under the wearer and the horizon's at its edge. */
+function paintGround(canvas: HTMLCanvasElement, look: Look): void {
+  const g = canvas.getContext('2d');
+  if (g == null) return;
+  const r = canvas.width / 2;
+  const gradient = g.createRadialGradient(r, r, 0, r, r, r);
+  gradient.addColorStop(0, look.floor);
+  gradient.addColorStop(0.55, look.floor);
+  gradient.addColorStop(1, look.horizon);
+  g.fillStyle = gradient;
+  g.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+export class SetLightSystem extends createSystem({}) {
+  private key: PointLight | null = null;
+  private keyIntensity = 0;
+  private keyDistance = 0;
+  private fill: HemisphereLight | null = null;
+  private backdrop: Mesh | null = null;
+  private stage: Object3D | null = null;
+  private sky: Mesh | null = null;
+  private ground: Mesh | null = null;
+  private skyCanvas: HTMLCanvasElement | null = null;
+  private groundCanvas: HTMLCanvasElement | null = null;
+  /** The light last painted on the fill, the backdrop and the world. */
+  private applied = '';
+  private head = new Vector3();
+  private floor = new Vector3();
+
+  init(): void {
+    const g = this.globals as Globals;
+    this.cleanupFuncs.push(
+      g.setLight.subscribe((light) => {
+        if (isLight(light)) saveJson(StoreKey.Light, light);
+      }),
+      () => {
+        (this.sky?.material as MeshBasicMaterial | undefined)?.map?.dispose();
+        (this.ground?.material as MeshBasicMaterial | undefined)?.map?.dispose();
+      },
+    );
+  }
+
+  /** The light the set is in now. */
+  current(): LightName {
+    const light = (this.globals as Globals).setLight.peek();
+    return isLight(light) ? light : 'studio';
+  }
+
+  update(): void {
+    if (!this.find()) return;
+    const g = this.globals as Globals;
+    const light = this.current();
+    const look = LOOKS[light];
+    if (light !== this.applied) {
+      this.applied = light;
+      this.paint(look);
+    }
+    // A light's output grows with the square of the set's size and its reach with the size, every frame, so the
+    // set growing around a wearer stepping inside is lit as it will be at full size all the way up.
+    const life = g.lifeSize.peek();
+    const scale = life ? this.stage!.scale.x : 1;
+    const key = this.key!;
+    key.intensity = this.keyIntensity * look.keyPower * scale * scale;
+    key.distance = this.keyDistance * scale;
+    this.placeWorld(life);
+  }
+
+  /** The key light, the fill, the lens backdrop and the stage, found once they exist. */
+  private find(): boolean {
+    if (this.key != null && this.fill != null && this.backdrop != null && this.stage != null) return true;
+    this.stage ??= this.scene.getObjectByName('Stage') ?? null;
+    if (this.key == null && this.stage != null) {
+      let found: PointLight | null = null;
+      this.stage.traverse((child) => {
+        if (found == null && child instanceof PointLight && child.name !== 'MonitorGlow' && child.parent?.name !== 'Viewfinder') found = child;
+      });
+      const key = found as PointLight | null;
+      if (key != null) {
+        this.key = key;
+        this.keyIntensity = key.intensity;
+        this.keyDistance = key.distance;
+      }
+    }
+    if (this.fill == null) {
+      const fill = this.scene.getObjectByName('RoomFill');
+      if (fill instanceof HemisphereLight) this.fill = fill;
+    }
+    if (this.backdrop == null) {
+      const backdrop = this.scene.getObjectByName('LensBackdrop');
+      if (backdrop instanceof Mesh) this.backdrop = backdrop;
+    }
+    return this.key != null && this.fill != null && this.backdrop != null && this.stage != null;
+  }
+
+  private paint(look: Look): void {
+    this.key!.color.setHex(look.key);
+    const fill = this.fill!;
+    fill.color.setHex(look.sky);
+    fill.groundColor.setHex(look.ground);
+    fill.intensity = look.fill;
+    // The sky behind the shot: the backdrop's own canvas, painted again.
+    const map = (this.backdrop!.material as MeshBasicMaterial).map;
+    if (map != null && map.image instanceof HTMLCanvasElement) {
+      paintSky(map.image, look);
+      map.needsUpdate = true;
+    }
+    this.ensureWorld();
+    if (this.skyCanvas != null && this.groundCanvas != null) {
+      paintSky(this.skyCanvas, look);
+      paintGround(this.groundCanvas, look);
+      (this.sky!.material as MeshBasicMaterial).map!.needsUpdate = true;
+      (this.ground!.material as MeshBasicMaterial).map!.needsUpdate = true;
+    }
+    // The monitor redraws with the new light.
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+  }
+
+  /** The sky and the ground around a set stepped inside, made once and hidden until then. */
+  private ensureWorld(): void {
+    if (this.sky != null) return;
+    this.skyCanvas = document.createElement('canvas');
+    this.skyCanvas.width = 4;
+    this.skyCanvas.height = 256;
+    const skyMap = new CanvasTexture(this.skyCanvas);
+    skyMap.colorSpace = SRGBColorSpace;
+    const sky = new Mesh(
+      new SphereGeometry(WORLD_RADIUS, 32, 16),
+      new MeshBasicMaterial({ map: skyMap, side: BackSide, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false }),
+    );
+    sky.name = 'SetWorldSky';
+    this.groundCanvas = document.createElement('canvas');
+    this.groundCanvas.width = 128;
+    this.groundCanvas.height = 128;
+    const groundMap = new CanvasTexture(this.groundCanvas);
+    groundMap.colorSpace = SRGBColorSpace;
+    const ground = new Mesh(
+      new CircleGeometry(WORLD_RADIUS, 48),
+      new MeshBasicMaterial({ map: groundMap, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false }),
+    );
+    ground.name = 'SetWorldGround';
+    ground.rotation.x = -Math.PI / 2;
+    for (const mesh of [sky, ground]) {
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      mesh.raycast = () => {};
+      mesh.renderOrder = -2;
+      const entity = this.world.createTransformEntity(mesh);
+      if (entity.object3D) entity.object3D.pointerEvents = 'none';
+    }
+    this.sky = sky;
+    this.ground = ground;
+  }
+
+  /**
+   * At full size the world is around the wearer, its ground on the set's floor, and it comes up as the set grows
+   * (the step inside takes a second): at the table it is not there at all.
+   */
+  private placeWorld(life: boolean): void {
+    const sky = this.sky;
+    const ground = this.ground;
+    if (sky == null || ground == null) return;
+    const inSession = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+    // How far the set has grown, by eye: it grows evenly in proportion, ten times over.
+    const grown = life && inSession ? Math.min(1, Math.log(Math.max(1, this.stage!.scale.x)) / Math.log(LIFE_SCALE)) : 0;
+    const show = grown > 0.001;
+    sky.visible = show;
+    ground.visible = show;
+    if (!show) return;
+    const cover = WORLD_COVER * grown;
+    (sky.material as MeshBasicMaterial).opacity = cover;
+    (ground.material as MeshBasicMaterial).opacity = cover;
+    this.player.head.getWorldPosition(this.head);
+    this.stage!.getWorldPosition(this.floor);
+    sky.position.set(this.head.x, this.floor.y, this.head.z);
+    ground.position.set(this.head.x, this.floor.y - 0.003, this.head.z);
+  }
+}
