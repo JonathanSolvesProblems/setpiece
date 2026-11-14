@@ -254,6 +254,7 @@
   <div id="says" class="says">
     <div id="voice-line" class="line muted">Floating. Not on your table yet.</div>
   </div>
+  <div id="btn-try" class="word" style="width: 100%">Try a shot: night chase</div>
   <div id="btn-snap" class="primary">Snap frame</div>
   <div id="btn-back" class="primary" style="display: none">Back to the table</div>
   <div class="row3">

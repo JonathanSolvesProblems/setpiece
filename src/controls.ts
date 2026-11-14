@@ -542,6 +542,24 @@ export class ControlsSystem extends createSystem({
     // The panel is small until More: Talk, Snap frame, Undo, Step inside. More opens the tabs, which hold every
     // control there is; it is kept open or shut between visits.
     let more = loadJson<{ more?: boolean }>(StoreKey.Settings)?.more === true;
+    // A shot to try, for a wearer the listener does not hear, or who would rather see one first: each press asks
+    // the set designer for the next of the page's three shots, as if it had been said. It is on the small panel
+    // only, and not at full size.
+    const tries = [
+      ['night chase', 'A night chase past a burning truck, a dragon on a rooftop'],
+      ['castle gate', 'A castle gate, two guards and a horse, low angle'],
+      ['diner argument', 'Two people arguing in a diner booth'],
+    ] as const;
+    let tryNext = 0;
+    const showTry = (): void => {
+      panel.getElementById<UIKit.Text>('btn-try')?.setProperties({ text: `Try a shot: ${tries[tryNext][0]}`, display: more || g.lifeSize.peek() ? 'none' : 'flex' });
+    };
+    wire('btn-try', () => {
+      const sentence = tries[tryNext][1];
+      tryNext = (tryNext + 1) % tries.length;
+      showTry();
+      this.heard(sentence);
+    });
     // What the piece last touched can be given follows the wearer to every tab; the Assets tab shows it always.
     const showPieceBar = (): void => {
       panel.getElementById('held-block')?.setProperties({ display: (more && openTab === 'assets') || g.castLine.peek() !== '' ? 'flex' : 'none' });
@@ -550,6 +568,7 @@ export class ControlsSystem extends createSystem({
       openTab = tab;
       showPieceBar();
       panel.getElementById('tabs')?.setProperties({ display: more ? 'flex' : 'none' });
+      showTry();
       panel.getElementById<UIKit.Text>('btn-more')?.setProperties({ text: more ? 'Less' : 'More', borderColor: more ? OPTIC_YELLOW : CHALK_HAZE });
       for (const name of TABS) {
         panel.getElementById(`page-${name}`)?.setProperties({ display: more && name === tab ? 'flex' : 'none' });
@@ -608,6 +627,7 @@ export class ControlsSystem extends createSystem({
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
         panel.getElementById('btn-back')?.setProperties({ display: on ? 'flex' : 'none' });
         panel.getElementById('btn-reset-stage')?.setProperties({ display: on ? 'none' : 'flex' });
+        showTry();
       }),
     );
     const squirm = panel.getElementById<UIKit.Text>('btn-squirm');

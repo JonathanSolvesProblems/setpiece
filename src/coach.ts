@@ -390,8 +390,8 @@ export class CoachSystem extends createSystem({
         return [
           '2 OF 4 · SAY THE SHOT',
           this.controllers
-            ? 'Pull the trigger on Talk and say what happens in the shot.'
-            : 'Pinch Talk on the panel and say what happens: a dragon lands on a burning car.',
+            ? 'Pull the trigger on Talk and say what happens in the shot, or on Try a shot.'
+            : 'Pinch Talk and say what happens: a dragon lands on a burning car. Or pinch Try a shot.',
         ];
       case Step.Move:
         return this.said
