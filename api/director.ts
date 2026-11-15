@@ -131,7 +131,8 @@ export async function POST(request: Request): Promise<Response> {
   }
   if (asked == null || typeof asked !== 'object' || Array.isArray(asked)) return refuse(400, 'The request could not be read.');
   // The page has opened: the designer's instructions are put in the cache now (or kept there), so the first sentence
-  // is not the slow one. The smallest request with the same model, speed, instructions and reply format as a plan.
+  // does not also pay for writing them. The smallest request with the same model, speed, instructions and reply format
+  // as a plan.
   if (asked.warm === true) {
     try {
       const message = await new Anthropic({ apiKey }).beta.messages.create({
