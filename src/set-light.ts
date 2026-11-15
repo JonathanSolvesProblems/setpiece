@@ -27,7 +27,7 @@ import type { LightName } from './director-plan.js';
 import { saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { GRAIN_FADE } from './wood-grain.js';
-import { LAMP_GLOW, WINDOW_GLASS } from './scene-assets/lib/practicals.js';
+import { LAMP_GLOW, LAMP_POOL, WINDOW_GLASS } from './scene-assets/lib/practicals.js';
 
 /** The set is 1:10, so a light's output grows by a hundred and its reach by ten at full size. */
 const LIFE_SCALE = 10;
@@ -65,7 +65,7 @@ const LOOKS: Record<LightName, Look> = {
   studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25', env: { sky: [0.95, 0.9, 0.82], equator: [0.42, 0.4, 0.38], ground: [0.12, 0.11, 0.1], power: 1 }, keyAt: [-0.45, 0.72, 0.42], practical: 0 },
   day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a', env: { sky: [0.78, 0.86, 1], equator: [0.55, 0.58, 0.6], ground: [0.2, 0.19, 0.17], power: 1 }, keyAt: [-0.3, 0.95, 0.3], practical: 0 },
   'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f', env: { sky: [1, 0.72, 0.48], equator: [0.55, 0.4, 0.3], ground: [0.14, 0.1, 0.08], power: 1 }, keyAt: [-0.8, 0.22, 0.12], practical: 0.2 },
-  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x3a4a7a, ground: 0x151219, fill: 0.3, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217', env: { sky: [0.2, 0.26, 0.45], equator: [0.07, 0.08, 0.13], ground: [0.02, 0.02, 0.03], power: 0.6 }, keyAt: [0.35, 0.85, -0.45], practical: 1 },
+  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x2e3a68, ground: 0x100e14, fill: 0.18, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217', env: { sky: [0.2, 0.26, 0.45], equator: [0.07, 0.08, 0.13], ground: [0.02, 0.02, 0.03], power: 0.6 }, keyAt: [0.3, 0.8, -1.1], practical: 1 },
   overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66', env: { sky: [0.75, 0.78, 0.82], equator: [0.5, 0.52, 0.54], ground: [0.2, 0.2, 0.19], power: 1 }, keyAt: [-0.2, 1, 0.2], practical: 0.08 },
 };
 
@@ -191,6 +191,7 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     // The set's own lights: windows lit from inside and the street lamp burning brighter as the light falls.
     WINDOW_GLASS.emissiveIntensity = 1.5 * look.practical;
     LAMP_GLOW.emissiveIntensity = 0.6 + 1.8 * look.practical;
+    LAMP_POOL.opacity = 0.75 * look.practical;
     const fill = this.fill!;
     fill.color.setHex(look.sky);
     fill.groundColor.setHex(look.ground);

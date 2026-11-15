@@ -11,7 +11,7 @@ import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vecto
 import type { BufferGeometry, Material } from '@iwsdk/core';
 import { alignSpan, bevelBox } from './lib/hardsurface.js';
 import { mergeByMaterial } from './lib/vehicle.js';
-import { LAMP_GLOW } from './lib/practicals.js';
+import { LAMP_GLOW, LAMP_POOL, poolGeometry } from './lib/practicals.js';
 
 /** Bare basswood, as a model maker's maquette comes before anyone paints it. */
 const primer = new MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.72 });
@@ -142,6 +142,12 @@ function lampPost(): Group {
   put(new Mesh(bevelBox(0.024, 0.014, 0.05, 0.003), rubber), 0, 0.398, 0.062);
   put(new Mesh(bevelBox(0.02, 0.004, 0.044, 0.001), lampGlow), 0, 0.3895, 0.062);
   mergeByMaterial(g, new Map<Material, string>([[rubber, 'Post'], [lampGlow, 'Lamp']]));
+  // The light it throws on the ground at dusk and at night (lib/practicals.ts); not part of the post's shape.
+  const pool = new Mesh(poolGeometry(0.16), LAMP_POOL);
+  pool.name = 'LampPool';
+  pool.position.set(0, 0.0015, 0.062);
+  pool.renderOrder = 1;
+  g.add(pool);
   return g;
 }
 

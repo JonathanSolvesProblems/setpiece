@@ -157,7 +157,7 @@ export const PAINTS = [
   { name: 'Yellow', hex: 0xc4a23f },
   { name: 'Green', hex: 0x4c6e52 },
   { name: 'Blue', hex: 0x3d5b7c },
-  { name: 'White', hex: 0xd8d3c4 },
+  { name: 'White', hex: 0xcbc5b4 },
   { name: 'Black', hex: 0x2a2826 },
 ] as const;
 export const SIZES = [
