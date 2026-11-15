@@ -18,13 +18,15 @@ import type { SizeAsked } from './spoken-commands.js';
 import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 import { TakeSystem } from './take.js';
 import { ViewfinderSystem } from './viewfinder.js';
-import { withGrain } from './wood-grain.js';
+import { BARE_GRAIN, PAINTED_GRAIN, setGrain, withGrain } from './wood-grain.js';
 
 import { LOOKS, POSES } from './catalog.js';
 export { LOOKS, POSES };
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
 const WOOD_LEGS = /^Leg/;
 const PAINTED = /^Body/;
+/** How rough a coat of enamel is: satin, so a painted body catches the light where it turns. */
+const ENAMEL_ROUGHNESS = 0.5;
 const TRIPOD = /^(Base|Post|Leg\d|TripodHead)$/;
 /** Where a drone hovers when it is first switched on, and the most a tripod stands. */
 const DRONE_START = 0.45;
@@ -782,8 +784,13 @@ export class TraySystem extends createSystem({
       if (PAINTED.test(mesh.name)) withGrain(own);
       mesh.material = own;
       mesh.userData[key] = material.color.getHex();
+      mesh.userData.ownRoughness = material.roughness;
     }
-    (mesh.material as MeshStandardMaterial).color.setHex(colour === 0 ? mesh.userData[key] : colour);
+    const own = mesh.material as MeshStandardMaterial;
+    own.color.setHex(colour === 0 ? mesh.userData[key] : colour);
+    // A model maker's enamel dries to a satin sheen that shows where a body curves; bare wood stays matte.
+    own.roughness = colour === 0 ? (mesh.userData.ownRoughness as number) : Math.min(ENAMEL_ROUGHNESS, mesh.userData.ownRoughness as number);
+    if (PAINTED.test(mesh.name)) setGrain(own, colour === 0 ? BARE_GRAIN : PAINTED_GRAIN);
   }
 
   /** Paint on the body, the size of the whole piece, and which fitting shows. */

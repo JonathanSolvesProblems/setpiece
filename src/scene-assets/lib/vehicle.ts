@@ -47,10 +47,10 @@ export function alongs(sections: TubeSection[], count: number): number[] {
 
 /** A tyre and hub cap with no arch, for an axle under a load bed or a bare chassis. */
 export function plainWheel(g: Group, side: number, z: number, radius: number, tyreWidth: number, wheelX: number, rubber: Material, tag: string): void {
-  const tyre = named(new Mesh(new CylinderGeometry(radius, radius, tyreWidth, 16), rubber), `Wheel${tag}`);
+  const tyre = named(new Mesh(new CylinderGeometry(radius, radius, tyreWidth, 24), rubber), `Wheel${tag}`);
   tyre.rotation.z = Math.PI / 2;
   tyre.position.set(side * wheelX, radius, z);
-  const cap = named(new Mesh(new CylinderGeometry(radius * 0.576, radius * 0.636, 0.004, 10), hub), 'Hub');
+  const cap = named(new Mesh(new CylinderGeometry(radius * 0.576, radius * 0.636, 0.004, 16), hub), 'Hub');
   cap.rotation.z = Math.PI / 2;
   cap.position.set(side * (wheelX + tyreWidth / 2 + 0.0005), radius, z);
   g.add(tyre, cap);
@@ -90,10 +90,10 @@ export function archedWheel(g: Group, w: ArchedWheel, paint: Material, rubber: M
   const lip = named(new Mesh(new TorusGeometry(w.wellRadius + 0.0005, 0.0022, 5, 14, Math.PI), paint), 'BodyArch');
   lip.rotation.y = w.side * (Math.PI / 2);
   lip.position.set(w.side * w.lipX, w.radius, w.z);
-  const tyre = named(new Mesh(new CylinderGeometry(w.radius, w.radius, w.tyreWidth, 16), rubber), `Wheel${w.tag}`);
+  const tyre = named(new Mesh(new CylinderGeometry(w.radius, w.radius, w.tyreWidth, 24), rubber), `Wheel${w.tag}`);
   tyre.rotation.z = Math.PI / 2;
   tyre.position.set(w.side * w.wheelX, w.radius, w.z);
-  const cap = named(new Mesh(new CylinderGeometry(w.radius * 0.576, w.radius * 0.636, 0.004, 10), hub), 'Hub');
+  const cap = named(new Mesh(new CylinderGeometry(w.radius * 0.576, w.radius * 0.636, 0.004, 16), hub), 'Hub');
   cap.rotation.z = Math.PI / 2;
   cap.position.set(w.side * (w.wheelX + w.tyreWidth / 2 + 0.0005), w.radius, w.z);
   g.add(well, lip, tyre, cap);

@@ -11,6 +11,7 @@ import {
   CircleGeometry,
   createSystem,
   HemisphereLight,
+  IBLGradient,
   Mesh,
   MeshBasicMaterial,
   Object3D,
@@ -45,15 +46,19 @@ interface Look {
   upper: string;
   horizon: string;
   floor: string;
+  /** The light every surface reflects: above, at the horizon, below (0 to 1 each), and its strength. Brighter above
+   * than below, so a surface shades as it turns away from the sky and a curve shows where it bends. */
+  env: { sky: Rgb; equator: Rgb; ground: Rgb; power: number };
 }
+type Rgb = [number, number, number];
 
 /** Studio is the look the set always had: a dark stage behind the lens, the authored key light. */
 const LOOKS: Record<LightName, Look> = {
-  studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25' },
-  day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a' },
-  'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f' },
-  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x3a4a7a, ground: 0x151219, fill: 0.3, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217' },
-  overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66' },
+  studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25', env: { sky: [0.95, 0.9, 0.82], equator: [0.42, 0.4, 0.38], ground: [0.12, 0.11, 0.1], power: 1 } },
+  day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a', env: { sky: [0.78, 0.86, 1], equator: [0.55, 0.58, 0.6], ground: [0.2, 0.19, 0.17], power: 1 } },
+  'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f', env: { sky: [1, 0.72, 0.48], equator: [0.55, 0.4, 0.3], ground: [0.14, 0.1, 0.08], power: 1 } },
+  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x3a4a7a, ground: 0x151219, fill: 0.3, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217', env: { sky: [0.2, 0.26, 0.45], equator: [0.07, 0.08, 0.13], ground: [0.02, 0.02, 0.03], power: 0.6 } },
+  overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66', env: { sky: [0.75, 0.78, 0.82], equator: [0.5, 0.52, 0.54], ground: [0.2, 0.2, 0.19], power: 1 } },
 };
 
 type Globals = { setLight: Signal<string>; lifeSize: Signal<boolean> };
@@ -84,7 +89,7 @@ function paintGround(canvas: HTMLCanvasElement, look: Look): void {
   g.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-export class SetLightSystem extends createSystem({}) {
+export class SetLightSystem extends createSystem({ environment: { required: [IBLGradient] } }) {
   private key: PointLight | null = null;
   private keyIntensity = 0;
   private keyDistance = 0;
@@ -97,6 +102,8 @@ export class SetLightSystem extends createSystem({}) {
   private groundCanvas: HTMLCanvasElement | null = null;
   /** The light last painted on the fill, the backdrop and the world. */
   private applied = '';
+  /** The light last given to the environment every surface reflects. */
+  private reflected = '';
   private head = new Vector3();
   private floor = new Vector3();
 
@@ -128,6 +135,7 @@ export class SetLightSystem extends createSystem({}) {
       this.applied = light;
       this.paint(look);
     }
+    if (light !== this.reflected) this.reflect(light, look);
     // A light's output grows with the square of the set's size and its reach with the size, every frame, so the
     // set growing around a wearer stepping inside is lit as it will be at full size all the way up.
     const life = g.lifeSize.peek();
@@ -186,6 +194,20 @@ export class SetLightSystem extends createSystem({}) {
     }
     // The monitor redraws with the new light.
     this.world.getSystem(ViewfinderSystem)?.refresh();
+  }
+
+  /** The environment every surface reflects, in the set's light; the environment system rebuilds it once. */
+  private reflect(light: LightName, look: Look): void {
+    for (const entity of this.queries.environment.entities) {
+      const { sky, equator, ground, power } = look.env;
+      entity.getVectorView(IBLGradient, 'sky').set([...sky, 1]);
+      entity.getVectorView(IBLGradient, 'equator').set([...equator, 1]);
+      entity.getVectorView(IBLGradient, 'ground').set([...ground, 1]);
+      entity.setValue(IBLGradient, 'intensity', power);
+      entity.setValue(IBLGradient, '_needsUpdate', true);
+      this.reflected = light;
+      return;
+    }
   }
 
   /** The sky and the ground around a set stepped inside, made once and hidden until then. */

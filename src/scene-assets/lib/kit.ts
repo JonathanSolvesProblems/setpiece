@@ -19,9 +19,9 @@ import { LoftSurface, alignSpan, bevelBox, type TubeSection } from './hardsurfac
 
 export const v = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z);
 export const SIDES = [-1, 1] as const;
-export const BALL = new SphereGeometry(1, 8, 6);
-export const BEAD = new SphereGeometry(1, 6, 4);
-export const CONE = new ConeGeometry(1, 1, 6);
+export const BALL = new SphereGeometry(1, 16, 12);
+export const BEAD = new SphereGeometry(1, 10, 7);
+export const CONE = new ConeGeometry(1, 1, 10);
 
 /** An ellipsoid centred at `at`. */
 export function ball(at: Vector3, rx: number, ry = rx, rz = rx, geometry: BufferGeometry = BALL): Mesh {
@@ -32,7 +32,7 @@ export function ball(at: Vector3, rx: number, ry = rx, rz = rx, geometry: Buffer
 }
 
 /** A tapered round section from a (radius ra) to b (radius rb). */
-export function limb(a: Vector3, b: Vector3, ra: number, rb: number, radial = 8): Mesh {
+export function limb(a: Vector3, b: Vector3, ra: number, rb: number, radial = 12): Mesh {
   const mesh = new Mesh(new CylinderGeometry(rb, ra, a.distanceTo(b), radial, 1));
   alignSpan(mesh, a, b);
   return mesh;
@@ -94,7 +94,7 @@ export const sec = (z: number, cy: number, halfW: number, hUp: number, hDown = h
 });
 
 /** A smooth loft swept along +Z, and the surface it came from for placing detail. */
-export function loft(sections: TubeSection[], segments = 12, per = 2): { mesh: Mesh; surface: LoftSurface } {
+export function loft(sections: TubeSection[], segments = 20, per = 3): { mesh: Mesh; surface: LoftSurface } {
   const dense = smooth(sections, per);
   const surface = LoftSurface.tube(dense);
   return { mesh: new Mesh(surface.build(dense.map((s) => s.z), segments, true)), surface };
@@ -102,7 +102,7 @@ export function loft(sections: TubeSection[], segments = 12, per = 2): { mesh: M
 
 /** A standing loft: rings stacked up Y, each with its own front and back depth. */
 export type Ring = { h: number; halfW: number; front: number; back: number; fwd?: number; side?: number; power?: number };
-export function upright(rings: Ring[], segments = 12, per = 2): Mesh {
+export function upright(rings: Ring[], segments = 20, per = 3): Mesh {
   const { mesh } = loft(
     rings.map((r) => ({ z: r.h, cx: r.side ?? 0, cy: -(r.fwd ?? 0), halfW: r.halfW, hUp: r.back, hDown: r.front, power: r.power ?? 2.3 })),
     segments,
