@@ -1,0 +1,55 @@
+{
+ "what": "Frame rate on a Meta Quest 3S in the Quest Browser after the look pass (smoother creatures and wheels, an environment light per look, the lamp pool; a night-chase set is about 44,600 triangles a frame, was 30,500), with both hands tracked and open. Seven sets built from saved plans, no model calls, by tmp/q-perf-sets.py: median frame gap standing, and with one piece moved by code. One shader was compiled while the first set went up and none after; in the emulator none is compiled during a build or a light change, page or session (tmp/t-programs.mjs), so it is taken to be the hands, first seen then.",
+ "measured": "2026-11-15",
+ "build": "local, at 871fbfa",
+ "sets": [
+  {
+   "set": "calibration (Nov 12 headset set)",
+   "pieces": 6,
+   "standing_fps": 91,
+   "moving_fps": 87,
+   "moving_sample": "ok",
+   "new_shaders_while_built": 1
+  },
+  {
+   "set": "night chase (real reply and its two looks)",
+   "pieces": 8,
+   "standing_fps": 88,
+   "moving_fps": null,
+   "moving_sample": "not used: a median frame of 3.8 ms is faster than the display can run, so frames were not being drawn to it",
+   "new_shaders_while_built": 0
+  },
+  {
+   "set": "castle gate (three made pieces)",
+   "pieces": 6,
+   "standing_fps": 89,
+   "moving_fps": 90,
+   "moving_sample": "ok",
+   "new_shaders_while_built": 0
+  },
+  {
+   "set": "funeral in the rain (14 pieces, real reply)",
+   "pieces": 11,
+   "standing_fps": 89,
+   "moving_fps": 89,
+   "moving_sample": "ok",
+   "new_shaders_while_built": 0
+  },
+  {
+   "set": "gas station zombies (17 made parts, real reply)",
+   "pieces": 10,
+   "standing_fps": 92,
+   "moving_fps": 91,
+   "moving_sample": "ok",
+   "new_shaders_while_built": 0
+  },
+  {
+   "set": "the most a plan allows (40 things, 8 made pieces of 32 parts)",
+   "pieces": 20,
+   "standing_fps": 95,
+   "moving_fps": 82,
+   "moving_sample": "ok",
+   "new_shaders_while_built": 0
+  }
+ ]
+}

@@ -410,7 +410,7 @@ for (const c of cases) {
     const settled = grade(c, after.plan);
     if (graded.problems.length === 0) clean++;
     if (settled.problems.length === 0) cleanAfter++;
-    results.push({ said: c.said, ms, stop: end?.stop, title: plan.title, says: plan.says, camera: plan.camera, ...graded, afterDresser: settled.problems, plan });
+    results.push({ said: c.said, hurry: process.env.DIRECTOR_HURRY === 'off' ? 'off' : 'on', ms, stop: end?.stop, title: plan.title, says: plan.says, camera: plan.camera, ...graded, afterDresser: settled.problems, plan });
     console.log(`${graded.problems.length === 0 ? 'ok  ' : 'FLAG'} ${(ms / 1000).toFixed(1)} s  ${c.said}  [${plan.title}: ${graded.things} things, ${graded.made} made; ${plan.camera?.lens} mm at ${plan.camera?.height} m]`);
     for (const problem of graded.problems) console.log(`       ${problem}`);
     if (after.moved > 0) console.log(`       set dresser moved ${after.moved}; after it: ${settled.problems.length === 0 ? 'nothing to flag' : settled.problems.join('; ')}`);

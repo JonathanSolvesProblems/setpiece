@@ -1,0 +1,15 @@
+{
+ "what": "A real voice on a Meta Quest 3S in the Quest Browser, the wearer's own sentence in their own words, heard by the app's recogniser with no word list and sent to the set designer. Times from the end of the sentence (the recogniser's final text) to the first piece standing and to the whole set, read by tmp/q-latency.js in the wearer's session.",
+ "measured": "2026-11-15",
+ "build": "local, after 82c98a5 (the designer asked to begin its answer at once)",
+ "limit": "One sentence. The headset was on home Wi-Fi to the development server on a laptop, which called the model; the deployed site calls it from Vercel.",
+ "runs": [
+  {
+   "heard": "a man is running away from a car chase that is about to explode on fire",
+   "firstPieceMs": 1629,
+   "wholeSetMs": 3265,
+   "pieces": 8,
+   "then": "THROUGH THE LENS | Camera pulled back to z 4 and lowered slightly, aim shifted, so the runner and both cars sit in frame."
+  }
+ ]
+}
