@@ -129,6 +129,9 @@ export class DirectorSystem extends createSystem({
     return this.status === 'ready';
   }
 
+  /** The designer's instructions have been put in the cache for this visit (api/director.ts, warm). */
+  private warmed = false;
+
   private async check(): Promise<void> {
     this.checked = performance.now();
     try {
@@ -136,6 +139,12 @@ export class DirectorSystem extends createSystem({
       const answer = (await response.json()) as { ready?: boolean };
       // Only a server that answers, and says it has no key, is taken as off; anything else is tried when asked.
       if (response.ok) this.status = answer.ready === true ? 'ready' : 'off';
+      // Once a visit, as soon as the designer is there: its instructions go in the cache now, so the first sentence is
+      // not the slow one. Not on this machine's own address, where the tests reload the page many times an hour.
+      if (this.status === 'ready' && !this.warmed && location.hostname !== 'localhost') {
+        this.warmed = true;
+        void fetch(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ warm: true }) }).catch(() => undefined);
+      }
     } catch {
       // Not known; the next request tries it.
     }

@@ -80,7 +80,7 @@ const subjectLine = (subject: unknown): string =>
 const refuse = (status: number, message: string): Response =>
   new Response(JSON.stringify({ t: 'error', m: message }) + '\n', { status, headers: { 'content-type': 'application/x-ndjson' } });
 
-type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown; coverage?: unknown };
+type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown; coverage?: unknown; warm?: unknown };
 
 /** What the designer is asked: the set as it stands, then the words, with the recogniser's other guesses. */
 function question(asked: Asked): string | null {
@@ -130,6 +130,29 @@ export async function POST(request: Request): Promise<Response> {
     return refuse(400, 'The request could not be read.');
   }
   if (asked == null || typeof asked !== 'object' || Array.isArray(asked)) return refuse(400, 'The request could not be read.');
+  // The page has opened: the designer's instructions are put in the cache now (or kept there), so the first sentence
+  // is not the slow one. The smallest request with the same model, speed, instructions and reply format as a plan.
+  if (asked.warm === true) {
+    try {
+      const message = await new Anthropic({ apiKey }).beta.messages.create({
+        model: MODEL,
+        max_tokens: 16,
+        ...(FAST ? { speed: 'fast' as const } : {}),
+        system: [{ type: 'text', text: directorSystem(), cache_control: { type: 'ephemeral', ttl: '1h' } }],
+        messages: [{ role: 'user', content: 'The director has not spoken yet.' }],
+        output_config: { effort: EFFORT, format: { type: 'json_schema', schema: PLAN_SCHEMA as unknown as Record<string, unknown> } },
+      });
+      return new Response(
+        JSON.stringify({ warm: true, cacheRead: message.usage.cache_read_input_tokens ?? 0, cacheWrite: message.usage.cache_creation_input_tokens ?? 0 }),
+        { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } },
+      );
+    } catch (error) {
+      const status = error instanceof Anthropic.APIError ? error.status : null;
+      return new Response(JSON.stringify({ warm: false, status, detail: process.env.DIRECTOR_DEBUG ? String(error) : undefined }), {
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+      });
+    }
+  }
   const text = question(asked);
   if (text == null) return refuse(400, 'Nothing was said.');
   // Shown the camera's picture, the designer looks through the lens and keeps or fixes the frame.
