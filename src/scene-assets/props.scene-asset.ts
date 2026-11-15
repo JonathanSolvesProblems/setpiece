@@ -11,6 +11,7 @@ import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vecto
 import type { BufferGeometry, Material } from '@iwsdk/core';
 import { alignSpan, bevelBox } from './lib/hardsurface.js';
 import { mergeByMaterial } from './lib/vehicle.js';
+import { LAMP_GLOW } from './lib/practicals.js';
 
 /** Bare basswood, as a model maker's maquette comes before anyone paints it. */
 const primer = new MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.72 });
@@ -80,7 +81,8 @@ export const carProp = car();
 const concrete = new MeshStandardMaterial({ color: 0x9b9a94, roughness: 0.95 });
 const timber = new MeshStandardMaterial({ color: 0x8a6a48, roughness: 0.85 });
 const leaf = new MeshStandardMaterial({ color: 0x4d6b45, roughness: 0.95 });
-const lampGlow = new MeshStandardMaterial({ color: 0xfff2c4, emissive: 0xffe6a0, emissiveIntensity: 0.9 });
+/** Shared with every lamp post, so the set's light can turn it up at night (lib/practicals.ts). */
+const lampGlow = LAMP_GLOW;
 const mortar = new MeshStandardMaterial({ color: 0x7c7a73, roughness: 0.95 });
 const timberDark = new MeshStandardMaterial({ color: 0x5e4630, roughness: 0.9 });
 

@@ -23,6 +23,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { bevelBox } from './lib/hardsurface.js';
+import { WINDOW_GLASS } from './lib/practicals.js';
 import { boatShell } from './lib/boat.js';
 import { busShell } from './lib/bus.js';
 import { pickupShell } from './lib/pickup.js';
@@ -318,7 +319,8 @@ function house(): Group {
       kit.put('Fittings', steel, ball(v(x1 - 0.01, cy, 0.001), 0.003, 0.003, 0.003, BEAD));
       return;
     }
-    kit.put('Glass', glass, block(x1 - x0, y1 - y0, 0.004, cx, cy, -0.003, 0.0005));
+    // The house's own glass, lit from inside as the set's light falls (lib/practicals.ts).
+    kit.put('Glass', WINDOW_GLASS, block(x1 - x0, y1 - y0, 0.004, cx, cy, -0.003, 0.0005));
     kit.put('Frames', trim, block(0.004, y1 - y0, 0.006, cx, cy, -0.001, 0.0005), block(x1 - x0, 0.004, 0.006, cx, cy, -0.001, 0.0005));
     kit.put('Sills', concrete, block(x1 - x0 + 0.016, 0.008, 0.018, cx, y0 - 0.004, 0.006, 0.001));
   });

@@ -26,12 +26,15 @@ import { isLight } from './director-plan.js';
 import type { LightName } from './director-plan.js';
 import { saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
+import { GRAIN_FADE } from './wood-grain.js';
+import { LAMP_GLOW, WINDOW_GLASS } from './scene-assets/lib/practicals.js';
 
 /** The set is 1:10, so a light's output grows by a hundred and its reach by ten at full size. */
 const LIFE_SCALE = 10;
 /** How much of the world around a set stepped inside covers the room: the rest of the room shows through. */
 const WORLD_COVER = 0.9;
 const WORLD_RADIUS = 60;
+const ORIGIN = new Vector3();
 
 interface Look {
   /** The key light's colour, and its strength against the strength it was authored at. */
@@ -49,16 +52,21 @@ interface Look {
   /** The light every surface reflects: above, at the horizon, below (0 to 1 each), and its strength. Brighter above
    * than below, so a surface shades as it turns away from the sky and a curve shows where it bends. */
   env: { sky: Rgb; equator: Rgb; ground: Rgb; power: number };
+  /** Where the key light stands, on the stage (it was authored at studio's): high for day, low and to the side at
+   * golden hour so the shadows run long, behind and above at night as the moon would. */
+  keyAt: Rgb;
+  /** How far the set's own lights are up, 0 to 1: lit windows and a burning street lamp at night. */
+  practical: number;
 }
 type Rgb = [number, number, number];
 
 /** Studio is the look the set always had: a dark stage behind the lens, the authored key light. */
 const LOOKS: Record<LightName, Look> = {
-  studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25', env: { sky: [0.95, 0.9, 0.82], equator: [0.42, 0.4, 0.38], ground: [0.12, 0.11, 0.1], power: 1 } },
-  day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a', env: { sky: [0.78, 0.86, 1], equator: [0.55, 0.58, 0.6], ground: [0.2, 0.19, 0.17], power: 1 } },
-  'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f', env: { sky: [1, 0.72, 0.48], equator: [0.55, 0.4, 0.3], ground: [0.14, 0.1, 0.08], power: 1 } },
-  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x3a4a7a, ground: 0x151219, fill: 0.3, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217', env: { sky: [0.2, 0.26, 0.45], equator: [0.07, 0.08, 0.13], ground: [0.02, 0.02, 0.03], power: 0.6 } },
-  overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66', env: { sky: [0.75, 0.78, 0.82], equator: [0.5, 0.52, 0.54], ground: [0.2, 0.2, 0.19], power: 1 } },
+  studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25', env: { sky: [0.95, 0.9, 0.82], equator: [0.42, 0.4, 0.38], ground: [0.12, 0.11, 0.1], power: 1 }, keyAt: [-0.45, 0.72, 0.42], practical: 0 },
+  day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a', env: { sky: [0.78, 0.86, 1], equator: [0.55, 0.58, 0.6], ground: [0.2, 0.19, 0.17], power: 1 }, keyAt: [-0.3, 0.95, 0.3], practical: 0 },
+  'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f', env: { sky: [1, 0.72, 0.48], equator: [0.55, 0.4, 0.3], ground: [0.14, 0.1, 0.08], power: 1 }, keyAt: [-0.8, 0.22, 0.12], practical: 0.2 },
+  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x3a4a7a, ground: 0x151219, fill: 0.3, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217', env: { sky: [0.2, 0.26, 0.45], equator: [0.07, 0.08, 0.13], ground: [0.02, 0.02, 0.03], power: 0.6 }, keyAt: [0.35, 0.85, -0.45], practical: 1 },
+  overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66', env: { sky: [0.75, 0.78, 0.82], equator: [0.5, 0.52, 0.54], ground: [0.2, 0.2, 0.19], power: 1 }, keyAt: [-0.2, 1, 0.2], practical: 0.08 },
 };
 
 type Globals = { setLight: Signal<string>; lifeSize: Signal<boolean> };
@@ -140,6 +148,8 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     // set growing around a wearer stepping inside is lit as it will be at full size all the way up.
     const life = g.lifeSize.peek();
     const scale = life ? this.stage!.scale.x : 1;
+    // The grain is drawn in each piece's own coordinates and grows with the set: at full size it is a third as deep.
+    GRAIN_FADE.value = 1 / Math.sqrt(scale);
     const key = this.key!;
     key.intensity = this.keyIntensity * look.keyPower * scale * scale;
     key.distance = this.keyDistance * scale;
@@ -175,6 +185,12 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
 
   private paint(look: Look): void {
     this.key!.color.setHex(look.key);
+    // The light sits in an object authored at studio's spot; it is moved within that, by the difference.
+    const at = this.key!.parent?.position ?? ORIGIN;
+    this.key!.position.set(look.keyAt[0] - at.x, look.keyAt[1] - at.y, look.keyAt[2] - at.z);
+    // The set's own lights: windows lit from inside and the street lamp burning brighter as the light falls.
+    WINDOW_GLASS.emissiveIntensity = 1.5 * look.practical;
+    LAMP_GLOW.emissiveIntensity = 0.6 + 1.8 * look.practical;
     const fill = this.fill!;
     fill.color.setHex(look.sky);
     fill.groundColor.setHex(look.ground);

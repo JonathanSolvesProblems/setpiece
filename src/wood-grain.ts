@@ -10,8 +10,13 @@ import { MeshStandardMaterial } from '@iwsdk/core';
 
 const KEY = 'setpiece-wood-grain';
 /** How deep the grain shows: bare wood in full, under a coat of enamel only faintly. */
-export const BARE_GRAIN = 0.1;
-export const PAINTED_GRAIN = 0.035;
+export const BARE_GRAIN = 0.075;
+export const PAINTED_GRAIN = 0.03;
+/**
+ * One more fade for every grained piece at once: the grain is drawn in the piece's own coordinates, so a set grown
+ * to full size around the wearer would show its bands ten times as wide. src/set-light.ts sets it each frame.
+ */
+export const GRAIN_FADE = { value: 1 };
 
 /** The grain's depth on one material, kept in its own userData so a clone carries its own. */
 export function setGrain(material: MeshStandardMaterial, depth: number): void {
@@ -23,16 +28,22 @@ export function withGrain(material: MeshStandardMaterial): void {
   if (material.customProgramCacheKey() === KEY) return;
   material.onBeforeCompile = function (this: MeshStandardMaterial, shader) {
     shader.uniforms.grainDepth = (this.userData.grain ??= { value: BARE_GRAIN }) as { value: number };
+    shader.uniforms.grainFade = GRAIN_FADE;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vGrainAt;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGrainAt = position;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainAt;\nuniform float grainDepth;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainAt;\nuniform float grainDepth;\nuniform float grainFade;')
       .replace(
         '#include <color_fragment>',
+        // Straight-ish bands, unevenly spaced as in a cut board, faded where a band is thinner than about two pixels
+        // so a small or distant piece does not shimmer.
         `#include <color_fragment>
-        float grainAt = vGrainAt.y + sin(vGrainAt.z * 31.0) * 0.007 + sin(vGrainAt.x * 57.0 + vGrainAt.z * 13.0) * 0.003;
-        diffuseColor.rgb *= 1.0 - grainDepth + grainDepth * sin(grainAt * 390.0) * sin(grainAt * 83.0 + 1.7);`,
+        float grainAt = vGrainAt.y + sin(vGrainAt.z * 31.0) * 0.0035 + sin(vGrainAt.x * 57.0 + vGrainAt.z * 13.0) * 0.002;
+        grainAt += sin(grainAt * 23.0 + vGrainAt.x * 7.0) * 0.004;
+        float grainBands = grainAt * 390.0;
+        float grainShown = grainDepth * grainFade * clamp(1.5 - fwidth(grainBands) * 0.75, 0.0, 1.0);
+        diffuseColor.rgb *= 1.0 - grainShown + grainShown * sin(grainBands) * sin(grainAt * 83.0 + 1.7);`,
       );
   };
   material.customProgramCacheKey = () => KEY;
