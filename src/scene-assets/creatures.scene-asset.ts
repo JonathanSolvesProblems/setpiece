@@ -468,7 +468,10 @@ function horse(): Group {
     sec(0.132, 0.153, 0.0105, 0.011, 0.013),
     sec(0.144, 0.141, 0.0105, 0.0105, 0.0115),
     sec(0.152, 0.136, 0.007, 0.0075, 0.008),
-  ], 12);
+    // The muzzle rounds off rather than ending in a sawn face.
+    sec(0.1555, 0.1355, 0.0052, 0.0056, 0.006),
+    sec(0.1578, 0.1352, 0.0024, 0.0026, 0.0028),
+  ], 20);
   kit.put('BodyCoat', primer, head,
     // The barrel: croup, quarters, loin, the belly at its lowest behind the girth, withers, chest.
     loft([
@@ -481,7 +484,7 @@ function horse(): Group {
       sec(0.052, 0.12, 0.03, 0.03, 0.036),
       sec(0.068, 0.12, 0.021, 0.022, 0.03),
       sec(0.077, 0.12, 0.008, 0.01, 0.014),
-    ], 14).mesh,
+    ], 22).mesh,
     // The neck rises out of the withers and the chest: deep at the base, arched along the crest, fine at the throat.
     loft([
       sec(0.032, 0.13, 0.023, 0.034, 0.034),
@@ -489,7 +492,7 @@ function horse(): Group {
       sec(0.068, 0.163, 0.016, 0.03, 0.026),
       sec(0.084, 0.178, 0.0135, 0.022, 0.022),
       sec(0.094, 0.188, 0.012, 0.012, 0.016),
-    ], 12).mesh);
+    ], 20).mesh);
   kit.put('Mane', hair,
     ...chain([v(0, 0.204, 0.096), v(0, 0.202, 0.084), v(0, 0.194, 0.068), v(0, 0.181, 0.05), v(0, 0.166, 0.034), v(0, 0.154, 0.026)], [0.004, 0.0075, 0.0085, 0.0085, 0.0075, 0.004]),
     // The forelock, between the ears.
@@ -502,8 +505,8 @@ function horse(): Group {
       // Ears, pricked.
       spike(v(side * 0.008, 0.2, 0.094), v(side * 0.012, 0.222, 0.089), 0.0044, 0.6, v(0, 0, 1)),
       // The shoulder and the quarter: the muscle a leg hangs from.
-      ball(v(side * 0.02, 0.114, 0.05), 0.014, 0.027, 0.022),
-      ball(v(side * 0.021, 0.116, -0.054), 0.018, 0.03, 0.03),
+      ball(v(side * 0.018, 0.114, 0.05), 0.0125, 0.025, 0.02),
+      ball(v(side * 0.019, 0.116, -0.054), 0.0165, 0.028, 0.028),
       // Foreleg, upright: forearm, knee, cannon, fetlock, pastern.
       ...chain([v(side * 0.021, 0.094, 0.05), v(side * 0.021, 0.054, 0.051), v(side * 0.021, 0.02, 0.05), v(side * 0.021, 0.01, 0.055)], [0.0135, 0.0078, 0.0062, 0.0058]),
       // Hind leg: gaskin back to the hock, cannon forward to the fetlock.

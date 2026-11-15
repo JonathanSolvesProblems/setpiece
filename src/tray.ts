@@ -23,7 +23,8 @@ import { BARE_GRAIN, PAINTED_GRAIN, setGrain, withGrain } from './wood-grain.js'
 import { LOOKS, POSES } from './catalog.js';
 export { LOOKS, POSES };
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
-const WOOD_LEGS = /^Leg/;
+// The pelvis is worn under the trousers, so a suited actor has no band of wood at the waist.
+const WOOD_LEGS = /^(Leg|Pelvis)/;
 const PAINTED = /^Body/;
 /** How rough a coat of enamel is: satin, so a painted body catches the light where it turns. */
 const ENAMEL_ROUGHNESS = 0.5;

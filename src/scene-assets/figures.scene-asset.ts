@@ -28,6 +28,8 @@ const UP = new Vector3(0, 1, 0);
 const woodLight = new MeshStandardMaterial({ color: 0xd9ac8b, roughness: 0.62 });
 const wood = new MeshStandardMaterial({ color: 0xa37a60, roughness: 0.66 });
 const woodDark = new MeshStandardMaterial({ color: 0x64453e, roughness: 0.7 });
+/** The joints: the same wood a shade darker, as on an artist's lay figure, not a dark ball on a pale limb. */
+const joint = new MeshStandardMaterial({ color: 0x8c654c, roughness: 0.66 });
 const slateShadow = new MeshStandardMaterial({ color: 0x1e232b, roughness: 0.9 });
 const steel = new MeshStandardMaterial({ color: 0x6f6c6b, roughness: 0.5, metalness: 0.6 });
 const felt = new MeshStandardMaterial({ color: 0xd6e13c, roughness: 1 });
@@ -78,6 +80,15 @@ function absorb(into: Mesh, ...others: Mesh[]): Mesh {
   merged.computeBoundingSphere();
   into.geometry = merged;
   return into;
+}
+
+/** A lay figure's hand: a flat paddle carried on from the forearm, not a ball. */
+function hand(elbow: Vector3, wrist: Vector3, h: number, tag: 'L' | 'R'): Mesh {
+  const along = new Vector3().subVectors(wrist, elbow).normalize();
+  const mesh = ball(wrist.clone().addScaledVector(along, 0.022 * h), 0.034 * h, woodLight, `Hand${tag}`);
+  mesh.quaternion.setFromUnitVectors(UP, along);
+  mesh.scale.set(0.82, 1.45, 0.5);
+  return mesh;
 }
 
 function ball(at: Vector3, r: number, material: MeshStandardMaterial, name: string): Mesh {
@@ -131,12 +142,12 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
   const post = new Mesh(new CylinderGeometry(0.0022, 0.0022, hipY, 8), steel);
   post.name = 'Post';
   post.position.y = hipY / 2;
-  const pelvis = ball(new Vector3(0, hipY, 0), 0.11 * h, woodDark, 'Pelvis');
-  pelvis.scale.set(1.15, 0.85, 0.9);
+  const pelvis = ball(new Vector3(0, hipY, 0), 0.1 * h, wood, 'Pelvis');
+  pelvis.scale.set(1.1, 0.8, 0.82);
   const torso = limb(new Vector3(0, hipY + 0.02 * h, 0), new Vector3(0, 0.78 * h, 0), 0.1 * h, woodLight, 'Torso');
   const chest = ball(new Vector3(0, 0.76 * h, 0), 0.12 * h, woodLight, 'Chest');
   chest.scale.set(1.25, 0.7, 0.85);
-  const neck = ball(new Vector3(0, 0.86 * h, 0), 0.045 * h, woodDark, 'Neck');
+  const neck = ball(new Vector3(0, 0.86 * h, 0), 0.04 * h, joint, 'Neck');
   const head = ball(new Vector3(0, 0.925 * h, 0), 0.075 * h, woodLight, 'Head');
   head.scale.set(0.95, 1.1, 1);
   // The chest is carved into the torso: one piece of wood, one coat.
@@ -158,13 +169,14 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
         ? ankle.clone().add(new Vector3(0, -0.015 * h, 0.03 * h))
         : new Vector3(side * 0.075 * h, 0.035 * h, (stepping ? 0.11 : 0.02) * h),
       0.04 * h,
-      woodDark,
+      joint,
       `Foot${tag}`,
     );
+    foot.scale.set(0.8, 0.55, 1.45);
     // A leg swings as one from the hip: thigh and shin are one mesh, knee and foot another.
     g.add(
       absorb(limb(hip, knee, 0.05 * h, wood, `Leg${tag}Upper`), limb(knee, ankle, 0.042 * h, wood, `Leg${tag}Lower`)),
-      absorb(ball(knee, 0.052 * h, woodDark, `Knee${tag}`), foot),
+      absorb(ball(knee, 0.047 * h, joint, `Knee${tag}`), foot),
     );
     const shoulder = new Vector3(side * 0.16 * h, 0.8 * h, 0);
     let elbow = new Vector3(side * 0.19 * h, 0.62 * h, -0.01 * h);
@@ -189,9 +201,9 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
     }
     // An arm swings as one from the shoulder: both lengths are one mesh, shoulder and elbow another.
     g.add(
-      absorb(ball(shoulder, 0.05 * h, woodDark, `Shoulder${tag}`), ball(elbow, 0.042 * h, woodDark, `Elbow${tag}`)),
+      absorb(ball(shoulder, 0.044 * h, joint, `Shoulder${tag}`), ball(elbow, 0.037 * h, joint, `Elbow${tag}`)),
       absorb(limb(shoulder, elbow, 0.04 * h, wood, `Arm${tag}Upper`), limb(elbow, wrist, 0.035 * h, wood, `Arm${tag}Lower`)),
-      ball(wrist, 0.04 * h, woodLight, `Hand${tag}`),
+      hand(elbow, wrist, h, tag),
     );
     if (stance.aiming === tag) g.add(propPistol(wrist, tag));
   }
