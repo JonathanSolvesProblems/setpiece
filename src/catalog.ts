@@ -148,6 +148,8 @@ export const LOOKS = [
   { name: 'Hi-vis', top: 0xd6e13c, legs: 0x2f3a45, hair: true },
 ] as const;
 export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim'] as const;
+/** An actor's build: a lay figure is made in a man's and a woman's proportions, as artists' figures are. */
+export const BUILDS = ['man', 'woman'] as const;
 
 /** Model maker's enamels: everything comes in bare wood, and colour is a choice. */
 export const PAINTS = [

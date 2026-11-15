@@ -7,7 +7,7 @@
  * the wearer and at 90 to their right.
  */
 import { LENSES } from './camera-formats.js';
-import { LOOKS, PAINTS, POSES } from './catalog.js';
+import { BUILDS, LOOKS, PAINTS, POSES } from './catalog.js';
 
 /** Shapes a new piece is turned and cut from. Each is one unit across before it is sized. */
 export const SHAPES = ['box', 'cylinder', 'cone', 'pyramid', 'sphere', 'dome', 'wedge'] as const;
@@ -52,6 +52,7 @@ export type Thing = {
   fitting: string;
   pose: string;
   look: string;
+  build: string;
   parts: string[];
 };
 
@@ -105,7 +106,7 @@ export const PLAN_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['id', 'name', 'x', 'z', 'y', 'yaw', 'size', 'paint', 'fitting', 'pose', 'look', 'parts'],
+        required: ['id', 'name', 'x', 'z', 'y', 'yaw', 'size', 'paint', 'fitting', 'pose', 'look', 'build', 'parts'],
         properties: {
           id: string,
           name: string,
@@ -118,6 +119,7 @@ export const PLAN_SCHEMA = {
           fitting: string,
           pose: { type: 'string', enum: ['', ...POSES] },
           look: { type: 'string', enum: ['', ...LOOKS.map((look) => look.name)] },
+          build: { type: 'string', enum: ['', ...BUILDS] },
           parts: { type: 'array', items: string },
         },
       },
@@ -200,6 +202,7 @@ export function cleanThing(raw: unknown): Thing | null {
   const paint = text(t.paint, 20).toLowerCase();
   const pose = text(t.pose, 20);
   const look = text(t.look, 20);
+  const build = text(t.build, 10);
   const parts = Array.isArray(t.parts) ? t.parts.filter((part): part is string => typeof part === 'string').slice(0, MOST_PARTS) : [];
   return {
     id,
@@ -214,6 +217,7 @@ export function cleanThing(raw: unknown): Thing | null {
     fitting: text(t.fitting, 20),
     pose: (POSES as readonly string[]).includes(pose) ? pose : '',
     look: LOOKS.some((entry) => entry.name === look) ? look : '',
+    build: (BUILDS as readonly string[]).includes(build) ? build : '',
     parts: parts.map((part) => part.slice(0, 120)),
   };
 }

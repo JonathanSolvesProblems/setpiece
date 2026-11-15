@@ -109,7 +109,7 @@ function rigFor(pose: Object3D): Rig {
       limb(arms, shoulder.position.clone(), ARM_WAVE, i * Math.PI + Math.PI / 2, aiming(arms) ? 0 : side * ARM_SPLAY, X, aiming(arms) ? 0 : ARM_STRIDE, i * Math.PI + Math.PI),
     );
   });
-  limbs.push(limb(byName(/^(Neck|Head|Hair)$/), neck.position.clone(), HEAD_ROLL, 0.8, 0, new Vector3(0, 0, 1)));
+  limbs.push(limb(byName(/^(Neck|Head|Hair|HairLong)$/), neck.position.clone(), HEAD_ROLL, 0.8, 0, new Vector3(0, 0, 1)));
   return {
     pose,
     base: pose.matrix.clone(),

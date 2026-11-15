@@ -4,7 +4,7 @@
  * requests, so it is read from the cache after the first.
  */
 import { LENSES } from './camera-formats.js';
-import { ASSETS, LOOKS, POSES, SHELF_ASSETS, sparesOf } from './catalog.js';
+import { ASSETS, BUILDS, LOOKS, POSES, SHELF_ASSETS, sparesOf } from './catalog.js';
 import { FINISHES, MOST_NEW, MOST_PARTS, MOST_THINGS, SHAPES } from './director-plan.js';
 
 /**
@@ -82,7 +82,7 @@ Each line gives the ids you may use, what it is and its real size. These are the
 ${libraryLines()}
 
 Actors cannot sit or lie down: an actor meant to be seated stands just beside the seat, facing the way they would sit. There are four actors. For more people (a crowd, soldiers, a queue), make one plain figure as a new piece (a cylinder body and a sphere head, 1.7 m tall) and copy it.
-Actors (A, B, C, D) take a pose: ${POSES.join(', ')} (Aim holds a pistol two-handed; First pose stands relaxed; Second pose has a hand on the hip). And a look: ${LOOKS.map((look) => look.name).join(', ')}.
+Actors (A, B, C, D) take a pose: ${POSES.join(', ')} (Aim holds a pistol two-handed; First pose stands relaxed; Second pose has a hand on the hip). And a look: ${LOOKS.map((look) => look.name).join(', ')}. And a build, ${BUILDS.join(' or ')}: as the sentence says (a woman, two sisters, a mother and her son); where it does not say, a mix of the two; "" keeps the build they have.
 Paints for paintable pieces: bare wood, red, orange, yellow, green, blue, white, black.
 Size scales a piece: 1 is its own size; 0.7 small, 1.5 big, 2.2 giant; 0 keeps the size it has now. Keep everything at size 1 so the shot reads at true scale (previs is for judging what fits in a frame): change a size only when the director asks, or when a thing is meant to be out of scale (a giant dragon). When the stage is too small for everything, show less of the place, never shrink it. Actors are always 1.
 Effects are animated particles: put them where they happen (fire on a burning car takes the car's x and z).

@@ -50,7 +50,9 @@ export type Finish = [number, number, number, number?];
 type Walked = Object3D & { intersectChildren?: boolean };
 type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
 type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: number };
-export type Dress = { cast: Record<string, [number, number]>; finish: Record<string, Finish> };
+/** An actor's pose, look and build (0 a man, 1 a woman; a board saved before builds has none, and is a man). */
+export type Cast = [number, number, number?];
+export type Dress = { cast: Record<string, Cast>; finish: Record<string, Finish> };
 type Saved = { on: string[]; sensor: number; rig: string } & Partial<Dress>;
 /**
  * What came of a change asked for in words: the piece (the first, when there were several), how
@@ -114,7 +116,7 @@ export class TraySystem extends createSystem({
   private moving: Moving[] = [];
   /** Pieces with a part that moves by itself: the lens has to keep looking at them, as it does at an effect. */
   private restless = new Set<string>();
-  private cast = new Map<string, [number, number]>();
+  private cast = new Map<string, Cast>();
   private finish = new Map<string, Finish>();
   private selected: Entity | null = null;
   private toldChanges = false;
@@ -534,7 +536,7 @@ export class TraySystem extends createSystem({
     const actors = this.managed.filter((piece) => this.on.has(this.key(piece)) && isActor(this.key(piece)));
     actors.forEach((piece, i) => {
       const key = this.key(piece);
-      const value: [number, number] = [AIM, this.cast.get(key)?.[1] ?? 0];
+      const value: Cast = [AIM, this.cast.get(key)?.[1] ?? 0, this.cast.get(key)?.[2] ?? 0];
       this.cast.set(key, value);
       this.dress(piece, value);
       const from = piece.object3D;
@@ -755,12 +757,13 @@ export class TraySystem extends createSystem({
   }
 
   /** One pose shows; its clothes are the look, tinted over the figure's own wood. */
-  private dress(actor: Entity, [pose, look]: [number, number]): void {
+  private dress(actor: Entity, [pose, look, build = 0]: Cast): void {
     const style = LOOKS[look] ?? LOOKS[0];
     for (const child of actor.object3D!.children) {
-      const match = /^Pose(\d)$/.exec(child.name);
+      // A woman's poses are named with a W after the number.
+      const match = /^Pose(\d)(W?)$/.exec(child.name);
       if (match == null) continue;
-      child.visible = Number(match[1]) === pose;
+      child.visible = Number(match[1]) === pose && (match[2] === 'W') === (build === 1);
       (child as Walked).intersectChildren = child.visible;
       child.traverse((object) => {
         if (object.name === 'Hair') object.visible = style.hair;
@@ -926,7 +929,7 @@ export class TraySystem extends createSystem({
    * One piece of the plan, on the set where the plan put it, in slate metres and radians, and dressed as it
    * asked. Returns the piece's object, or null when there is no such piece. The set is published at the end.
    */
-  planPiece(label: string, x: number, y: number, z: number, yaw: number, finish: Finish | null, cast: [number, number] | null): Object3D | null {
+  planPiece(label: string, x: number, y: number, z: number, yaw: number, finish: Finish | null, cast: Cast | null): Object3D | null {
     const piece = this.managed.find((entity) => this.key(entity) === label);
     const object = piece?.object3D;
     if (piece == null || object == null || assetByLabel(label)?.shelf === 'Kit') return null;
@@ -970,7 +973,7 @@ export class TraySystem extends createSystem({
   }
 
   /** How a piece is finished and dressed now, for the set designer to be told. */
-  dressOf(label: string): { finish: Finish; cast: [number, number] | null } {
+  dressOf(label: string): { finish: Finish; cast: Cast | null } {
     return { finish: this.finishOf(label), cast: this.cast.get(label) ?? null };
   }
 

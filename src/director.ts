@@ -22,7 +22,7 @@ import type { Footing, Kind } from './settle.js';
 import type { Spoken } from './scene-request.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
 import { TraySystem } from './tray.js';
-import type { Finish } from './tray.js';
+import type { Cast, Finish } from './tray.js';
 import { jpegOf, ViewfinderSystem } from './viewfinder.js';
 
 type Globals = {
@@ -431,7 +431,7 @@ export class DirectorSystem extends createSystem({
       const scale = (finish[3] ?? 0) > 0 ? finish[3]! : (SIZES[finish[1]]?.scale ?? 1);
       if (Math.abs(scale - 1) > 0.01) words.push(`size ${one(scale)}`);
       if (finish[2] > 0 && asset.styles?.[finish[2]]) words.push(`fitting ${asset.styles[finish[2]]}`);
-      if (cast != null) words.push(`pose ${POSES[cast[0]] ?? POSES[0]}, look ${LOOKS[cast[1]]?.name ?? LOOKS[0].name}`);
+      if (cast != null) words.push(`pose ${POSES[cast[0]] ?? POSES[0]}, look ${LOOKS[cast[1]]?.name ?? LOOKS[0].name}, build ${cast[2] === 1 ? 'woman' : 'man'}`);
       lines.push(`- ${words.filter((word) => word !== '').join('; ')}`);
     }
     if (lines.length === 0) lines.push('Nothing is on the set.');
@@ -729,7 +729,7 @@ class PlanBuild {
   }
 
   /** The finish and dress a thing asks for, keeping what it does not mention. */
-  private dressFor(label: string, thing: Thing, tray: TraySystem): { finish: Finish; cast: [number, number] | null } {
+  private dressFor(label: string, thing: Thing, tray: TraySystem): { finish: Finish; cast: Cast | null } {
     const now = tray.dressOf(label);
     const asset = assetByLabel(label);
     const finish: Finish = [...now.finish] as Finish;
@@ -748,12 +748,13 @@ class PlanBuild {
       const style = asset.styles.findIndex((name) => name.toLowerCase() === thing.fitting.toLowerCase());
       if (style >= 0) finish[2] = style;
     }
-    let cast: [number, number] | null = null;
+    let cast: Cast | null = null;
     if (this.entityOf(label)?.getValue(SetPiece, 'role') === SetRole.Actor) {
-      const was = now.cast ?? [0, 0];
+      const was: Cast = now.cast ?? [0, 0, 0];
       const pose = POSES.indexOf(thing.pose as (typeof POSES)[number]);
       const look = LOOKS.findIndex((entry) => entry.name === thing.look);
-      cast = [pose >= 0 ? pose : was[0], look >= 0 ? look : was[1]];
+      const build = thing.build === 'woman' ? 1 : thing.build === 'man' ? 0 : (was[2] ?? 0);
+      cast = [pose >= 0 ? pose : was[0], look >= 0 ? look : was[1], build];
     }
     return { finish, cast };
   }

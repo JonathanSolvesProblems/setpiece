@@ -131,8 +131,17 @@ function propPistol(hand: Vector3, tag: 'L' | 'R'): Mesh {
   return slide;
 }
 
-export function layFigure(name: string, realHeightM: number, stance: Stance = {}): Group {
+/**
+ * A woman's lay figure is made in her proportions, as artists' figures are: shoulders and limbs narrower, a waist,
+ * the hips wider, the head a little smaller. The parts and their names are the same, so poses, looks and the squirm
+ * work on both.
+ */
+const WOMAN = { shoulders: 0.86, waist: 0.84, hips: 1.18, limbs: 0.88, head: 0.94 };
+const MAN = { shoulders: 1, waist: 1, hips: 1, limbs: 1, head: 1 };
+
+export function layFigure(name: string, realHeightM: number, stance: Stance = {}, woman = false): Group {
   const h = realHeightM * SCALE;
+  const build = woman ? WOMAN : MAN;
   const g = new Group();
   g.name = name;
   const base = new Mesh(new CylinderGeometry(0.11 * h, 0.12 * h, 0.004, 20), slateShadow);
@@ -143,19 +152,19 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
   post.name = 'Post';
   post.position.y = hipY / 2;
   const pelvis = ball(new Vector3(0, hipY, 0), 0.1 * h, wood, 'Pelvis');
-  pelvis.scale.set(1.1, 0.8, 0.82);
-  const torso = limb(new Vector3(0, hipY + 0.02 * h, 0), new Vector3(0, 0.78 * h, 0), 0.1 * h, woodLight, 'Torso');
+  pelvis.scale.set(1.1 * build.hips, 0.8, 0.82 * (woman ? 1.08 : 1));
+  const torso = limb(new Vector3(0, hipY + 0.02 * h, 0), new Vector3(0, 0.78 * h, 0), 0.1 * h * build.waist, woodLight, 'Torso');
   const chest = ball(new Vector3(0, 0.76 * h, 0), 0.12 * h, woodLight, 'Chest');
-  chest.scale.set(1.25, 0.7, 0.85);
+  chest.scale.set(1.25 * build.shoulders, 0.7, woman ? 0.98 : 0.85);
   const neck = ball(new Vector3(0, 0.86 * h, 0), 0.04 * h, joint, 'Neck');
-  const head = ball(new Vector3(0, 0.925 * h, 0), 0.075 * h, woodLight, 'Head');
+  const head = ball(new Vector3(0, 0.925 * h, 0), 0.075 * h * build.head, woodLight, 'Head');
   head.scale.set(0.95, 1.1, 1);
   // The chest is carved into the torso: one piece of wood, one coat.
   g.add(base, post, pelvis, absorb(torso, chest), neck, head);
   for (const side of [-1, 1]) {
     const tag = side < 0 ? 'L' : 'R';
     const stepping = stance.step === tag;
-    const hip = new Vector3(side * 0.07 * h, hipY - 0.02 * h, 0);
+    const hip = new Vector3(side * 0.07 * h * build.hips, hipY - 0.02 * h, 0);
     let knee = new Vector3(side * 0.075 * h, stepping ? 0.28 * h : 0.27 * h, stepping ? 0.07 * h : 0.01 * h);
     let ankle = new Vector3(side * 0.075 * h, 0.05 * h, stepping ? 0.09 * h : 0);
     if (stance.running) {
@@ -175,7 +184,7 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
     foot.scale.set(0.8, 0.55, 1.45);
     // A leg swings as one from the hip: thigh and shin are one mesh, knee and foot another.
     g.add(
-      absorb(limb(hip, knee, 0.05 * h, wood, `Leg${tag}Upper`), limb(knee, ankle, 0.042 * h, wood, `Leg${tag}Lower`)),
+      absorb(limb(hip, knee, 0.05 * h * build.limbs, wood, `Leg${tag}Upper`), limb(knee, ankle, 0.042 * h * build.limbs, wood, `Leg${tag}Lower`)),
       absorb(ball(knee, 0.047 * h, joint, `Knee${tag}`), foot),
     );
     const shoulder = new Vector3(side * 0.16 * h, 0.8 * h, 0);
@@ -199,10 +208,14 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       elbow = new Vector3(side * 0.2 * h, 0.66 * h, fore ? 0.1 * h : -0.12 * h);
       wrist = new Vector3(side * 0.16 * h, fore ? 0.74 * h : 0.6 * h, fore ? 0.22 * h : -0.06 * h);
     }
+    // Narrower shoulders carry the arm in with them.
+    shoulder.x *= build.shoulders;
+    elbow.x *= build.shoulders;
+    wrist.x *= build.shoulders;
     // An arm swings as one from the shoulder: both lengths are one mesh, shoulder and elbow another.
     g.add(
       absorb(ball(shoulder, 0.044 * h, joint, `Shoulder${tag}`), ball(elbow, 0.037 * h, joint, `Elbow${tag}`)),
-      absorb(limb(shoulder, elbow, 0.04 * h, wood, `Arm${tag}Upper`), limb(elbow, wrist, 0.035 * h, wood, `Arm${tag}Lower`)),
+      absorb(limb(shoulder, elbow, 0.04 * h * build.limbs, wood, `Arm${tag}Upper`), limb(elbow, wrist, 0.035 * h * build.limbs, wood, `Arm${tag}Lower`)),
       hand(elbow, wrist, h, tag),
     );
     if (stance.aiming === tag) g.add(propPistol(wrist, tag));
@@ -244,6 +257,17 @@ function castFigure(name: string, realHeightM: number, stances: Stance[]): Group
     pose.add(hair);
     pose.visible = i === 0;
     g.add(pose);
+    // The same actor in a woman's build, a little shorter, with her hair to the shoulders: she wears it in every
+    // look, so she reads as a woman from across the table even in bare wood.
+    const hw = h * 0.96;
+    const her = layFigure(`Pose${i}W`, realHeightM * 0.96, stance, true);
+    const cap = ball(new Vector3(0, 0.95 * hw, -0.01 * hw), 0.077 * hw, hairDark, 'HairLong');
+    cap.scale.set(1.04, 0.86, 1.06);
+    const fall = ball(new Vector3(0, 0.875 * hw, -0.04 * hw), 0.07 * hw, hairDark, 'HairLong');
+    fall.scale.set(1.08, 1.25, 0.62);
+    her.add(cap, fall);
+    her.visible = false;
+    g.add(her);
   });
   return g;
 }
