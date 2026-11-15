@@ -284,7 +284,9 @@ export class DirectorSystem extends createSystem({
       build.finish(reader.whole);
       if (!build.begun) {
         if (looking) return 'built';
-        this.status = failed !== '' && /no key|cannot sign in/.test(failed) ? 'off' : this.status;
+        // No key, no sign-in, or the spend limit reached: the library builds from now on (the designer is checked
+        // again now and then, in case the limit was raised).
+        this.status = failed !== '' && /no key|cannot sign in|not taking requests/.test(failed) ? 'off' : this.status;
         this.fallback(said, failed || 'The set designer sent nothing back.');
         return 'library';
       }

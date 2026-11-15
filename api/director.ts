@@ -180,8 +180,13 @@ export async function POST(request: Request): Promise<Response> {
         });
       } catch (error) {
         const status = error instanceof Anthropic.APIError ? error.status : undefined;
-        const message =
-          status === 429 || status === 529
+        // The key's workspace has reached its monthly spend limit (a billing error, or a request refused for usage
+        // limits): the app builds from its own library until the limit resets or is raised.
+        const text = error instanceof Error ? error.message : '';
+        const spent = status === 402 || (status === 400 && /usage limit|spend limit|credit balance/i.test(text));
+        const message = spent
+          ? 'The set designer is not taking requests right now.'
+          : status === 429 || status === 529
             ? 'The set designer is busy. Try again in a moment.'
             : status === 401 || status === 403
               ? 'The set designer cannot sign in.'
