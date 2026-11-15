@@ -47,6 +47,9 @@ const MOST_DROPS = 64;
 /** No word from the designer in this long and the words go to the library's reader instead. */
 const FIRST_WORD_MS = 25000;
 const WHOLE_MS = 90000;
+/** How long an empty table waits before the call sheet says the designer is still thinking, and what it says. */
+const THINKING_NOTE_MS = 3500;
+const THINKING_NOTE = 'DESIGNING THE SET | A busy set takes a few seconds to think through. The pieces land as they are written.';
 const ENDPOINT = '/api/director';
 /** Long enough after the camera stands for the monitor to show what it sees. */
 const LOOK_AFTER_MS = 700;
@@ -241,6 +244,13 @@ export class DirectorSystem extends createSystem({
     let timer = window.setTimeout(() => asking.abort(), FIRST_WORD_MS);
     const whole = window.setTimeout(() => asking.abort(), WHOLE_MS);
     const build = new PlanBuild(this.world, (label) => this.entityOf(label), this.keys, looking);
+    // A busy sentence is thought through before its first piece is written (the night chase: 7 to 9 s from a desktop,
+    // devpost/results/designer-first-request.json), so a table still empty after a few seconds says why.
+    const thinking = looking
+      ? 0
+      : window.setTimeout(() => {
+          if (asking === this.asking && !build.begun) g.coachNote.value = THINKING_NOTE;
+        }, THINKING_NOTE_MS);
     try {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
@@ -328,6 +338,7 @@ export class DirectorSystem extends createSystem({
     } finally {
       window.clearTimeout(timer);
       window.clearTimeout(whole);
+      window.clearTimeout(thinking);
       if (asking === this.asking) {
         this.asking = null;
         g.designing.value = false;
