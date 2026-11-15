@@ -57,7 +57,7 @@ for await (const chunk of response.body) {
 const run = { said: SAID, firstPieceMs, wholeMs: Date.now() - started, stop: end?.stop ?? end?.t, model: end?.model, usage: end?.usage };
 const result = {
   measured: new Date().toISOString().slice(0, 10),
-  what: "The first sentence after over an hour with no requests, sent 20 s after the page's warm request, from a desktop on home broadband. Seconds from the request to the first piece being complete, and to the whole plan. claude-opus-5-5, fast mode, low effort, structured output.",
+  what: "The first sentence after over an hour with no requests, sent 20 s after the page's warm request, from a desktop on home broadband. Seconds from the request to the first piece being complete, and to the whole plan. claude-opus-5-5, fast mode, low effort, structured output" + (process.env.DIRECTOR_HURRY === 'off' ? '.' : ', asked to begin its answer at once (api/director.ts, HURRY).'),
   limit: "One run. The headset's own share is not in this number: its speech recogniser, the Quest's network, and drawing the pieces.",
   warm: { ms: warmMs, cacheWrite: warm.cacheWrite, cacheRead: warm.cacheRead },
   gapMs: GAP_MS,

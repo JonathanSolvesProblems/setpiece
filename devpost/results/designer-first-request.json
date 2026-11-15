@@ -1,24 +1,24 @@
 {
  "measured": "2026-11-15",
- "what": "The first sentence after over an hour with no requests, sent 20 s after the page's warm request, from a desktop on home broadband. Seconds from the request to the first piece being complete, and to the whole plan. claude-opus-5-5, fast mode, low effort, structured output.",
+ "what": "The first sentence after over an hour with no requests, sent 20 s after the page's warm request, from a desktop on home broadband. Seconds from the request to the first piece being complete, and to the whole plan. claude-opus-5-5, fast mode, low effort, structured output, asked to begin its answer at once (api/director.ts, HURRY).",
  "limit": "One run. The headset's own share is not in this number: its speech recogniser, the Quest's network, and drawing the pieces.",
  "warm": {
-  "ms": 1628,
+  "ms": 2039,
   "cacheWrite": 6769,
   "cacheRead": 0
  },
  "gapMs": 20000,
  "run": {
   "said": "a night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop",
-  "firstPieceMs": 8935,
-  "wholeMs": 10441,
+  "firstPieceMs": 1042,
+  "wholeMs": 2684,
   "stop": "end_turn",
   "model": "claude-opus-5-5",
   "usage": {
-   "input": 68,
+   "input": 89,
    "cacheRead": 6769,
    "cacheWrite": 0,
-   "output": 2350
+   "output": 777
   }
  }
 }
