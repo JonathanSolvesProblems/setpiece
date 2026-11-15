@@ -18,7 +18,7 @@ import { withGrain } from './wood-grain.js';
 
 export type MadeDef = { id: string; name: string; parts: string[] };
 type Saved = { defs: MadeDef[]; slots: Record<string, string> };
-type Globals = { setReady: Signal<boolean>; trayOn: Signal<string[]> };
+type Globals = { setReady: Signal<boolean>; trayOn: Signal<string[]>; startOver: Signal<number> };
 
 /** The most made pieces kept between visits: every one in a place, and the latest of the rest. */
 const KEEP = 48;
@@ -38,6 +38,16 @@ export class MadeSystem extends createSystem({
   private made = 0;
 
   init(): void {
+    const g = this.globals as Globals;
+    let started = g.startOver.peek();
+    this.cleanupFuncs.push(
+      // Start over: the made pieces kept off the set are let go, so the designer is no longer told of them.
+      g.startOver.subscribe((n) => {
+        if (n <= started) return;
+        started = n;
+        this.forgetOffSet();
+      }),
+    );
     const viewfinder = this.world.getSystem(ViewfinderSystem);
     if (viewfinder != null) {
       viewfinder.madeState = {
@@ -182,6 +192,15 @@ export class MadeSystem extends createSystem({
     this.world.getSystem(ViewfinderSystem)?.refresh();
     this.forgetUnused();
     if (keep) this.save();
+  }
+
+  /** Every made piece not standing on the set, forgotten (Start over). */
+  private forgetOffSet(): void {
+    const on = (this.globals as Globals).trayOn.peek();
+    const standing = new Set<string>();
+    for (const [label, id] of this.slots) if (on.includes(label)) standing.add(id);
+    for (const id of [...this.defs.keys()]) if (!standing.has(id)) this.defs.delete(id);
+    this.save();
   }
 
   /** Shapes no place holds are let go once there are many of them; their parts are kept, to be built again. */
