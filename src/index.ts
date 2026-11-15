@@ -14,6 +14,7 @@ import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SetLightSystem } from './set-light.js';
+import { EffectSoundSystem } from './effect-sound.js';
 import { SlateSystem } from './slate.js';
 import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
 import { LifeSizeSystem } from './life-size.js';
@@ -142,6 +143,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     .registerSystem(ViewfinderSystem, { priority: 20 })
     .registerSystem(MadeSystem, { priority: 21 })
     .registerSystem(DirectorSystem, { priority: 22 })
+    .registerSystem(EffectSoundSystem, { priority: 23 })
     .registerSystem(SetLightSystem, { priority: 24 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })

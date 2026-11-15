@@ -23,7 +23,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` opens a managed browser with the Immersive Web SDK emulator. `npm run typecheck` checks types. `npm run build` writes `dist/` for any static host. `node tools/make-audio.mjs` regenerates the four sounds.
+`npm run dev` opens a managed browser with the Immersive Web SDK emulator. `npm run typecheck` checks types. `npm run build` writes `dist/` for any static host. `node tools/make-audio.mjs` regenerates the nine sounds.
 
 To check it yourself: `node tools/check-live.mjs` asserts thirty-odd things about the live site and writes what it found to `devpost/checks/last-run.md`. `npm run check:claims` fails when this README or the submission text disagrees with the code or the measurements. Every number in this file traces to `devpost/sources.md`.
 
@@ -100,7 +100,7 @@ Checked only in the IWSDK emulator so far, each step by state: the set following
 
 ## Type, art and sound
 
-Big Shoulders Stencil by Patric King and Schibsted Grotesk by Schibsted, both under the SIL Open Font License (`public/ui/fonts/OFL.txt`). The chalk drawings were generated on my own machine from a written art direction and keyed by hand; the mark, the wordmark and every number were set, not generated. The four sounds (the clap, a piece lifted, a piece set down, the slate landing) are synthesised by `tools/make-audio.mjs` from sine partials and filtered noise; nothing is sampled.
+Big Shoulders Stencil by Patric King and Schibsted Grotesk by Schibsted, both under the SIL Open Font License (`public/ui/fonts/OFL.txt`). The chalk drawings were generated on my own machine from a written art direction and keyed by hand; the mark, the wordmark and every number were set, not generated. The nine sounds (the clap, a piece lifted, a piece set down, the slate landing, the rush of air as the set grows around you, and the loops that rain, fire, wind and water play from where they stand on the set) are synthesised by `tools/make-audio.mjs` from sine partials and filtered noise; nothing is sampled.
 
 ## Licence
 

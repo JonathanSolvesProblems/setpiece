@@ -61,6 +61,8 @@ export class LifeSizeSystem extends createSystem({
   private savedQuaternion = new Quaternion();
   private hidden: Object3D[] = [];
   /** Where the growing set ends up, in its parent's space, and how far along it is (below 0 when not growing). */
+  /** The rush of air as the set grows around the wearer: made on the first frame, so it has loaded by the first step inside. */
+  private arrive: Entity | null = null;
   private growTo = new Vector3();
   private growTurn = new Quaternion();
   private growT = -1;
@@ -101,6 +103,12 @@ export class LifeSizeSystem extends createSystem({
    * takes them: the set slides so that spot is under their feet. A hand at the panel is the panel's.
    */
   update(delta: number): void {
+    if (this.arrive == null) {
+      const holder = new Object3D();
+      holder.name = 'ArriveSound';
+      this.arrive = this.world.createTransformEntity(holder);
+      this.arrive.addComponent(AudioSource, { src: './audio/arrive.wav', volume: 0.55, positional: false });
+    }
     if (this.growT >= 0) this.grow(delta);
     const g = this.globals as Globals;
     const object = this.stage()?.object3D;
@@ -112,6 +120,13 @@ export class LifeSizeSystem extends createSystem({
       return;
     }
     const mark = this.ensureMark(object);
+    // While the set is still growing around the wearer there is nowhere to walk to yet.
+    if (this.growT >= 0) {
+      mark.visible = false;
+      this.aimed = null;
+      this.armed = null;
+      return;
+    }
     object.getWorldPosition(this.floor);
     const controls = this.world.getSystem(ControlsSystem);
     this.player.head.getWorldPosition(this.head);
@@ -196,6 +211,9 @@ export class LifeSizeSystem extends createSystem({
     if (!g.lifeSize.peek()) this.enter(false);
     const object = this.stage()?.object3D;
     if (object == null || !g.lifeSize.peek()) return '';
+    // Asked for while the set is still growing: it is full size at once, and the walk below is not undone by the growth.
+    this.growT = -1;
+    object.scale.setScalar(LIFE_SCALE);
     // A step in front of it, facing it: its own reach and half a metre more, in slate metres.
     const reach = (assetByLabel(label)?.grab?.[0] ?? 0.08) * target.scale.x + 0.05;
     this.toward.set(0, 0, 1).applyQuaternion(target.quaternion);
@@ -298,6 +316,7 @@ export class LifeSizeSystem extends createSystem({
       object.quaternion.copy(this.savedQuaternion);
       object.scale.setScalar(1);
       this.growT = 0;
+      if (this.arrive != null) AudioUtils.play(this.arrive);
     }
 
     this.hidden.length = 0;
