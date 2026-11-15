@@ -44,21 +44,22 @@ export function truckShell(g: Group, paint: MeshStandardMaterial, glass: MeshSta
     g.add(handle);
     // Mirrors hang from arms off the A pillars.
     g.add(bar(skinAt(cab, 0.292, 0.238, side), new Vector3(side * 0.127, 0.238, 0.292), 0.0012, rubber, 'MirrorArm'));
-    const mirror = named(new Mesh(new SphereGeometry(1, 6, 4), paint), 'BodyMirror');
+    const mirror = named(new Mesh(new SphereGeometry(1, 12, 8), paint), 'BodyMirror');
     mirror.scale.set(0.004, 0.018, 0.009);
     mirror.position.set(side * 0.128, 0.224, 0.292);
-    const head = named(new Mesh(new SphereGeometry(1, 8, 6), lens), 'Headlamp');
-    head.scale.set(0.02, 0.011, 0.008);
-    head.position.set(side * 0.072, 0.085, 0.3165);
-    const rear = named(new Mesh(new SphereGeometry(1, 8, 6), tail), 'TailLamp');
-    rear.scale.set(0.014, 0.01, 0.005);
-    rear.position.set(side * 0.085, 0.072, -0.2985);
+    // A rectangular headlamp in a steel bezel, and a rectangular tail lamp: a truck's lamps are boxes, not blobs.
+    const head = named(new Mesh(bevelBox(0.034, 0.016, 0.004, 0.0015), lens), 'Headlamp');
+    head.position.set(side * 0.072, 0.085, 0.3185);
+    const bezel = named(new Mesh(bevelBox(0.039, 0.021, 0.004, 0.0015), steel), 'HeadlampBezel');
+    bezel.position.set(side * 0.072, 0.085, 0.317);
+    const rear = named(new Mesh(bevelBox(0.026, 0.016, 0.004, 0.0012), tail), 'TailLamp');
+    rear.position.set(side * 0.085, 0.072, -0.2995);
     // A chassis rail, and a mudguard over the rear wheels under the load.
     const rail = named(new Mesh(bevelBox(0.012, 0.032, 0.5, 0.002), steel), 'ChassisRail');
     rail.position.set(side * 0.055, 0.078, -0.045);
     const guard = named(new Mesh(bevelBox(0.044, 0.008, 0.21, 0.002), rubber), 'Mudguard');
     guard.position.set(side * 0.09, 0.093, -0.195);
-    g.add(mirror, head, rear, rail, guard);
+    g.add(mirror, head, bezel, rear, rail, guard);
     archedWheel(g, { side, z: FRONT_AXLE, radius: WHEEL_RADIUS, tyreWidth: 0.03, wheelX: 0.09, wellRadius: 0.056, wellX: 0.108, lipX: 0.1135, tag: side < 0 ? 'FL' : 'FR', halfWell: true }, paint, rubber);
     for (const z of REAR_AXLES) plainWheel(g, side, z, WHEEL_RADIUS, 0.04, 0.088, rubber, `R${side < 0 ? 'L' : 'R'}`);
   }
@@ -80,6 +81,12 @@ export function truckShell(g: Group, paint: MeshStandardMaterial, glass: MeshSta
   const back = named(new Mesh(bevelBox(0.2, 0.014, 0.012, 0.003), rubber), 'BumperRear');
   back.position.set(0, 0.05, -0.298);
   g.add(grille, front, back);
+  // Steel slats across the grille, so the front of the cab reads as a truck's face.
+  for (const dy of [-0.015, -0.005, 0.005, 0.015]) {
+    const slat = named(new Mesh(bevelBox(0.146, 0.004, 0.004, 0.001), steel), 'GrilleSlat');
+    slat.position.set(0, 0.125 + dy, 0.3205);
+    g.add(slat);
+  }
   mergeByMaterial(
     g,
     new Map<Material, string>([
