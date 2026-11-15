@@ -19,6 +19,8 @@ const ENDPOINT = '/api/director';
 const BOARD_SLOTS = 6;
 /** Seconds the camera is given to stand and the monitor to show the shot before it is snapped. */
 const SETTLE = 1.8;
+/** Seconds the camera takes to glide to each shot's mark on the table, inside SETTLE. */
+const GLIDE = 0.9;
 /** Seconds the frame is left to be seen before the next shot. */
 const HOLD = 1.4;
 /** Seconds each shot is stood in, stepped inside, before the cut to the next. */
@@ -132,8 +134,9 @@ export class CoverageSystem extends createSystem({
         if (!life && g.shotFrames.peek().length >= BOARD_SLOTS) break;
         const { title, says, camera } = shots[shot];
         g.coachNote.value = `SHOT ${shot + 1} OF ${shots.length}: ${title.toUpperCase()} | ${says}`;
-        // A camera that could not move is no new shot: nothing is snapped for it.
-        if (!director.frameShot(camera)) continue;
+        // A camera that could not move is no new shot: nothing is snapped for it. On the table it glides to its
+        // mark and the monitor plays the move; inside, the wearer is cut to it.
+        if (!director.frameShot(camera, life ? 0 : GLIDE)) continue;
         if (life) {
           this.world.getSystem(LifeSizeSystem)?.cutToCamera();
           if (!(await this.wait(INSIDE_HOLD))) break;

@@ -160,6 +160,9 @@ const FALL = 5;
 const FALL_FROM = 0.015;
 /** A flyer let go closer than this above what is under it lands on it (30 cm at 1:10); higher, it stays in the air. */
 const LAND_FROM = 0.03;
+/** A camera moved less than this (slate metres) just stands there; the most a glide rises in the middle. */
+const GLIDE_LEAST = 0.005;
+const GLIDE_RISE = 0.05;
 /** Let go this far below the top of something, a piece goes beside or inside it, not onto it. */
 const STACK_SLACK = 0.03;
 const NO_RAYCAST = (): void => {};
@@ -191,6 +194,7 @@ type Globals = {
   trayOn: Signal<string[]>;
   layoutChanged: Signal<number>;
   sizedByHand: Signal<{ label: string; scale: number } | null>;
+  lifeSize: Signal<boolean>;
 };
 /**
  * A second hand closing on a held piece sizes it: how near that hand must be, and how small and big
@@ -268,6 +272,16 @@ export class PiecesSystem extends createSystem({
   private guard = 0;
   /** Whether the call sheet has said once this visit that a flyer stays where it is let go. */
   private toldFlies = false;
+  /** A camera gliding to its new mark (coverage on the table), from where it stood to where it goes. */
+  private gliding: Entity | null = null;
+  private glideFrom = new Vector3();
+  private glideTo = new Vector3();
+  private glideFromYaw = 0;
+  private glideToYaw = 0;
+  private glideFromTilt = 0;
+  private glideToTilt = 0;
+  private glideTime = 0;
+  private glideSeconds = 0;
   private grab: GrabSystem | undefined;
   private volumeMaterial = new MeshBasicMaterial({ visible: false, side: DoubleSide });
   private ringMaterial = new MeshBasicMaterial({ color: OPTIC_YELLOW, toneMapped: false });
@@ -379,6 +393,7 @@ export class PiecesSystem extends createSystem({
         this.legsToRestore = 0;
       }
     }
+    if (this.gliding != null) this.glideCamera(delta);
     this.reachWith('left', delta);
     this.reachWith('right', delta);
     this.followHands(delta, time);
@@ -1261,7 +1276,7 @@ export class PiecesSystem extends createSystem({
    * slate metres, then turned and tilted to look at a piece (by label) or, with no label, at a point on the
    * slate. A lens higher than the legs reach flies the camera. Returns false when a hand has it or a take runs.
    */
-  placeCamera(x: number, z: number, lensHeight: number, label: string, point: Vector3 | null): boolean {
+  placeCamera(x: number, z: number, lensHeight: number, label: string, point: Vector3 | null, glide = 0): boolean {
     const viewfinder = this.world.getSystem(ViewfinderSystem);
     const cam = viewfinder?.liveCamera();
     const rig = cam?.object3D;
@@ -1269,6 +1284,10 @@ export class PiecesSystem extends createSystem({
     if (viewfinder == null || cam == null || rig == null || stage == null) return false;
     const g = this.globals as Globals;
     if (cam.hasComponent(Held) || g.takeState.peek() !== 'idle') return false;
+    // Where it stands now, mid-glide or not: a glide starts from here.
+    this.glideFrom.copy(rig.position);
+    const fromYaw = rig.rotation.y;
+    const fromTilt = (cam.getValue(ShotCamera, 'tilt') as number | undefined) ?? 0;
     const first = this.key(cam) === FIRST_CAMERA;
     // What it looks at, on the slate: a piece's eyes if it has them, else the middle of its shape.
     let target: Entity | null = null;
@@ -1311,12 +1330,61 @@ export class PiecesSystem extends createSystem({
     const pivot = rig.position.y + HEAD_PIVOT * (first ? viewfinder.legs() : 1);
     const far = Math.hypot(run, this.point.y - pivot);
     const tilt = Math.atan2(this.point.y - pivot, run) - (far > LENS_ABOVE_PIVOT ? Math.asin(LENS_ABOVE_PIVOT / far) : 0);
-    cam.setValue(ShotCamera, 'tilt', Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, tilt)));
+    const toTilt = Math.max(-CAMERA_TILT_LIMIT, Math.min(CAMERA_TILT_LIMIT, tilt));
     cam.setValue(ShotCamera, 'aimed', true);
+    // Asked to glide (coverage on the table): the camera travels there as a grip would carry it, and the monitor
+    // plays the move. The pose is put back to where it was, and update() carries it over.
+    if (glide > 0 && this.glideFrom.distanceTo(rig.position) > GLIDE_LEAST) {
+      this.glideTo.copy(rig.position);
+      this.glideToYaw = rig.rotation.y;
+      this.glideToTilt = toTilt;
+      this.glideFromYaw = fromYaw;
+      this.glideFromTilt = fromTilt;
+      rig.position.copy(this.glideFrom);
+      rig.rotation.y = fromYaw;
+      cam.setValue(ShotCamera, 'tilt', fromTilt);
+      this.gliding = cam;
+      this.glideTime = 0;
+      this.glideSeconds = glide;
+      viewfinder.refresh();
+      return true;
+    }
+    this.gliding = null;
+    cam.setValue(ShotCamera, 'tilt', toTilt);
     viewfinder.refresh();
     this.knock(Cue.Place, cam);
     this.save();
     return true;
+  }
+
+  /**
+   * One frame of a camera's glide to its new mark: eased in and out, rising a little in the middle as a crane would,
+   * so it does not drive through a piece on the way. A hand on it, a take, or stepping inside ends it where it is.
+   */
+  private glideCamera(delta: number): void {
+    const cam = this.gliding!;
+    const rig = cam.object3D;
+    const g = this.globals as Globals;
+    if (rig == null || cam.hasComponent(Held) || g.takeState.peek() !== 'idle') {
+      this.gliding = null;
+      this.save();
+      return;
+    }
+    this.glideTime += delta;
+    const done = this.glideTime >= this.glideSeconds || g.lifeSize.peek();
+    const u = done ? 1 : this.glideTime / this.glideSeconds;
+    const k = u * u * (3 - 2 * u);
+    const reach = this.glideFrom.distanceTo(this.glideTo);
+    rig.position.lerpVectors(this.glideFrom, this.glideTo, k);
+    rig.position.y += Math.sin(Math.PI * u) * Math.min(GLIDE_RISE, reach * 0.25);
+    const turn = Math.atan2(Math.sin(this.glideToYaw - this.glideFromYaw), Math.cos(this.glideToYaw - this.glideFromYaw));
+    rig.rotation.y = this.glideFromYaw + turn * k;
+    cam.setValue(ShotCamera, 'tilt', this.glideFromTilt + (this.glideToTilt - this.glideFromTilt) * k);
+    this.world.getSystem(ViewfinderSystem)?.refresh();
+    if (!done) return;
+    this.gliding = null;
+    this.knock(Cue.Place, cam);
+    this.save();
   }
 
   /**
