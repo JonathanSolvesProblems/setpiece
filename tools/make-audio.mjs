@@ -16,6 +16,8 @@
  * wind    a slow, swelling low wind, looped (smoke, fog, dust, snow)
  * water   a burble with bubbles, looped
  * arrive  a rising whoosh as the set grows around the wearer
+ *
+ * listen-on, listen-off   two soft notes rising as the microphone opens, falling as it closes
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -209,3 +211,11 @@ const LOOP = 4.5;
   const swell = renderAt(seconds, (t) => Math.sin(2 * Math.PI * (55 + 40 * t) * t) * Math.sin((Math.PI * t) / seconds) * 0.5);
   write('arrive', normalise(mix(swept, swell), 0.7), LOOP_RATE);
 }
+
+// The microphone: two soft notes, rising as it opens, falling as it closes.
+function notes(first, second) {
+  const tone = (hz, at) => render(0.24, (t) => (t < at ? 0 : Math.sin(2 * Math.PI * hz * (t - at)) * Math.exp(-(t - at) / 0.05)));
+  return normalise(mix(tone(first, 0), tone(second, 0.085)), 0.35);
+}
+write('listen-on', notes(880, 1320));
+write('listen-off', notes(1320, 880));

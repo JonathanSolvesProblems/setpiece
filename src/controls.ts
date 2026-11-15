@@ -1,4 +1,6 @@
 import {
+  AudioSource,
+  AudioUtils,
   createSystem,
   Entity,
   Object3D,
@@ -687,6 +689,9 @@ export class ControlsSystem extends createSystem({
       g.talkOffered.value = true;
       let voice: Voice | null = null;
       let busy = false;
+      let cueOn: Entity | null = null;
+      let cueOff: Entity | null = null;
+      let heardOpen = false;
       const tell = (text: string, holdMs = 0, hint = false): void => says('', text, holdMs, hint);
       const WORDS: Record<VoiceState, string> = {
         idle: 'Talk',
@@ -733,9 +738,23 @@ export class ControlsSystem extends createSystem({
           return;
         }
         saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), squirm: g.squirmOn.peek(), voice: true });
+        // Two soft notes as the microphone opens and closes, so the wearer hears that it is listening.
+        if (cueOn == null) {
+          for (const [name, src] of [['ListenOn', './audio/listen-on.wav'], ['ListenOff', './audio/listen-off.wav']] as const) {
+            const holder = new Object3D();
+            holder.name = name;
+            const entity = this.world.createTransformEntity(holder);
+            entity.addComponent(AudioSource, { src, volume: 0.5, positional: false });
+            if (name === 'ListenOn') cueOn = entity;
+            else cueOff = entity;
+          }
+        }
         voice ??= new Voice({
           words: wordsToHear(),
           onState: (state, detail) => {
+            if (state === 'listening' && !heardOpen && cueOn != null) AudioUtils.play(cueOn);
+            if (state !== 'listening' && heardOpen && cueOff != null) AudioUtils.play(cueOff);
+            heardOpen = state === 'listening';
             busy = state === 'loading' || state === 'listening' || state === 'thinking';
             voiceButton.setProperties({
               text: state === 'idle' && g.designing.peek() ? 'Designing' : WORDS[state],

@@ -1354,7 +1354,10 @@ export class ViewfinderSystem extends createSystem({
     }
     if (this.snapPending) {
       this.snapPending = false;
-      void this.captureFrame(cam);
+      // A picture that could not be read (the graphics were lost and are coming back) is no frame: say so.
+      this.captureFrame(cam).catch(() => {
+        (this.globals as Globals).coachNote.value = 'NO FRAME THAT TIME | The picture could not be read. Snap again.';
+      });
     }
   }
 
