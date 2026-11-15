@@ -302,6 +302,11 @@ export class PiecesSystem extends createSystem({
   /** How far each piece reaches from its own origin, by index: a quick way to rule a hand out. */
   private spans: number[] = [];
   private readings: Record<Side, HandReading> = { left: new HandReading(), right: new HandReading() };
+
+  /** What one tracked hand is doing now (src/set-finder.ts hears a clap from the two). */
+  hand(side: Side): HandReading {
+    return this.readings[side];
+  }
   private carrying: Record<Side, Carry | null> = { left: null, right: null };
   private stretch: Stretch | null = null;
   private panelRay = new Raycaster();
