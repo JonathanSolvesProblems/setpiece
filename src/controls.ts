@@ -561,14 +561,20 @@ export class ControlsSystem extends createSystem({
     // Once a set stands it becomes Shoot coverage: the designer plans the shots and the app shoots them onto the board.
     // While it shoots, Stop coverage, whichever tab is open and at full size too.
     const setStands = (): boolean => g.setsBuilt.peek() > 0 && g.trayOn.peek().length > 0;
+    // In the headset with the board full, it is the way to the page, where the board and the take are saved.
+    const boardFull = (): boolean => g.shotFrames.peek().length >= BOARD_SLOTS && this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
     const showTry = (): void => {
       const covering = g.coverageRunning.peek();
-      const text = covering ? 'Stop coverage' : setStands() ? 'Shoot coverage' : `Try a shot: ${tries[tryNext][0]}`;
+      const text = covering ? 'Stop coverage' : boardFull() ? 'Save the board' : setStands() ? 'Shoot coverage' : `Try a shot: ${tries[tryNext][0]}`;
       panel.getElementById<UIKit.Text>('btn-try')?.setProperties({ text, display: covering || (!more && !g.lifeSize.peek()) ? 'flex' : 'none' });
     };
     wire('btn-try', () => {
       if (g.coverageRunning.peek()) {
         g.coverageStopRequested.value = g.coverageStopRequested.peek() + 1;
+        return;
+      }
+      if (boardFull()) {
+        this.world.exitXR();
         return;
       }
       if (setStands()) {
@@ -650,6 +656,8 @@ export class ControlsSystem extends createSystem({
         showTry();
       }),
       g.coverageRunning.subscribe(() => showTry()),
+      g.shotFrames.subscribe(() => showTry()),
+      this.world.visibilityState.subscribe(() => showTry()),
       g.setsBuilt.subscribe(() => showTry()),
       g.trayOn.subscribe(() => {
         showTry();
