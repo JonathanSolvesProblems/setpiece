@@ -339,6 +339,8 @@ export class LifeSizeSystem extends createSystem({
   private leave(restorePose = true): void {
     const g = this.globals as Globals;
     this.growT = -1;
+    // Stepping out mid-growth, or the session ending, takes the rush of air with it.
+    if (this.arrive != null) AudioUtils.stop(this.arrive);
     const object = this.stage()?.object3D;
     if (object == null) return;
     object.scale.setScalar(1);

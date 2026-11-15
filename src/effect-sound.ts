@@ -5,7 +5,7 @@
  * size around the wearer). The sounds are made by tools/make-audio.mjs, so nothing is sampled or licensed.
  */
 import { AudioSource, AudioUtils, createSystem } from '@iwsdk/core';
-import type { Entity } from '@iwsdk/core';
+import type { Entity, Object3D } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { SetPiece } from './set-components.js';
 
@@ -35,8 +35,12 @@ export class EffectSoundSystem extends createSystem({
 }) {
   /** The effect pieces sounding now. */
   private sounding = new Set<Entity>();
-  /** What is on the set changed: the sounds are put right on the next frame. */
+  /** What is on the set changed, or a sound is still loading: the sounds are put right on the next frame. */
   private dirty = true;
+  private stage: Object3D | null = null;
+  /** The stage's shown and size as last seen: a change of either puts the sounds right. */
+  private stageShown = false;
+  private stageScale = 1;
 
   init(): void {
     this.cleanupFuncs.push(
@@ -47,6 +51,18 @@ export class EffectSoundSystem extends createSystem({
   }
 
   update(): void {
+    this.stage ??= this.scene.getObjectByName('Stage') ?? null;
+    const shown = this.stage?.visible === true;
+    const scale = this.stage?.scale.x ?? 1;
+    if (shown !== this.stageShown) {
+      this.stageShown = shown;
+      this.dirty = true;
+    }
+    // At full size the set is ten times farther away: a sound's reach grows with it, or it falls to a tenth.
+    if (scale !== this.stageScale) {
+      this.stageScale = scale;
+      for (const piece of this.sounding) piece.setValue(AudioSource, 'refDistance', REACH * scale);
+    }
     if (!this.dirty) return;
     this.dirty = false;
     const on = (this.globals as Globals).trayOn.peek();
@@ -54,7 +70,8 @@ export class EffectSoundSystem extends createSystem({
       const label = String(piece.getValue(SetPiece, 'label'));
       const sound = SOUNDS[label];
       if (sound == null) continue;
-      const wanted = on.includes(label) && piece.object3D?.visible === true;
+      // On the set, and the set shown: not while it is put away to be landed.
+      const wanted = shown && on.includes(label) && piece.object3D?.visible === true;
       if (wanted && !this.sounding.has(piece)) {
         if (!piece.hasComponent(AudioSource)) {
           piece.addComponent(AudioSource, {
@@ -62,11 +79,17 @@ export class EffectSoundSystem extends createSystem({
             volume: sound.volume,
             loop: true,
             positional: true,
-            refDistance: REACH,
+            refDistance: REACH * scale,
             rolloffFactor: 1.2,
             maxInstances: 1,
           });
         }
+        // Asked to play only once it has loaded: a piece taken off while its sound loads must not start it later.
+        if (piece.getValue(AudioSource, '_loaded') !== true) {
+          this.dirty = true;
+          continue;
+        }
+        piece.setValue(AudioSource, 'refDistance', REACH * scale);
         AudioUtils.play(piece, FADE);
         this.sounding.add(piece);
       } else if (!wanted && this.sounding.has(piece)) {

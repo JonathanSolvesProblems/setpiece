@@ -150,7 +150,8 @@ function loopify(samples, fadeSeconds) {
   const fade = Math.round(fadeSeconds * LOOP_RATE);
   const n = samples.length - fade;
   const out = samples.slice(0, n);
-  for (let i = 0; i < fade; i++) out[i] = samples[i] * (i / fade) + samples[n + i] * (1 - i / fade);
+  // Equal power: the two noises are unrelated, so straight gains would dip by 3 dB at every seam.
+  for (let i = 0; i < fade; i++) out[i] = samples[i] * Math.sqrt(i / fade) + samples[n + i] * Math.sqrt(1 - i / fade);
   return out;
 }
 /** Short bursts at random moments: each a decaying click made by the given shaper. */
