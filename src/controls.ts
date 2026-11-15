@@ -103,6 +103,11 @@ const PLACED_STATUSES = new Set<string>([
 ]);
 
 type Globals = {
+  /** Sets built from words, and whether the designer's coverage is being shot (src/coverage.ts). */
+  setsBuilt: Signal<number>;
+  coverageRunning: Signal<boolean>;
+  coverageRequested: Signal<number>;
+  coverageStopRequested: Signal<number>;
   lensMm: Signal<number>;
   snapRequested: Signal<number>;
   eyelineText: Signal<string[]>;
@@ -551,10 +556,23 @@ export class ControlsSystem extends createSystem({
       ['diner argument', 'Two people arguing in a diner booth'],
     ] as const;
     let tryNext = 0;
+    // Once a set stands it becomes Shoot coverage: the designer plans the shots and the app shoots them onto the board.
+    // While it shoots, Stop coverage, whichever tab is open and at full size too.
+    const setStands = (): boolean => g.setsBuilt.peek() > 0 && g.trayOn.peek().length > 0;
     const showTry = (): void => {
-      panel.getElementById<UIKit.Text>('btn-try')?.setProperties({ text: `Try a shot: ${tries[tryNext][0]}`, display: more || g.lifeSize.peek() ? 'none' : 'flex' });
+      const covering = g.coverageRunning.peek();
+      const text = covering ? 'Stop coverage' : setStands() ? 'Shoot coverage' : `Try a shot: ${tries[tryNext][0]}`;
+      panel.getElementById<UIKit.Text>('btn-try')?.setProperties({ text, display: covering || (!more && !g.lifeSize.peek()) ? 'flex' : 'none' });
     };
     wire('btn-try', () => {
+      if (g.coverageRunning.peek()) {
+        g.coverageStopRequested.value = g.coverageStopRequested.peek() + 1;
+        return;
+      }
+      if (setStands()) {
+        g.coverageRequested.value = g.coverageRequested.peek() + 1;
+        return;
+      }
       const sentence = tries[tryNext][1];
       tryNext = (tryNext + 1) % tries.length;
       showTry();
@@ -627,6 +645,11 @@ export class ControlsSystem extends createSystem({
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
         panel.getElementById('btn-back')?.setProperties({ display: on ? 'flex' : 'none' });
         panel.getElementById('btn-reset-stage')?.setProperties({ display: on ? 'none' : 'flex' });
+        showTry();
+      }),
+      g.coverageRunning.subscribe(() => showTry()),
+      g.setsBuilt.subscribe(() => showTry()),
+      g.trayOn.subscribe(() => {
         showTry();
       }),
     );

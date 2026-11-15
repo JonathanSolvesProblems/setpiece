@@ -237,6 +237,13 @@ export class LifeSizeSystem extends createSystem({
     return `BY THE ${assetTitle(label).toUpperCase()} | Look around. Say take me to another piece, or step out.`;
   }
 
+  /** At full size, a cut: the wearer stands at the live camera where it now stands (coverage moves it shot by shot). */
+  cutToCamera(): void {
+    if (!(this.globals as Globals).lifeSize.peek()) return;
+    this.leave();
+    this.enter(false);
+  }
+
   /** Back to the table, by word. */
   out(): string {
     const g = this.globals as Globals;

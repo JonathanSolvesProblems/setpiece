@@ -12,6 +12,7 @@ import type { World } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { CAMERAS, LENSES, Rig } from './camera-formats.js';
 import { assetTitle, isMade, PAINTS } from './catalog.js';
+import { CoverageSystem } from './coverage.js';
 import { DirectorSystem } from './director.js';
 import { LifeSizeSystem } from './life-size.js';
 import { PiecesSystem } from './pieces.js';
@@ -112,6 +113,8 @@ function obey(world: World, g: Globals, command: Command): string {
     }
     case 'go':
       return world.getSystem(LifeSizeSystem)?.goTo(command.labels[0]) ?? '';
+    case 'cover':
+      return world.getSystem(CoverageSystem)?.cover() ?? '';
     case 'snap':
       if (g.lifeSize.peek()) return 'BACK TO THE TABLE FIRST | A frame is snapped from the table. Say it again there.';
       bump(g.snapRequested);
@@ -132,7 +135,13 @@ function obey(world: World, g: Globals, command: Command): string {
       return g.takeState.peek() === TakeState.Recording
         ? 'RECORDING | Carry a piece along its path. Say stop to end the take.'
         : 'NOT RECORDING | There is nothing on the set to record.';
-    case 'stop':
+    case 'stop': {
+      // Coverage being shot is what a stop stops first.
+      const coverage = world.getSystem(CoverageSystem);
+      if (coverage?.running()) {
+        coverage.stop();
+        return '';
+      }
       if (g.takeState.peek() === TakeState.Recording) {
         bump(g.recordRequested);
         // A pass in which nothing was carried is no take, and the recorder says so itself.
@@ -143,6 +152,7 @@ function obey(world: World, g: Globals, command: Command): string {
         return 'STOPPED | Say play to see the take again.';
       }
       return 'NOTHING IS RUNNING | Say record to start a take.';
+    }
     case 'play':
       if (g.takeState.peek() === TakeState.Recording) return 'STILL RECORDING | Say stop first.';
       if (g.takeState.peek() === TakeState.Playing) return 'ALREADY PLAYING | Say stop to hold it.';

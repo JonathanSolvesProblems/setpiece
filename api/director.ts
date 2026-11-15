@@ -7,6 +7,7 @@
  * {"t":"end",...} closes it with how it went; {"t":"error","m":"..."} says why there is no plan.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { COVERAGE_ASK, COVERAGE_SCHEMA } from '../src/coverage-plan.js';
 import { PLAN_SCHEMA } from '../src/director-plan.js';
 import { directorSystem } from '../src/director-prompt.js';
 
@@ -79,7 +80,7 @@ const subjectLine = (subject: unknown): string =>
 const refuse = (status: number, message: string): Response =>
   new Response(JSON.stringify({ t: 'error', m: message }) + '\n', { status, headers: { 'content-type': 'application/x-ndjson' } });
 
-type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown };
+type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown; coverage?: unknown };
 
 /** What the designer is asked: the set as it stands, then the words, with the recogniser's other guesses. */
 function question(asked: Asked): string | null {
@@ -133,9 +134,15 @@ export async function POST(request: Request): Promise<Response> {
   if (text == null) return refuse(400, 'Nothing was said.');
   // Shown the camera's picture, the designer looks through the lens and keeps or fixes the frame.
   const image = typeof asked.image === 'string' && asked.image.length <= LARGEST_IMAGE && /^[A-Za-z0-9+/=]+$/.test(asked.image) ? asked.image : null;
+  // Asked for coverage: the shots to cover the set as it stands, not a change to it (src/coverage-plan.ts).
+  const coverage = asked.coverage === true && image == null;
   const content: Anthropic.Beta.BetaContentBlockParam[] | string =
     image == null
-      ? text
+      ? coverage
+        ? `${text}
+
+${COVERAGE_ASK}`
+        : text
       : [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
           { type: 'text', text: `${text}\n\n${frame(asked.report)}${subjectLine(asked.subject)}${LOOK}` },
@@ -158,7 +165,7 @@ export async function POST(request: Request): Promise<Response> {
           fallbacks: 'default',
           system: [{ type: 'text', text: directorSystem(), cache_control: { type: 'ephemeral', ttl: '1h' } }],
           messages: [{ role: 'user', content }],
-          output_config: { effort: EFFORT, format: { type: 'json_schema', schema: PLAN_SCHEMA as unknown as Record<string, unknown> } },
+          output_config: { effort: EFFORT, format: { type: 'json_schema', schema: (coverage ? COVERAGE_SCHEMA : PLAN_SCHEMA) as unknown as Record<string, unknown> } },
         });
         stream.on('text', (delta) => {
           if (first === 0) first = Date.now() - started;

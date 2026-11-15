@@ -15,6 +15,7 @@ import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SetLightSystem } from './set-light.js';
 import { EffectSoundSystem } from './effect-sound.js';
+import { CoverageSystem } from './coverage.js';
 import { SlateSystem } from './slate.js';
 import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
 import { LifeSizeSystem } from './life-size.js';
@@ -70,6 +71,10 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.startOver = signal(0);
   // Sets asked for in words, built by the set designer or the library's reader; and whether Talk is on the panel.
   globals.setsBuilt = signal(0);
+  // Cover it is shooting the designer's coverage (src/coverage.ts).
+  globals.coverageRunning = signal(false);
+  globals.coverageRequested = signal(0);
+  globals.coverageStopRequested = signal(0);
   globals.talkOffered = signal(false);
   // The last note the sheet took, and how many it has taken: the panel repeats each one where the hand is.
   globals.noteSaid = signal('');
@@ -147,6 +152,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     .registerSystem(SetLightSystem, { priority: 24 })
     .registerSystem(SlateSystem, { priority: 25 })
     .registerSystem(PreviewCameraSystem, { priority: 26 })
+    .registerSystem(CoverageSystem, { priority: 27 })
     .registerSystem(CoachSystem, { priority: 28 })
     .registerSystem(ControlsSystem, { priority: 30 });
 

@@ -354,6 +354,11 @@ export class DirectorSystem extends createSystem({
   }
 
   /** The camera where the plan asked, looking at what it asked, with its lens on. */
+  /** Stands the camera for a shot the set designer planned in a coverage, as a plan's camera is stood (src/coverage.ts). */
+  frameShot(plan: CameraPlan): void {
+    this.frame(plan, new Map());
+  }
+
   private frame(plan: CameraPlan, labels: Map<string, string>): void {
     if (plan.keep) return;
     const g = this.globals as unknown as Globals;
@@ -366,7 +371,7 @@ export class DirectorSystem extends createSystem({
   }
 
   /** The set as it stands, in the words and units the designer works in. */
-  private describe(): string {
+  describe(): string {
     const tray = this.world.getSystem(TraySystem);
     const made = this.world.getSystem(MadeSystem);
     const viewfinder = this.world.getSystem(ViewfinderSystem);

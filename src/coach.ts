@@ -418,8 +418,8 @@ export class CoachSystem extends createSystem({
         return [
           '4 OF 4 · SNAP',
           this.controllers
-            ? 'Pull the trigger on Snap frame, on the panel to your left.'
-            : 'Pinch Snap frame, on the panel to your left.',
+            ? 'Pull the trigger on Snap frame, or on Shoot coverage and the designer shoots the board.'
+            : 'Pinch Snap frame, or Shoot coverage and the designer shoots the board.',
         ];
       case Step.Fill:
         return this.fillLine();

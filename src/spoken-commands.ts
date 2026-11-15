@@ -43,6 +43,7 @@ export type Command =
   | { do: 'undo' }
   | { do: 'inside'; on: boolean }
   | { do: 'go'; labels: string[] }
+  | { do: 'cover' }
   | { do: 'byHand' };
 
 /** Words that carry no instruction of their own. */
@@ -121,6 +122,11 @@ const WHOLE_SIZES = new Set(['normal size', 'original size', 'regular size']);
 /** Into the set at full size, and out again, as it is said. */
 const INSIDE = new Set(['step inside', 'go inside', 'step in', 'stand in the shot', 'full size', 'life size', 'walk inside', 'go in']);
 const OUTSIDE = new Set(['step out', 'step outside', 'back out', 'go out', 'back to the table', 'go back to the table', 'leave the set', 'small again']);
+/** The designer's coverage of the set, shot by itself (src/coverage.ts): "cover it", "shoot coverage". */
+const COVER = new Set([
+  'cover it', 'cover this', 'cover that', 'cover scene', 'cover set', 'cover shot', 'cover the scene', 'cover the set', 'cover the shot',
+  'coverage', 'shoot coverage', 'get coverage', 'shoot the coverage', 'plan the shots', 'plan shots', 'shot list', 'make a shot list', 'shoot it all',
+]);
 /** Walking to a piece on a full-size set: "take me to the dragon", "stand next to the car". */
 const GO_VERBS = new Set(['take', 'walk', 'stand', 'teleport', 'jump', 'head']);
 const GO_JOINS = new Set(['by', 'next', 'near', 'beside', 'behind', 'over', 'up', 'across', 'me', 'us']);
@@ -165,6 +171,7 @@ export function commandIn(words: string[], named: Named[]): Command | null {
   const plain = words.filter((word) => !POLITE.has(word)).join(' ');
   if (pieces.length === 0) {
     if (UNDO.has(plain)) return { do: 'undo' };
+    if (COVER.has(plain) || COVER.has(rest)) return { do: 'cover' };
     if (INSIDE.has(plain) || INSIDE.has(rest)) return { do: 'inside', on: true };
     if (OUTSIDE.has(plain) || OUTSIDE.has(rest)) return { do: 'inside', on: false };
     // "Take me to the camera": stand at the lens, as Step inside does.
@@ -340,7 +347,7 @@ export function commandWords(): string[] {
   take(LENS_UNITS);
   take(Object.keys(STEPS));
   take(Object.keys(STEPS_OF_THE_CAMERA));
-  for (const set of [WIDER, TIGHTER, RECORD, STOP, PLAY, PAINT_VERBS, MAKE_VERBS, SIZE_VERBS, GROW_VERBS, SHRINK_VERBS, IT, BIGGER, SMALLER, BY_HAND, AIM_VERBS, AIM_LEADS, AIM_JOINS]) take(set);
+  for (const set of [COVER, WIDER, TIGHTER, RECORD, STOP, PLAY, PAINT_VERBS, MAKE_VERBS, SIZE_VERBS, GROW_VERBS, SHRINK_VERBS, IT, BIGGER, SMALLER, BY_HAND, AIM_VERBS, AIM_LEADS, AIM_JOINS]) take(set);
   take(Object.keys(COLOURS));
   take(Object.keys(SIZES));
   const out = [...words];
