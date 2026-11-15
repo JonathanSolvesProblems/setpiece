@@ -38,9 +38,10 @@ export default defineConfig(({ command }) => ({
         } catch {
           // No file: the designer uses whatever key the shell has, or answers that it has none.
         }
-        server.middlewares.use('/api/director', async (req, res) => {
+        // The designer and its voice (api/speak.ts): the same functions Vercel runs, answered here in development.
+        for (const name of ['director', 'speak']) server.middlewares.use(`/api/${name}`, async (req, res) => {
           try {
-            const handlers = (await server.ssrLoadModule('/api/director.ts')) as {
+            const handlers = (await server.ssrLoadModule(`/api/${name}.ts`)) as {
               GET: () => Response;
               POST: (request: Request) => Promise<Response>;
             };
@@ -49,7 +50,7 @@ export default defineConfig(({ command }) => ({
             const headers = new Headers();
             for (const [key, value] of Object.entries(req.headers)) if (typeof value === 'string' && !key.startsWith(':')) headers.set(key, value);
             const post = req.method === 'POST';
-            const request = new Request('https://localhost/api/director', { method: req.method, headers, body: post ? Buffer.concat(chunks) : undefined });
+            const request = new Request(`https://localhost/api/${name}`, { method: req.method, headers, body: post ? Buffer.concat(chunks) : undefined });
             const response = post ? await handlers.POST(request) : handlers.GET();
             res.statusCode = response.status;
             response.headers.forEach((value, key) => res.setHeader(key, value));

@@ -23,6 +23,7 @@ import type { Spoken } from './scene-request.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
 import { TraySystem } from './tray.js';
 import type { Cast, Finish } from './tray.js';
+import { speak } from './speech.js';
 import { jpegOf, ViewfinderSystem } from './viewfinder.js';
 
 type Globals = {
@@ -499,7 +500,11 @@ class PlanBuild {
 
   value(key: string, value: unknown): void {
     if (key === 'title') this.title = plainLine(value, 40);
-    else if (key === 'says') this.says = plainLine(value, 160);
+    else if (key === 'says') {
+      this.says = plainLine(value, 160);
+      // Said aloud as it arrives, so the wearer hears what is being built while the pieces go down.
+      if (!this.looking) speak(this.says);
+    }
     else if (key === 'next') this.next = plainLine(value, 60);
     else if (key === 'fresh') this.begin(value === true && !this.looking);
     // The light the scene is in; "" keeps it. A look does not change it, and a plan that could not begin does not either.
@@ -785,6 +790,7 @@ class PlanBuild {
       if (!changed) return;
       if (this.placed.size > 0) this.world.getSystem(TraySystem)?.planEnd(false);
       g.coachNote.value = `THROUGH THE LENS | ${this.says || 'The frame is put right.'}`;
+      speak(this.says);
       return;
     }
     this.world.getSystem(TraySystem)?.planEnd(this.fresh);

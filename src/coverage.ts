@@ -6,6 +6,7 @@
  * pinch Stop coverage), when a piece is picked up, when something new is asked of the designer, or when the session
  * ends, and keeps what it has shot.
  */
+import { speak } from './speech.js';
 import { createSystem, VisibilityState } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { cleanCamera } from './director-plan.js';
@@ -134,6 +135,8 @@ export class CoverageSystem extends createSystem({
         if (!life && g.shotFrames.peek().length >= BOARD_SLOTS) break;
         const { title, says, camera } = shots[shot];
         g.coachNote.value = `SHOT ${shot + 1} OF ${shots.length}: ${title.toUpperCase()} | ${says}`;
+        // Called as a first assistant director would, while the camera goes to it.
+        speak(`Shot ${shot + 1}. ${title}.`);
         // A camera that could not move is no new shot: nothing is snapped for it. On the table it glides to its
         // mark and the monitor plays the move; inside, the wearer is cut to it.
         if (!director.frameShot(camera, life ? 0 : GLIDE)) continue;

@@ -30,6 +30,7 @@ import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
 import { micAnswer } from './mic.js';
+import { chooseSpoken, speak, SPOKEN, spokenChoice } from './speech.js';
 
 /**
  * Where the panel sits relative to the stage, as the scene authors it: left of
@@ -667,6 +668,19 @@ export class ControlsSystem extends createSystem({
     const squirm = panel.getElementById<UIKit.Text>('btn-squirm');
     wire('btn-squirm', () => {
       g.squirmOn.value = !g.squirmOn.peek();
+    });
+    // The designer's replies read aloud: her voice, his, or none. Pressed, it steps on and says so in the new voice.
+    const spoken = panel.getElementById<UIKit.Text>('btn-spoken');
+    const showSpoken = (): void => {
+      const now = spokenChoice();
+      spoken?.setProperties({ text: now === 'off' ? 'Replies: not spoken' : `Replies: ${now} voice`, borderColor: now === 'off' ? CHALK_HAZE : OPTIC_YELLOW });
+    };
+    showSpoken();
+    wire('btn-spoken', () => {
+      const next = SPOKEN[(SPOKEN.indexOf(spokenChoice()) + 1) % SPOKEN.length];
+      chooseSpoken(next);
+      showSpoken();
+      if (next !== 'off') speak(next === 'her' ? 'I will read you what I build.' : 'I will read you what I build, in this voice.');
     });
     this.cleanupFuncs.push(
       g.squirmOn.subscribe((on) => {
