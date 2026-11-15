@@ -151,9 +151,20 @@ ${COVERAGE_ASK}`
   const client = new Anthropic({ apiKey });
   const started = Date.now();
   const encoder = new TextEncoder();
+  // A request the app abandons (something new was said, or stop) stops the model too, so it is not billed to the end.
+  let upstream: { abort(): void } | null = null;
   const body = new ReadableStream<Uint8Array>({
+    cancel() {
+      upstream?.abort();
+    },
     async start(controller) {
-      const send = (event: Record<string, unknown>): void => controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+      const send = (event: Record<string, unknown>): void => {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+        } catch {
+          // The reader has gone.
+        }
+      };
       let first = 0;
       try {
         const stream = client.beta.messages.stream({
@@ -167,6 +178,7 @@ ${COVERAGE_ASK}`
           messages: [{ role: 'user', content }],
           output_config: { effort: EFFORT, format: { type: 'json_schema', schema: (coverage ? COVERAGE_SCHEMA : PLAN_SCHEMA) as unknown as Record<string, unknown> } },
         });
+        upstream = stream;
         stream.on('text', (delta) => {
           if (first === 0) first = Date.now() - started;
           send({ t: 'd', s: delta });
@@ -200,7 +212,11 @@ ${COVERAGE_ASK}`
               : 'The set designer could not be reached.';
         send({ t: 'error', m: message, status: status ?? null, detail: process.env.DIRECTOR_DEBUG ? String(error) : undefined });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Already cancelled by the reader.
+        }
       }
     },
   });

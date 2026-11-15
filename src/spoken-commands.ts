@@ -72,7 +72,10 @@ const WIDER = new Set(['wider', 'wide', 'zoom out', 'shorter']);
 const TIGHTER = new Set(['tighter', 'tight', 'longer', 'zoom in', 'punch in']);
 
 const RECORD = new Set(['record', 'recording', 'start recording', 'record take', 'record it', 'start take', 'roll', 'rolling', 'roll camera', 'action']);
-const STOP = new Set(['stop', 'stop recording', 'stop it', 'stop take', 'stop playing', 'end take', 'cut', 'thats cut']);
+const STOP = new Set([
+  'stop', 'stop recording', 'stop it', 'stop take', 'stop playing', 'end take', 'cut', 'thats cut',
+  'stop coverage', 'stop covering', 'end coverage', 'cancel coverage', 'stop shooting', 'enough',
+]);
 const PLAY = new Set(['play', 'play it', 'play back', 'playback', 'play it back', 'play that back', 'play take', 'replay', 'replay it', 'show take']);
 
 const FIRST = new Set(['a', 'ay', 'eh', 'one', 'first']);

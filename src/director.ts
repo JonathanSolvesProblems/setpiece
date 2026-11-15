@@ -354,20 +354,34 @@ export class DirectorSystem extends createSystem({
   }
 
   /** The camera where the plan asked, looking at what it asked, with its lens on. */
-  /** Stands the camera for a shot the set designer planned in a coverage, as a plan's camera is stood (src/coverage.ts). */
-  frameShot(plan: CameraPlan): void {
-    this.frame(plan, new Map());
+  /**
+   * Stands the camera for a shot the set designer planned in a coverage, as a plan's camera is stood
+   * (src/coverage.ts). False when the camera could not move (it is held, or a take is running).
+   */
+  frameShot(plan: CameraPlan): boolean {
+    return this.frame(plan, new Map());
   }
 
-  private frame(plan: CameraPlan, labels: Map<string, string>): void {
-    if (plan.keep) return;
+  /** Nothing of a set is still coming: no reply being read, no piece dropping, no camera or look waiting. */
+  settled(): boolean {
+    return this.asking == null && this.drops === 0 && this.pendingCamera == null && this.lookAt === 0 && this.lookFor === '';
+  }
+
+  /** A refusal heard elsewhere (a coverage plan): no key, no sign-in or the spend limit switches the designer off too. */
+  noteRefusal(message: string): void {
+    if (/no key|cannot sign in|not taking requests/.test(message)) this.status = 'off';
+  }
+
+  private frame(plan: CameraPlan, labels: Map<string, string>): boolean {
+    if (plan.keep) return false;
     const g = this.globals as unknown as Globals;
     const pieces = this.world.getSystem(PiecesSystem);
-    if (pieces == null) return;
+    if (pieces == null) return false;
     const label = plan.look_at === '' ? '' : (labels.get(plan.look_at) ?? plan.look_at);
     this.point.set(plan.look_x * SLATE, plan.look_y * SLATE, plan.look_z * SLATE);
-    pieces.placeCamera(plan.x * SLATE, plan.z * SLATE, plan.height * SLATE, label, this.point);
+    const placed = pieces.placeCamera(plan.x * SLATE, plan.z * SLATE, plan.height * SLATE, label, this.point);
     if ((LENSES as readonly number[]).includes(plan.lens)) g.lensMm.value = plan.lens;
+    return placed;
   }
 
   /** The set as it stands, in the words and units the designer works in. */

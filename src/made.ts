@@ -200,6 +200,8 @@ export class MadeSystem extends createSystem({
     const standing = new Set<string>();
     for (const [label, id] of this.slots) if (on.includes(label)) standing.add(id);
     for (const id of [...this.defs.keys()]) if (!standing.has(id)) this.defs.delete(id);
+    // Their places are emptied too, so none is left pointing at a piece that is gone.
+    for (const [label, id] of [...this.slots]) if (!standing.has(id)) this.slots.delete(label);
     this.save();
   }
 
