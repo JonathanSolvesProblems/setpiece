@@ -14,6 +14,7 @@ import { PiecesSystem } from './pieces.js';
 import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SetLightSystem } from './set-light.js';
+import { prefetchListener } from './voice.js';
 import { EffectSoundSystem } from './effect-sound.js';
 import { CoverageSystem } from './coverage.js';
 import { SlateSystem } from './slate.js';
@@ -425,7 +426,10 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   // The loading card comes off once the set has drawn, not when the code has finished.
   const setIsReady = globals.setReady as Signal<boolean>;
   setIsReady.subscribe((ready) => {
-    if (ready) requestAnimationFrame(setReady);
+    if (!ready) return;
+    requestAnimationFrame(setReady);
+    // The listener's model, fetched quietly while the visitor looks around, so their first Talk is quick.
+    window.setTimeout(prefetchListener, 5000);
   });
 
   // Outside a session, a newer build replaces this one. Inside, it waits until the session ends.

@@ -530,3 +530,28 @@ export class Voice {
     this.quietTimer = 0;
   }
 }
+
+let prefetched = false;
+
+/**
+ * Fetches the listener's model into the browser's own cache in the background, so a first press of Talk does not
+ * wait for 41 MB: it is read in chunks and let go, never held whole, and costs the frame next to nothing. Not on this
+ * machine's own address, where the tests reload the page many times an hour.
+ */
+export function prefetchListener(): void {
+  if (prefetched || location.hostname === 'localhost') return;
+  prefetched = true;
+  void (async () => {
+    try {
+      const response = await fetch(fileUrl(MODEL_FILE));
+      const reader = response.body?.getReader();
+      if (reader == null) return;
+      for (;;) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+    } catch {
+      // It is fetched again when Talk is pressed.
+    }
+  })();
+}
