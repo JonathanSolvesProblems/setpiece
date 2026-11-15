@@ -158,6 +158,8 @@ const HAND_SMOOTHING = 45;
 /** A piece let go above the slate falls to it. */
 const FALL = 5;
 const FALL_FROM = 0.015;
+/** A flyer let go closer than this above what is under it lands on it (30 cm at 1:10); higher, it stays in the air. */
+const LAND_FROM = 0.03;
 /** Let go this far below the top of something, a piece goes beside or inside it, not onto it. */
 const STACK_SLACK = 0.03;
 const NO_RAYCAST = (): void => {};
@@ -264,6 +266,8 @@ export class PiecesSystem extends createSystem({
   /** Grabs that began inside the guard window and were let go at once. */
   private ignored = new Set<Entity>();
   private guard = 0;
+  /** Whether the call sheet has said once this visit that a flyer stays where it is let go. */
+  private toldFlies = false;
   private grab: GrabSystem | undefined;
   private volumeMaterial = new MeshBasicMaterial({ visible: false, side: DoubleSide });
   private ringMaterial = new MeshBasicMaterial({ color: OPTIC_YELLOW, toneMapped: false });
@@ -428,10 +432,15 @@ export class PiecesSystem extends createSystem({
         if (piece.hasComponent(Held)) piece.removeComponent(Held);
         continue;
       }
-      if (piece.hasComponent(Held) || piece.hasComponent(ShotCamera) || object.position.y <= FALL_FROM) continue;
+      if (piece.hasComponent(Held) || piece.hasComponent(ShotCamera) || object.position.y <= FALL_FROM || this.flies(piece)) continue;
       const floor = this.supportUnder(i);
       if (object.position.y > floor + FALL_FROM) this.drop(piece, floor);
     }
+  }
+
+  /** A dragon, a ghost, a helicopter or a saucer stays where it is put in the air. */
+  private flies(piece: Entity): boolean {
+    return assetByLabel(String(piece.getValue(SetPiece, 'label')))?.flies === true;
   }
 
   private sideCarrying(piece: Entity): Side | null {
@@ -1120,7 +1129,7 @@ export class PiecesSystem extends createSystem({
       const piece = this.dressed[i];
       const object = piece.object3D;
       if (object == null || piece === lifted || piece.hasComponent(Held) || piece.hasComponent(ShotCamera)) continue;
-      if (object.position.y <= FALL_FROM) continue;
+      if (object.position.y <= FALL_FROM || this.flies(piece)) continue;
       const floor = this.supportUnder(i);
       if (object.position.y > floor + FALL_FROM) this.drop(piece, floor);
     }
@@ -1192,7 +1201,14 @@ export class PiecesSystem extends createSystem({
       this.knock(Cue.Place, piece);
     } else {
       const floor = this.supportUnder(this.dressed.indexOf(piece));
-      if (object.position.y > floor + FALL_FROM) {
+      if (this.flies(piece) && object.position.y > floor + LAND_FROM) {
+        // Let go in the air, it flies there; said once a visit, since every other piece falls.
+        this.knock(Cue.Place, piece);
+        if (!this.toldFlies) {
+          this.toldFlies = true;
+          (this.globals as Globals).coachNote.value = `${assetTitle(String(piece.getValue(SetPiece, 'label'))).toUpperCase()} IS FLYING | It stays where you let go. Let go just above a roof or the slate and it lands.`;
+        }
+      } else if (object.position.y > floor + FALL_FROM) {
         this.drop(piece, floor);
       } else {
         object.position.y = floor;

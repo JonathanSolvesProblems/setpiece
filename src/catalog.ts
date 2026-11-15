@@ -24,6 +24,8 @@ export type Asset = {
   solid?: boolean;
   /** Moving, it knocks down an actor in its way. */
   mover?: boolean;
+  /** It flies: let go in the air, it stays there; let go just above something, it lands on it. */
+  flies?: boolean;
   /** This actor's tape: the colour of their mark, their tag and their line on the panel. */
   tape?: string;
   /** Other words a person might say for it. */
@@ -64,12 +66,12 @@ export const ASSETS: Asset[] = [
   { label: 'Lamp post', shelf: 'Set', grab: [0.05, 0.42], aliases: ['street light', 'lamp'] },
   { label: 'Tree', shelf: 'Set', grab: [0.08, 0.4] },
   { label: 'Crate', shelf: 'Props', grab: [0.05, 0.08], solid: true, aliases: ['box'] },
-  { label: 'Dragon', shelf: 'Creatures', grab: [0.14, 0.29], paint: true, mover: true },
+  { label: 'Dragon', shelf: 'Creatures', grab: [0.14, 0.29], paint: true, mover: true, flies: true },
   { label: 'Troll', shelf: 'Creatures', grab: [0.12, 0.4], paint: true, mover: true, aliases: ['ogre'] },
   { label: 'Dinosaur', shelf: 'Creatures', grab: [0.12, 0.28], paint: true, mover: true, aliases: ['dino', 'rex'] },
   { label: 'Robot', shelf: 'Creatures', grab: [0.1, 0.35], paint: true, mover: true, aliases: ['mech'] },
   { label: 'Alien', shelf: 'Creatures', grab: [0.04, 0.24], paint: true },
-  { label: 'Ghost', shelf: 'Creatures', grab: [0.06, 0.2], paint: true },
+  { label: 'Ghost', shelf: 'Creatures', grab: [0.06, 0.2], paint: true, flies: true },
   { label: 'Spider', shelf: 'Creatures', grab: [0.12, 0.12], paint: true, mover: true },
   { label: 'Kraken', shelf: 'Creatures', grab: [0.12, 0.35], paint: true, aliases: ['tentacles', 'octopus', 'squid'] },
   { label: 'Horse', shelf: 'Cast', grab: [0.08, 0.23], paint: true, mover: true, styles: ['Plain', 'Unicorn'], aliases: ['unicorn'] },
@@ -77,9 +79,9 @@ export const ASSETS: Asset[] = [
   { label: 'Truck', shelf: 'Vehicles', grab: [0.15, 0.33], paint: true, solid: true, mover: true, styles: ['Box', 'Flatbed', 'Tanker'], aliases: ['lorry'] },
   { label: 'Pickup', shelf: 'Vehicles', grab: [0.13, 0.18], paint: true, solid: true, mover: true },
   { label: 'Bus', shelf: 'Vehicles', grab: [0.16, 0.33], paint: true, solid: true, mover: true, aliases: ['coach'] },
-  { label: 'Helicopter', shelf: 'Vehicles', grab: [0.2, 0.27], paint: true, mover: true, aliases: ['chopper'] },
+  { label: 'Helicopter', shelf: 'Vehicles', grab: [0.2, 0.27], paint: true, mover: true, flies: true, aliases: ['chopper'] },
   { label: 'Boat', shelf: 'Vehicles', grab: [0.13, 0.15], paint: true, solid: true, mover: true, aliases: ['ship'] },
-  { label: 'Saucer', shelf: 'Vehicles', title: 'Flying saucer', grab: [0.18, 0.16], paint: true, mover: true, aliases: ['ufo', 'spaceship'] },
+  { label: 'Saucer', shelf: 'Vehicles', title: 'Flying saucer', grab: [0.18, 0.16], paint: true, mover: true, flies: true, aliases: ['ufo', 'spaceship'] },
   { label: 'Bicycle', shelf: 'Vehicles', grab: [0.06, 0.1], paint: true, mover: true, aliases: ['cycle'] },
   { label: 'Tank', shelf: 'Vehicles', grab: [0.16, 0.21], paint: true, solid: true, mover: true },
   { label: 'House', shelf: 'Set', title: 'House front', grab: [0.2, 0.56], paint: true, solid: true, aliases: ['building'] },
