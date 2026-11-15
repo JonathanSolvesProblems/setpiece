@@ -18,7 +18,7 @@ export type Vocab = { label: string; title: string; shelf: string; aliases?: str
 
 export type Request = {
   clear: boolean;
-  items: { label: string; count: number; colour?: string; size?: 'small' | 'big' | 'giant' }[];
+  items: { label: string; count: number; colour?: string; size?: 'small' | 'big' | 'giant'; build?: 'man' | 'woman' }[];
   remove: string[];
   unknown: string[];
 };
@@ -440,6 +440,10 @@ export function namesIn(words: string[], vocab: Vocab): { labels: string[]; at: 
   return found;
 }
 
+/** The words for an actor that say a woman or a man: the actor is cast in that build. */
+const WOMAN_WORDS = /^(actress|actresses|woman|women|girl|girls)$/;
+const MAN_WORDS = /^(man|men|guy|guys|boy|boys)$/;
+
 export function parseRequest(text: string, vocab: Vocab): Request {
   const request: Request = { clear: false, items: [], remove: [], unknown: [] };
   const words = mend(plain(text).split(' ').filter(Boolean));
@@ -464,7 +468,7 @@ export function parseRequest(text: string, vocab: Vocab): Request {
     size = undefined;
     expecting = false;
   };
-  const give = (label: string, howMany: number, once: boolean): void => {
+  const give = (label: string, howMany: number, once: boolean, build?: 'man' | 'woman'): void => {
     if (nextGoes || mode === 'remove') {
       if (!request.remove.includes(label)) request.remove.push(label);
       return;
@@ -473,11 +477,13 @@ export function parseRequest(text: string, vocab: Vocab): Request {
     const same = request.items.find((item) => item.label === label && item.colour === colour && item.size === size);
     if (same) {
       same.count = once ? 1 : Math.min(MOST, same.count + howMany);
+      if (build) same.build = build;
       return;
     }
     const item: Request['items'][number] = { label, count: once ? 1 : Math.min(MOST, howMany) };
     if (colour) item.colour = colour;
     if (size) item.size = size;
+    if (build) item.build = build;
     request.items.push(item);
   };
   /** The thing a phrase was building up to has been named, or the phrase has run out. */
@@ -570,7 +576,10 @@ export function parseRequest(text: string, vocab: Vocab): Request {
           continue;
         }
         if (name.member) handedOut.add(name.label);
-        give(name.label, count ?? (name.plural ? 2 : 1), name.member);
+        // "A woman", "a man": the actor named by it is cast in that build.
+        const said = words.slice(i - found.length, i).join(' ');
+        const build = name.member && WOMAN_WORDS.test(said) ? 'woman' : name.member && MAN_WORDS.test(said) ? 'man' : undefined;
+        give(name.label, count ?? (name.plural ? 2 : 1), name.member, build);
         close();
       } else if (name.kind === 'group') {
         const members = lexicon.groups.get(name.group) ?? [];
@@ -579,11 +588,14 @@ export function parseRequest(text: string, vocab: Vocab): Request {
           for (const label of all ? members : members.slice(0, count ?? 1)) give(label, 1, true);
         } else if (mode === 'add') {
           let wanted = name.every ? members.length : count ?? (name.plural ? 2 : 1);
+          // "Two women", "an actress", "a man": the actors handed out are cast in that build.
+          const said = words.slice(i - found.length, i).join(' ');
+          const build = WOMAN_WORDS.test(said) ? 'woman' : MAN_WORDS.test(said) ? 'man' : undefined;
           for (const label of members) {
             if (wanted === 0) break;
             if (handedOut.has(label)) continue;
             handedOut.add(label);
-            give(label, 1, true);
+            give(label, 1, true, build);
             wanted--;
           }
         }

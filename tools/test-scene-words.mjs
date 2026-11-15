@@ -110,7 +110,8 @@ const CASES = [
   // The cast.
   ['"to actors" is two actors', 'to actors', NOW, { items: [one('A'), one('B')] }],
   ['one actor is the first', 'add an actor', NOW, { items: [one('A')] }],
-  ['a man and a woman', 'a man and a woman', NOW, { items: [one('A'), one('B')] }],
+  ['a man and a woman, each in their build', 'a man and a woman', NOW, { items: [one('A', { build: 'man' }), one('B', { build: 'woman' })] }],
+  ['two women and a man', 'new scene with two women and a man', NOW, { clear: true, items: [one('A', { build: 'woman' }), one('B', { build: 'woman' }), one('C', { build: 'man' })] }],
   ['a named actor is not handed out twice', 'actor b and two people', NOW, { items: [one('B'), one('A'), one('C')] }],
   ['no more actors than there are', 'five people', NOW, { items: [one('A'), one('B'), one('C'), one('D')] }],
   ['everyone', 'bring everyone', NOW, { items: [one('A'), one('B'), one('C'), one('D')] }],

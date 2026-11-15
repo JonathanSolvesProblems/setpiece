@@ -476,6 +476,16 @@ export class TraySystem extends createSystem({
       }
     }
     for (const piece of this.managed) if (refinished.includes(this.key(piece))) this.coat(piece, this.finishOf(this.key(piece)));
+    // An actor asked for as a woman or a man is cast in that build, without the set designer.
+    for (const item of request.items) {
+      if (item.build == null) continue;
+      const piece = this.managed.find((one) => this.key(one) === item.label);
+      if (piece == null || piece.getValue(SetPiece, 'role') !== SetRole.Actor) continue;
+      const cast: Cast = [...(this.cast.get(item.label) ?? [0, 0, 0])] as Cast;
+      cast[2] = item.build === 'woman' ? 1 : 0;
+      this.cast.set(item.label, cast);
+      this.dress(piece, cast);
+    }
     this.setOn(next);
     for (const label of placed) this.clearSpot(label);
     this.layoutDone();
