@@ -8,6 +8,8 @@
  *   node tools/eval-designer.mjs [index ...]     writes tmp/director/eval.json
  *   node tools/eval-designer.mjs --regrade [--publish]
  *       grades the saved plans again without asking the model; --publish writes devpost/results/designer-eval.json
+ *   node tools/eval-designer.mjs --ab [--from=N]   every case with the hurry line off and on, writes tmp/director/eval-ab.json
+ *   node tools/eval-designer.mjs --ab-publish      writes devpost/results/designer-hurry.json from that run
  */
 import { build } from 'esbuild';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -33,7 +35,7 @@ await build({
 });
 const stamp = Date.now();
 const { POST } = await import(`../tmp/director/api/director.js?${stamp}`);
-const { cleanThing, readPart } = await import(`../tmp/director/src/director-plan.js?${stamp}`);
+const { cleanThing, readPart, PlanReader } = await import(`../tmp/director/src/director-plan.js?${stamp}`);
 const { ASSETS } = await import(`../tmp/director/src/catalog.js?${stamp}`);
 const { settle } = await import(`../tmp/director/src/settle.js?${stamp}`);
 const BASE = new Map(ASSETS.map((asset) => [asset.label, asset]));
@@ -94,18 +96,24 @@ const CASES = [
   { said: 'a funeral in the rain, mourners with umbrellas' },
 ];
 
+let asks = 0;
 async function ask(c) {
   const started = Date.now();
   const response = await POST(
     new Request('http://localhost/api/director', {
       method: 'POST',
-      headers: { origin: 'http://localhost:8081', 'content-type': 'application/json' },
+      // Each request its own visitor, so a whole run is not stopped by the per-visitor limit (used only off Vercel).
+      headers: { origin: 'http://localhost:8081', 'content-type': 'application/json', 'x-real-ip': `eval-${(asks += 1)}` },
       body: JSON.stringify({ said: c.said, set: c.set ?? '', heard: [] }),
     }),
   );
   let text = '';
   let end = null;
   let carry = '';
+  let firstPieceMs = 0;
+  const reader = new PlanReader(() => {}, () => {
+    if (firstPieceMs === 0) firstPieceMs = Date.now() - started;
+  });
   const decoder = new TextDecoder();
   for await (const chunk of response.body) {
     carry += decoder.decode(chunk, { stream: true });
@@ -114,11 +122,13 @@ async function ask(c) {
       carry = carry.slice(nl + 1);
       if (line.trim() === '') continue;
       const event = JSON.parse(line);
-      if (event.t === 'd') text += event.s;
-      else end = event;
+      if (event.t === 'd') {
+        text += event.s;
+        reader.push(event.s);
+      } else end = event;
     }
   }
-  return { plan: JSON.parse(text), end, ms: Date.now() - started };
+  return { plan: JSON.parse(text), end, ms: Date.now() - started, firstPieceMs };
 }
 
 /** The four corners of a footprint, turned by its yaw, in metres. */
@@ -303,7 +313,7 @@ ${ok} of ${saved.length} plans with nothing to flag as the model wrote them; ${o
         {
           what: 'The set designer graded by rule (tools/eval-designer.mjs): every piece one the library has or a made piece whose parts read, nothing outside the stage or standing inside another piece, true scale unless asked, the camera where it may stand and a metre or more from its subject, no brand or real person, an edit changing only what it was asked. Each plan is graded as the model wrote it, and again after the set dresser (src/settle.ts) has moved apart what stood inside something else, with the library pieces at their measured sizes.',
           sentences: 'Written on Nov 13 after the designer\'s instructions were settled, in the shape a stranger says a shot, and graded before any change was made for them.',
-          model: 'claude-opus-5-5, fast mode, effort low',
+          model: `claude-opus-5-5, fast mode, effort low${saved.some((run) => run.hurry === 'on') ? ', asked to begin its answer at once (api/director.ts, HURRY)' : ''}`,
           planned: new Date(statSync('tmp/director/eval.json').mtimeMs).toISOString().slice(0, 10),
           summary: { sentences: rows.length, nothingFlaggedAsWritten: ok, nothingFlaggedAfterSetDresser: okAfter },
           runs: rows,
@@ -314,6 +324,77 @@ ${ok} of ${saved.length} plans with nothing to flag as the model wrote them; ${o
     );
     console.log('wrote devpost/results/designer-eval.json');
   }
+  process.exit(0);
+}
+// --ab asks every case with the hurry line off and on (api/director.ts), alternating which goes first so neither
+// arm gets the quieter minute, plus the night chase twice; writes tmp/director/eval-ab.json with each plan's grade,
+// its time to the first piece and to the whole plan, and its output tokens. About 66 requests, $4 to $5.
+if (process.argv.includes('--ab')) {
+  const NIGHT_CHASE = { said: 'a night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop' };
+  const list = [...CASES, NIGHT_CHASE, NIGHT_CHASE];
+  // --from=N carries on from case N, keeping the answered runs already in the file.
+  const from = Number((process.argv.find((arg) => arg.startsWith('--from=')) ?? '--from=0').slice(7));
+  const { existsSync, readFileSync } = await import('node:fs');
+  const runs = from > 0 && existsSync('tmp/director/eval-ab.json') ? JSON.parse(readFileSync('tmp/director/eval-ab.json', 'utf8')).filter((run) => run.error == null) : [];
+  for (let i = from; i < list.length; i++) {
+    const c = list[i];
+    for (const hurry of i % 2 === 0 ? ['off', 'on'] : ['on', 'off']) {
+      process.env.DIRECTOR_HURRY = hurry;
+      try {
+        const { plan, end, ms, firstPieceMs } = await ask(c);
+        const graded = grade(c, plan);
+        const settled = grade(c, dressed(c, plan).plan);
+        runs.push({ said: c.said, hurry, ms, firstPieceMs, output: end?.usage?.output ?? null, stop: end?.stop, title: plan.title, things: graded.things, made: graded.made, flagged: graded.problems, flaggedAfterSetDresser: settled.problems, plan });
+        console.log(`${hurry.padEnd(3)} ${(firstPieceMs / 1000).toFixed(1)} / ${(ms / 1000).toFixed(1)} s ${String(end?.usage?.output).padStart(5)} out ${graded.problems.length === 0 ? 'ok  ' : 'FLAG'} ${c.said.slice(0, 64)}`);
+        for (const problem of graded.problems) console.log(`       ${problem}`);
+      } catch (error) {
+        runs.push({ said: c.said, hurry, error: String(error) });
+        console.log(`FAIL ${hurry} ${c.said}: ${error}`);
+      }
+    }
+  }
+  writeFileSync('tmp/director/eval-ab.json', JSON.stringify(runs, null, 1));
+  for (const hurry of ['off', 'on']) console.log(hurry, JSON.stringify(abSummary(runs, hurry)));
+  process.exit(0);
+}
+
+/** One arm of an --ab run: how many plans, first piece and whole plan (median and slowest tenth), tokens, grades. */
+function abSummary(runs, hurry) {
+  const sorted = (values) => [...values].sort((a, b) => a - b);
+  const at = (values, q) => sorted(values)[Math.min(values.length - 1, Math.floor(values.length * q))];
+  const mine = runs.filter((run) => run.hurry === hurry && run.error == null);
+  const first = mine.filter((run) => run.firstPieceMs > 0).map((run) => run.firstPieceMs);
+  const whole = mine.map((run) => run.ms);
+  return {
+    plans: mine.length,
+    firstPieceMs: { median: at(first, 0.5), slowestTenth: at(first, 0.9), slowest: Math.max(...first), plansWithPieces: first.length },
+    wholeMs: { median: at(whole, 0.5), slowestTenth: at(whole, 0.9), slowest: Math.max(...whole) },
+    outputTokens: mine.reduce((sum, run) => sum + (run.output ?? 0), 0),
+    nothingFlaggedAsWritten: mine.filter((run) => run.flagged.length === 0).length,
+    nothingFlaggedAfterSetDresser: mine.filter((run) => run.flaggedAfterSetDresser.length === 0).length,
+  };
+}
+
+// --ab-publish writes devpost/results/designer-hurry.json from the last --ab run, without asking the model again.
+if (process.argv.includes('--ab-publish')) {
+  const { readFileSync, statSync } = await import('node:fs');
+  const runs = JSON.parse(readFileSync('tmp/director/eval-ab.json', 'utf8')).filter((run) => run.error == null);
+  writeFileSync(
+    'devpost/results/designer-hurry.json',
+    JSON.stringify(
+      {
+        what: "Each of the eval's 31 sentences, and the night chase twice, asked of the set designer twice: as it was, and with one line after the words, \"Latency-sensitive; begin your visible answer immediately.\" (api/director.ts, HURRY). The two were asked one after the other, alternating which went first. Time from the request to the first piece being complete and to the whole plan, from a desktop on home broadband; output tokens include the designer's thinking; each plan graded by tools/eval-designer.mjs's rules as written and after the set dresser.",
+        why: 'claude-opus-5-5 always thinks before it answers; effort low is the least. On a busy sentence that thinking came before any piece, with the table empty.',
+        model: 'claude-opus-5-5, fast mode, effort low',
+        asked: new Date(statSync('tmp/director/eval-ab.json').mtimeMs).toISOString().slice(0, 10),
+        summary: { without: abSummary(runs, 'off'), with: abSummary(runs, 'on') },
+        runs: runs.map(({ plan, ...run }) => ({ ...run, light: plan?.light, camera: plan?.camera == null ? null : `${plan.camera.lens} mm, ${plan.camera.height} m` })),
+      },
+      null,
+      1,
+    ),
+  );
+  console.log(JSON.stringify(abSummary(runs, 'off')), JSON.stringify(abSummary(runs, 'on')));
   process.exit(0);
 }
 const picked = process.argv.slice(2).map(Number);

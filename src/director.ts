@@ -244,8 +244,9 @@ export class DirectorSystem extends createSystem({
     let timer = window.setTimeout(() => asking.abort(), FIRST_WORD_MS);
     const whole = window.setTimeout(() => asking.abort(), WHOLE_MS);
     const build = new PlanBuild(this.world, (label) => this.entityOf(label), this.keys, looking);
-    // A busy sentence is thought through before its first piece is written (the night chase: 7 to 9 s from a desktop,
-    // devpost/results/designer-first-request.json), so a table still empty after a few seconds says why.
+    // A busy sentence can be thought through before its first piece is written (the night chase took 7 to 9 s before the
+    // designer was asked to begin at once, devpost/results/designer-first-request.json; since, the slowest of 33 took
+    // 2.5 s), so a table still empty after a few seconds says why.
     const thinking = looking
       ? 0
       : window.setTimeout(() => {

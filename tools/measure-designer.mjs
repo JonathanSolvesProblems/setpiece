@@ -101,7 +101,7 @@ const first = runs.map((run) => run.firstPieceMs);
 const whole = runs.map((run) => run.wholeMs);
 const result = {
   measured: new Date().toISOString().slice(0, 10),
-  what: 'Seconds from the request to the first piece of the plan being complete, and to the whole plan, for fresh sets, calling api/director.ts from a desktop on home broadband with the instructions cached. claude-opus-5-5, fast mode, low effort, structured output.',
+  what: `Seconds from the request to the first piece of the plan being complete, and to the whole plan, for fresh sets, calling api/director.ts from a desktop on home broadband with the instructions cached. claude-opus-5-5, fast mode, low effort, structured output${process.env.DIRECTOR_HURRY === 'off' ? '' : ', asked to begin its answer at once (api/director.ts, HURRY; devpost/results/designer-hurry.json)'}.`,
   limit: "The headset's own share is not in this number: its speech recogniser, the Quest's network, and drawing the pieces.",
   summary: {
     sentences: runs.length,

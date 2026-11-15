@@ -82,6 +82,16 @@ const refuse = (status: number, message: string): Response =>
 
 type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown; coverage?: unknown; warm?: unknown };
 
+/**
+ * A spoken sentence is waited on with the table empty, so the designer is asked to start writing at once instead of
+ * thinking a busy set through first. After the words, so the cached instructions stay the same. A look and a coverage
+ * plan are not waited on that way and keep their thinking. Measured on 33 sentences, each asked both ways
+ * (devpost/results/designer-hurry.json): the slowest tenth of first pieces fell from 5.0 s to 2.1 s, the night chase
+ * from 5 to 6 s to 1 s, a fifth fewer tokens were written, and no more sets were flagged. DIRECTOR_HURRY=off turns it off.
+ */
+const HURRY = 'Latency-sensitive; begin your visible answer immediately.';
+const hurried = (): boolean => process.env.DIRECTOR_HURRY !== 'off';
+
 /** What the designer is asked: the set as it stands, then the words, with the recogniser's other guesses. */
 function question(asked: Asked): string | null {
   const said = typeof asked.said === 'string' ? asked.said.trim().slice(0, LONGEST_SAID) : '';
@@ -166,7 +176,9 @@ export async function POST(request: Request): Promise<Response> {
         ? `${text}
 
 ${COVERAGE_ASK}`
-        : text
+        : hurried()
+          ? `${text}\n\n${HURRY}`
+          : text
       : [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
           { type: 'text', text: `${text}\n\n${frame(asked.report)}${subjectLine(asked.subject)}${LOOK}` },
