@@ -15,8 +15,10 @@ import { PlacementSystem, StageStatus } from './placement.js';
 import { PreviewCameraSystem } from './preview-camera.js';
 import { SetLightSystem } from './set-light.js';
 import { prefetchListener } from './voice.js';
+import { micAnswer } from './mic.js';
 import { EffectSoundSystem } from './effect-sound.js';
 import { CoverageSystem } from './coverage.js';
+import { SetFinderSystem } from './set-finder.js';
 import { SlateSystem } from './slate.js';
 import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
 import { LifeSizeSystem } from './life-size.js';
@@ -155,6 +157,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     .registerSystem(PreviewCameraSystem, { priority: 26 })
     .registerSystem(CoverageSystem, { priority: 27 })
     .registerSystem(CoachSystem, { priority: 28 })
+    .registerSystem(SetFinderSystem, { priority: 29 })
     .registerSystem(ControlsSystem, { priority: 30 });
 
   // The page's own controls: Enter XR, lenses, snap and reset, wired to the
@@ -224,6 +227,27 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   enter?.addEventListener('click', async () => {
     if (enter.dataset.mode !== 'copy') {
       if (world.sessionRequestPending || world.session != null) return;
+      // The headset cannot show the microphone's question once the session has started, so a visitor who has not
+      // answered it is asked here, on the page, first. Answering can take longer than the press may start a
+      // session for; then the page asks for one more press.
+      if (mic != null && !mic.hidden && !mic.disabled && (await micAnswer()) === 'prompt') {
+        enter.textContent = 'Answer the microphone';
+        if (hint) hint.textContent = 'Setpiece only listens while you pinch Talk, to hear the shot. Allow the microphone and the set comes up.';
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          for (const track of stream.getTracks()) track.stop();
+          mic.textContent = 'Microphone allowed';
+          mic.disabled = true;
+        } catch {
+          mic.textContent = 'Microphone not allowed';
+        }
+        enter.textContent = 'Enter XR';
+        if ((navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive === false) {
+          if (hint) hint.textContent = 'Now press Enter XR.';
+          return;
+        }
+        if (hint) hint.textContent = restingHint;
+      }
       world.launchXR();
       watchRequest();
       return;

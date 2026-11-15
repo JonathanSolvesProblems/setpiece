@@ -29,6 +29,7 @@ import { ViewfinderSystem } from './viewfinder.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
+import { micAnswer } from './mic.js';
 
 /**
  * Where the panel sits relative to the stage, as the scene authors it: left of
@@ -814,10 +815,24 @@ export class ControlsSystem extends createSystem({
           voice.stop();
         } else {
           chained = false;
-          // With the set designer there, anything can be said, so the listener takes any words; without it,
-          // only the library's words mean anything, and listening for just those hears them far better.
-          voice.listenFor(this.world.getSystem(DirectorSystem)?.available() === true ? undefined : wordsToHear());
-          void voice.start();
+          // The headset cannot show the microphone's question in here, so a wearer who never answered it on the page
+          // is told how to, and given the presets, instead of waiting on a listener that cannot start.
+          const inSession = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+          void micAnswer().then((answer) => {
+            if (inSession && (answer === 'prompt' || answer === 'denied')) {
+              tell(
+                answer === 'denied'
+                  ? 'The microphone is not allowed for this page. Allow it in the browser, or pinch Try a shot.'
+                  : 'The headset cannot ask for the microphone in here. Leave, press Enter XR on the page and allow it, or pinch Try a shot.',
+                10000,
+              );
+              return;
+            }
+            // With the set designer there, anything can be said, so the listener takes any words; without it,
+            // only the library's words mean anything, and listening for just those hears them far better.
+            voice?.listenFor(this.world.getSystem(DirectorSystem)?.available() === true ? undefined : wordsToHear());
+            void voice?.start();
+          });
         }
       });
       this.cleanupFuncs.push(
