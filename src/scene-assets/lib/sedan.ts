@@ -92,16 +92,16 @@ export function sedanShell(g: Group, paint: MeshStandardMaterial, glass: MeshSta
       handle.position.copy(out(skinAt(body, z, 0.09, side)));
       g.add(handle);
     }
-    const mirror = named(new Mesh(new SphereGeometry(1, 8, 6), paint), 'BodyMirror');
+    const mirror = named(new Mesh(new SphereGeometry(1, 14, 10), paint), 'BodyMirror');
     mirror.scale.set(0.009, 0.0055, 0.0065);
     mirror.position.copy(skinAt(cabin, 0.078, 0.103, side)).add(nudge.set(side * 0.008, 0.004, 0));
     g.add(mirror);
     // Lamps wrap the corners rather than sitting on a flat face.
-    const head = named(new Mesh(new SphereGeometry(1, 10, 8), lens), 'Headlamp');
+    const head = named(new Mesh(new SphereGeometry(1, 20, 14), lens), 'Headlamp');
     head.scale.set(0.021, 0.0075, 0.012);
     head.position.set(side * 0.058, 0.074, 0.212);
     head.rotation.y = side * 0.35;
-    const rear = named(new Mesh(new SphereGeometry(1, 10, 8), tail), 'TailLamp');
+    const rear = named(new Mesh(new SphereGeometry(1, 20, 14), tail), 'TailLamp');
     rear.scale.set(0.023, 0.0078, 0.008);
     rear.position.set(side * 0.058, 0.082, -0.219);
     rear.rotation.y = -side * 0.3;
@@ -123,6 +123,12 @@ export function sedanShell(g: Group, paint: MeshStandardMaterial, glass: MeshSta
   const back = named(new Mesh(bevelBox(0.118, 0.012, 0.012, 0.004), rubber), 'BumperRear');
   back.position.set(0, 0.044, -0.2245);
   g.add(grille, front, back);
+  // Two bright slats across the grille, in the hubs' metal.
+  for (const dy of [-0.0028, 0.0028]) {
+    const slat = named(new Mesh(bevelBox(0.078, 0.0024, 0.003, 0.0008), hub), 'GrilleSlat');
+    slat.position.set(0, 0.058 + dy, 0.2268);
+    g.add(slat);
+  }
   mergeByMaterial(
     g,
     new Map<Material, string>([
