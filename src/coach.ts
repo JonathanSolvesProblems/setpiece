@@ -444,8 +444,9 @@ export class CoachSystem extends createSystem({
   /** After the first frame the sheet is the shot list: what the director wants next. */
   private fillLine(): [string, string] {
     const brief = BRIEFS[(this.globals as Globals).briefIndex.peek()];
+    // The first frame is the moment to stand in it: the set grows around the wearer, in its own light.
+    if (this.shots === 1) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Now stand in it: pinch Step inside twice and the set grows around you.'];
     if (this.shots === 2) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Pinch a frame on the board to go back to its setup.'];
-    if (this.shots === 3) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Press Stand in the shot to walk your blocking at full size.'];
     if (brief == null) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Every shot is printed. Shoot what you like.'];
     return [`NEXT: ${brief.title.toUpperCase()}`, brief.ask];
   }

@@ -38,6 +38,9 @@ export class HandReading {
   /** Inside the closed hand, in world space. */
   readonly fistAt = new Vector3();
   shut = false;
+  /** The last readings, for measuring a real hand: the other three fingers' curl and the index's, in palm lengths. */
+  curl = 0;
+  indexCurl = 0;
   /** Metres between thumb and index tips, as last tracked. */
   pinchGap = 0;
   /** Two points along the hand's pointing ray, from aimFrom. */
@@ -96,6 +99,8 @@ export class HandReading {
     if (palm < 0.01) return;
     const curl = (dist(p, 4, 0) + dist(p, 5, 0) + dist(p, 6, 0)) / 3 / palm;
     const index = dist(p, 3, 0) / palm;
+    this.curl = curl;
+    this.indexCurl = index;
     if (!this.shut && curl <= FIST_SHUT && index <= INDEX_SHUT) {
       this.shut = true;
       this.fistStart = true;

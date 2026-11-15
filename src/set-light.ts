@@ -222,6 +222,10 @@ export class SetLightSystem extends createSystem({}) {
     }
     this.sky = sky;
     this.ground = ground;
+    // The shot's own sky is the lens backdrop; the world around a wearer is not in the picture.
+    const viewfinder = this.world.getSystem(ViewfinderSystem);
+    viewfinder?.hideFromLens(sky);
+    viewfinder?.hideFromLens(ground);
   }
 
   /**

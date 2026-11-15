@@ -728,6 +728,8 @@ class PlanBuild {
     if (this.next === '') this.value('next', plan.next);
     if (this.camera == null) this.value('camera', plan.camera);
     if (!this.begun && typeof plan.fresh === 'boolean') this.begin(plan.fresh);
+    // The light, if the stream did not give it: setting the same light again changes nothing.
+    this.value('light', plan.light);
   }
 
   /** Everything is down: the set is published, and what was built and what to try next is said. */
