@@ -452,6 +452,11 @@ export class PiecesSystem extends createSystem({
     this.drops.push({ piece, speed: 0, floor });
   }
 
+  /** Calls off a fall under way for this piece: it has been stood somewhere, and stays there. */
+  stay(piece: Entity): void {
+    for (let i = this.drops.length - 1; i >= 0; i--) if (this.drops[i].piece === piece) this.drops.splice(i, 1);
+  }
+
   /** The set changed: nothing is carried that is no longer on it, and nothing stands on what has gone. */
   private setChanged(): void {
     for (const side of SIDES) {

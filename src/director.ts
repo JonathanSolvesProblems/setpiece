@@ -87,13 +87,14 @@ const BODY_HALF = 0.025;
 /** Higher than this off the ground, a piece is up on something or flying, and the set dresser leaves it be. */
 const RAISED = 0.01;
 /**
- * How tall each burning effect is, on the slate. One standing on the ground inside a solid piece taller than this
- * share of it is hidden, and is stood so that this share of it is sunk below the piece's top: fire on a truck burns
- * from the truck's roof, not inside its box.
+ * How tall each burning effect is, on the slate. One inside a solid piece taller than this share of it is hidden,
+ * and is stood this far below the piece's top (2 cm: 20 cm at full size): fire on a truck burns from the truck's
+ * roof, not inside its box. No lower than that, or the pieces' own rule (STACK_SLACK in src/pieces.ts) counts it as
+ * standing on nothing and lets it fall to the slate the next time the set changes.
  */
 const BURNS: Record<string, number> = { Fire: 0.18, Smoke: 0.3, Sparks: 0.12, Explosion: 0.2 };
 const BURN_HIDDEN = 0.45;
-const BURN_SUNK = 0.3;
+const BURN_SUNK = 0.02;
 /** A piece the set dresser moves less than this (slate metres, 10 cm real) is slid, not dropped again. */
 const NUDGE = 0.01;
 /** A raised piece rests on a top no more than this above its own height (slate metres, 6 cm real). */
@@ -796,6 +797,27 @@ class PlanBuild {
       let best: Standing | null = null;
       let bestTop = 0;
       let score = Infinity;
+      // Fire, smoke, sparks and an explosion belong to the thing that burns: the nearest solid piece (a vehicle, a
+      // building, something made) they lie within, at whatever height they were written. They burn from near its
+      // top; on something low they stay where they were put.
+      const reach = BURNS[one.base.spareOf ?? one.base.label];
+      if (reach !== undefined) {
+        for (const support of supports) {
+          const burns = support.one.base.solid === true || isMade(support.one.label);
+          if (!burns || support.one === one || !holds(support.foot, one.object.position.x, one.object.position.z)) continue;
+          const far = Math.hypot(support.foot.x - one.object.position.x, support.foot.z - one.object.position.z);
+          if (far < score) {
+            score = far;
+            best = support.one;
+            bestTop = support.top;
+          }
+        }
+        if (best != null) {
+          under.set(one, best);
+          if (this.placed.has(one.label) && bestTop > reach * BURN_HIDDEN) lifts.push([one, bestTop - BURN_SUNK]);
+          continue;
+        }
+      }
       for (const support of supports) {
         if (support.one === one || !holds(support.foot, one.object.position.x, one.object.position.z)) continue;
         if (raised && support.top > one.rest + RESTS_ON) continue;
@@ -807,9 +829,6 @@ class PlanBuild {
         }
       }
       if (best != null) under.set(one, best);
-      // Flames put on the ground inside the thing that burns are hidden by it: they go up to burn from its top.
-      const reach = BURNS[one.base.spareOf ?? one.base.label];
-      if (best != null && !raised && reach !== undefined && this.placed.has(one.label) && bestTop > reach * BURN_HIDDEN) lifts.push([one, bestTop - reach * BURN_SUNK]);
     }
     const moves: Moved[] = [];
     const apply = (feet: Footing[], owners: (Standing | null)[]): void => {
@@ -877,14 +896,21 @@ class PlanBuild {
       moves.push({ standing: one, dx: move.dx, dz: move.dz, foot: move.foot });
     }
     // A piece moved far enough to see drops onto its new mark; a nudge is only a nudge.
-    for (const move of moves) {
-      if (Math.hypot(move.dx, move.dz) >= NUDGE) drop(move.standing.entity, move.standing.object, move.standing.rest);
-    }
+    // What burns goes up to its place first, so a piece that was also moved drops once, onto the right height.
+    const pieces = this.world.getSystem(PiecesSystem);
     for (const [one, y] of lifts) {
       one.rest = y;
       this.restY.set(one.label, y);
-      drop(one.entity, one.object, y);
+      // It was put down on the ground or in the air inside the piece, and may be falling from there.
+      pieces?.stay(one.entity);
     }
+    const dropped = new Set<Standing>();
+    for (const move of moves) {
+      if (Math.hypot(move.dx, move.dz) < NUDGE || dropped.has(move.standing)) continue;
+      dropped.add(move.standing);
+      drop(move.standing.entity, move.standing.object, move.standing.rest);
+    }
+    for (const [one, y] of lifts) if (!dropped.has(one)) drop(one.entity, one.object, y);
     this.world.getSystem(ViewfinderSystem)?.refresh();
     return moves.length;
   }
