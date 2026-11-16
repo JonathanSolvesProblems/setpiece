@@ -9,14 +9,17 @@ import {
   BackSide,
   CanvasTexture,
   CircleGeometry,
+  Color,
   createSystem,
   HemisphereLight,
   IBLGradient,
   Mesh,
   MeshBasicMaterial,
   Object3D,
+  PlaneGeometry,
   PointLight,
   Quaternion,
+  RepeatWrapping,
   SphereGeometry,
   SRGBColorSpace,
   Vector3,
@@ -37,6 +40,41 @@ const LIFE_SCALE = 10;
 /** How much of the world around a set stepped inside covers the room: the rest of the room shows through. */
 const WORLD_COVER = 0.9;
 const WORLD_RADIUS = 60;
+/**
+ * The floor inside a set: a grid of one-metre squares out to this many metres, lying on the set's own floor and
+ * moving with the set, so a wearer who walks sees the ground pass under them. Its lines take the key light's colour
+ * and this much of the world's cover, and the stage's own 6 by 4 metres is drawn brighter in the middle of it.
+ */
+const GRID_REACH = 30;
+const GRID_SHOWS = 0.3;
+const STAGE_SHOWS = 0.7;
+
+/** One square of the grid: a soft line along two edges, clear inside. */
+function paintGridCell(canvas: HTMLCanvasElement): void {
+  const g = canvas.getContext('2d');
+  if (g == null) return;
+  const n = canvas.width;
+  g.clearRect(0, 0, n, n);
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  g.fillRect(0, 0, n, 3);
+  g.fillRect(0, 0, 3, n);
+  g.fillStyle = 'rgba(255,255,255,1)';
+  g.fillRect(0, 0, n, 1.5);
+  g.fillRect(0, 0, 1.5, n);
+}
+
+/** The stage's edge as tape on the floor: its outline and a tick at each corner. */
+function paintStageTape(canvas: HTMLCanvasElement): void {
+  const g = canvas.getContext('2d');
+  if (g == null) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(255,255,255,1)';
+  g.lineWidth = 5;
+  g.setLineDash([26, 14]);
+  g.strokeRect(4, 4, w - 8, h - 8);
+}
 /** Frames after a change of light before the world's sky is painted in it, unless the wearer steps inside first. */
 const WORLD_PAINT_AFTER = 150;
 const ORIGIN = new Vector3();
@@ -102,6 +140,8 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
   private stage: Object3D | null = null;
   private sky: Mesh | null = null;
   private ground: Mesh | null = null;
+  private grid: Mesh | null = null;
+  private tape: Mesh | null = null;
   private skyCanvas: HTMLCanvasElement | null = null;
   private groundCanvas: HTMLCanvasElement | null = null;
   /** The light last painted on the fill, the backdrop and the world. */
@@ -205,6 +245,10 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
       map.needsUpdate = true;
     }
     this.ensureWorld();
+    if (this.grid != null && this.tape != null) {
+      ((this.grid.material as MeshBasicMaterial).color as Color).setHex(look.key);
+      ((this.tape.material as MeshBasicMaterial).color as Color).setHex(look.key);
+    }
     if (this.groundCanvas != null) {
       paintGround(this.groundCanvas, look);
       (this.ground!.material as MeshBasicMaterial).map!.needsUpdate = true;
@@ -272,10 +316,48 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     }
     this.sky = sky;
     this.ground = ground;
+    const cell = document.createElement('canvas');
+    cell.width = 64;
+    cell.height = 64;
+    paintGridCell(cell);
+    const cells = new CanvasTexture(cell);
+    cells.wrapS = RepeatWrapping;
+    cells.wrapT = RepeatWrapping;
+    cells.repeat.set(GRID_REACH * 2, GRID_REACH * 2);
+    cells.anisotropy = 4;
+    // In the stage's own units: a tenth of a metre there is a metre at full size.
+    const grid = new Mesh(
+      new CircleGeometry(GRID_REACH / LIFE_SCALE, 48),
+      new MeshBasicMaterial({ map: cells, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false }),
+    );
+    grid.name = 'SetFloorGrid';
+    const strip = document.createElement('canvas');
+    strip.width = 768;
+    strip.height = 512;
+    paintStageTape(strip);
+    const tape = new Mesh(
+      new PlaneGeometry(0.6, 0.4),
+      new MeshBasicMaterial({ map: new CanvasTexture(strip), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false }),
+    );
+    tape.name = 'SetFloorStage';
+    for (const mesh of [grid, tape]) {
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      mesh.raycast = () => {};
+      mesh.renderOrder = -1;
+      (mesh as Mesh & { pointerEvents?: string }).pointerEvents = 'none';
+    }
+    grid.position.y = 0.0002;
+    tape.position.y = 0.0003;
+    this.grid = grid;
+    this.tape = tape;
     // The shot's own sky is the lens backdrop; the world around a wearer is not in the picture.
     const viewfinder = this.world.getSystem(ViewfinderSystem);
     viewfinder?.hideFromLens(sky);
     viewfinder?.hideFromLens(ground);
+    viewfinder?.hideFromLens(grid);
+    viewfinder?.hideFromLens(tape);
   }
 
   /**
@@ -292,10 +374,25 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     const show = grown > 0.001;
     sky.visible = show;
     ground.visible = show;
+    const grid = this.grid;
+    const tape = this.tape;
+    if (grid != null && tape != null) {
+      // They lie on the stage, so they go where it goes.
+      if (grid.parent !== this.stage) {
+        this.stage!.add(grid);
+        this.stage!.add(tape);
+      }
+      grid.visible = show;
+      tape.visible = show;
+    }
     if (!show) return;
     const cover = WORLD_COVER * grown;
     (sky.material as MeshBasicMaterial).opacity = cover;
     (ground.material as MeshBasicMaterial).opacity = cover;
+    if (grid != null && tape != null) {
+      (grid.material as MeshBasicMaterial).opacity = cover * GRID_SHOWS;
+      (tape.material as MeshBasicMaterial).opacity = cover * STAGE_SHOWS;
+    }
     this.player.head.getWorldPosition(this.head);
     this.stage!.getWorldPosition(this.floor);
     sky.position.set(this.head.x, this.floor.y, this.head.z);

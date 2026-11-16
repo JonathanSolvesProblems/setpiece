@@ -66,3 +66,6 @@ tmp/
 
 # The hackathon strategy card stays on this machine (the commit hook reads it here); it is not part of the published project.
 PHASE0.md
+
+# Headset captures and recordings for the video (large, kept local)
+broll/

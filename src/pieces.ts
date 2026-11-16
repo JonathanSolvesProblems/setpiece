@@ -16,6 +16,7 @@ import {
   AudioSource,
   AudioUtils,
   Box3,
+  BoxGeometry,
   CapsuleGeometry,
   createSystem,
   CylinderGeometry,
@@ -94,6 +95,8 @@ const OPTIC_YELLOW = 0xd6e13c;
 const REACH = 0.035;
 const REACH_RELEASE = 0.06;
 const THIN_REACH = 0.045;
+/** A made piece's grab zone is its own box and this much more on each side. */
+const GRAB_PAD = 0.012;
 /** Hand tracking drops out for a moment when fingers close: a held piece waits this long for it. */
 /** Half a vehicle's length along its nose, from its own shape, at its size on the set. */
 function localBoundsDepth(box: Box3 | null | undefined, object: Object3D): number {
@@ -323,6 +326,7 @@ export class PiecesSystem extends createSystem({
   private ghostThumb: Mesh | null = null;
   private point = new Vector3();
   private local = new Vector3();
+  private grabBox = new Box3();
   private padAt = new Vector3();
 
   init(): void {
@@ -1074,8 +1078,19 @@ export class PiecesSystem extends createSystem({
     const volume = object.getObjectByName('GrabVolume') as Mesh | undefined;
     if (volume != null) {
       volume.geometry.dispose();
-      volume.geometry = new CylinderGeometry(radius, radius, height, 14, 1);
-      volume.position.y = height / 2;
+      if (surfaces.length > 0) {
+        // A made piece is picked up by its own box, a finger's width bigger: a castle front 5 m across and 1 m
+        // deep took a drum 5 m across, and a pinch meant for a guard in front of it picked up the castle.
+        const box = this.grabBox.makeEmpty();
+        for (const surface of surfaces) box.union(surface);
+        box.getSize(this.local);
+        volume.geometry = new BoxGeometry(this.local.x + GRAB_PAD * 2, this.local.y, this.local.z + GRAB_PAD * 2);
+        box.getCenter(this.local);
+        volume.position.set(this.local.x, this.local.y, this.local.z);
+      } else {
+        volume.geometry = new CylinderGeometry(radius, radius, height, 14, 1);
+        volume.position.set(0, height / 2, 0);
+      }
       volume.updateMatrix();
     }
     const ring = this.rings[index];

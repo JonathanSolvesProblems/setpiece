@@ -41,8 +41,12 @@ const LENS_AHEAD = -0.06;
 /** Where a pointing hand would stand the wearer: a ring on the floor, this wide on the slate (ten times that at full size). */
 const MARK_INNER = 0.022;
 const MARK_OUTER = 0.032;
-/** A hand points at the floor when its ray falls at least this steeply, and the floor is between these, in metres. */
-const FALLS = -0.12;
+/** The wearer is looking at the floor when their look falls at least this steeply, and the floor is between these, in metres. */
+const LOOKS_DOWN = -0.07;
+/** The walk's line is tried this often for something solid, in slate metres (25 cm at full size). */
+const WALK_STEP = 0.025;
+/** How fast the ring follows the look, as a share of what is left each second. */
+const RING_FOLLOWS = 14;
 const NEAREST = 0.4;
 const FARTHEST = 25;
 /** A spot nearer the wearer's feet than this is not somewhere to walk to. */
@@ -51,7 +55,7 @@ const SIDES = ['left', 'right'] as const;
 type Side = (typeof SIDES)[number];
 const OPTIC_YELLOW = 0xd6e13c;
 /** What the panel says on stepping inside: the call sheet stays behind on the table. */
-const INSIDE_NOTE = 'INSIDE THE SET | Point at the floor: a yellow ring shows where you will stand. Pinch to walk there. Back to the table leaves.';
+const INSIDE_NOTE = 'INSIDE THE SET | Look at the floor: a yellow ring shows where you will stand. Pinch to walk there. Back to the table leaves.';
 /**
  * A walk is a short glide, not a jump: the wearer sees the set pass and knows where they have got to. It takes
  * this long for the first metre and this much more for each metre after, and never longer than the last.
@@ -122,8 +126,9 @@ export class LifeSizeSystem extends createSystem({
   private toward = new Vector3();
   /** The ring on the floor where a pinch would stand the wearer, and which hand is pointing there. */
   private mark: Mesh | null = null;
-  private aimed: Side | null = null;
-  private armed: Side | null = null;
+  private spot = new Vector3();
+  /** The ring was showing last frame: it glides to where the look moves, and appears at once where it was not. */
+  private settled = false;
   private from = new Vector3();
   private way = new Vector3();
   private hit = new Vector3();
@@ -147,8 +152,8 @@ export class LifeSizeSystem extends createSystem({
   }
 
   /**
-   * At full size, a hand pointing down at the floor marks where it would stand the wearer, and a pinch there
-   * takes them: the set slides so that spot is under their feet. A hand at the panel is the panel's.
+   * At full size, a ring on the floor where the wearer looks marks where they would stand, and a pinch of either
+   * hand takes them: the set glides so that spot comes under their feet. A hand at the panel is the panel's.
    */
   /** True when this spot on the slate is inside something solid, with the walk's margin around it. */
   private blocked(x: number, z: number, margin: number): boolean {
@@ -211,7 +216,7 @@ export class LifeSizeSystem extends createSystem({
         if (asked === 0 || !g.lifeSize.peek()) return;
         this.walkT = -1;
         this.cutToCamera();
-        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Point at the floor and pinch to walk.';
+        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Look at the floor and pinch to walk.';
       }),
     );
   }
@@ -233,16 +238,14 @@ export class LifeSizeSystem extends createSystem({
     const life = g.lifeSize.peek() && object != null && this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
     if (!life) {
       if (this.mark != null) this.mark.visible = false;
-      this.aimed = null;
-      this.armed = null;
+      this.settled = false;
       return;
     }
     const mark = this.ensureMark(object);
     // While the set is still growing around the wearer there is nowhere to walk to yet.
     if (this.growT >= 0) {
       mark.visible = false;
-      this.aimed = null;
-      this.armed = null;
+      this.settled = false;
       return;
     }
     // On the way to a spot: the set glides under the wearer, and nothing else is aimed at until they are there.
@@ -254,8 +257,7 @@ export class LifeSizeSystem extends createSystem({
       if (t < 1) return;
       this.walkT = -1;
       mark.visible = false;
-      this.aimed = null;
-      this.armed = null;
+      this.settled = false;
       this.world.getSystem(ViewfinderSystem)?.refresh();
       return;
     }
@@ -277,69 +279,74 @@ export class LifeSizeSystem extends createSystem({
       this.lostSaid = true;
       g.coachNote.value = LOST_NOTE;
     }
-    this.aimed = null;
-    // The hand that pinches is the one that walks; before a pinch, the right hand's aim shows, then the left's.
-    // A hand hanging at the side points at the wearer's own feet, and that is not a place to go.
-    for (let pass = 0; pass < 2 && this.aimed == null; pass++) {
-      for (let i = SIDES.length - 1; i >= 0 && this.aimed == null; i--) {
-        const side = SIDES[i];
-        if (pass === 0 && this.input.xr.gamepads[side]?.getSelectStart() !== true && this.armed !== side) continue;
-        if (controls?.panelWanted(side) === true) continue;
-        const ray = this.player.raySpaces[side];
-        ray.getWorldPosition(this.from);
-        // A target ray points down its own -Z.
-        ray.getWorldDirection(this.way).negate();
-        if (this.way.y > FALLS) continue;
-        const t = (this.floor.y - this.from.y) / this.way.y;
-        if (t < NEAREST || t > FARTHEST) continue;
-        this.hit.copy(this.from).addScaledVector(this.way, t);
-        if (Math.hypot(this.hit.x - this.head.x, this.hit.z - this.head.z) < AHEAD) continue;
-        this.aimed = side;
+    // Where the wearer looks on the floor is where they would stand. A head is steady and there is one of it: a
+    // hand's ray swings metres across a far floor with a turn of the wrist, and two resting hands both point down.
+    this.player.head.getWorldDirection(this.way).negate();
+    let found = false;
+    if (this.way.y <= LOOKS_DOWN) {
+      const t = (this.floor.y - this.head.y) / this.way.y;
+      if (t >= NEAREST && t <= FARTHEST) {
+        this.hit.copy(this.head).addScaledVector(this.way, t);
+        found = Math.hypot(this.hit.x - this.head.x, this.hit.z - this.head.z) >= AHEAD;
       }
     }
-    if (this.aimed == null) {
+    if (found) {
+      // Along the straight line there, the walk ends in front of the first solid thing: nobody walks through a
+      // wall. (Someone already inside a piece walks out of it first.)
+      object.worldToLocal(this.spot.copy(this.hit));
+      const dx = this.spot.x - this.here.x;
+      const dz = this.spot.z - this.here.z;
+      const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / WALK_STEP));
+      let clear = false;
+      found = false;
+      for (let i = 1; i <= steps; i++) {
+        const x = this.here.x + (dx * i) / steps;
+        const z = this.here.z + (dz * i) / steps;
+        if (this.blocked(x, z, SOLID_MARGIN)) {
+          if (clear) break;
+          continue;
+        }
+        clear = true;
+        // Not on the wearer's own feet.
+        if (Math.hypot(x - this.here.x, z - this.here.z) * LIFE_SCALE < AHEAD) continue;
+        this.spot.x = x;
+        this.spot.z = z;
+        found = true;
+      }
+    }
+    if (!found) {
       mark.visible = false;
-      this.armed = null;
+      this.settled = false;
       return;
     }
+    // The ring follows the look smoothly, so a small turn of the head does not make it jump.
+    this.spot.y = 0.0006;
+    if (this.settled) mark.position.lerp(this.spot, Math.min(1, RING_FOLLOWS * delta));
+    else mark.position.copy(this.spot);
+    this.settled = true;
     mark.visible = true;
-    mark.position.copy(this.hit);
-    object.worldToLocal(mark.position);
-    // Not into a wall: the spot comes back towards the wearer until it is clear of everything solid. (Someone
-    // already inside a piece goes wherever they point, which is how they get out.)
-    if (this.blocked(mark.position.x, mark.position.z, SOLID_MARGIN)) {
-      const fromX = mark.position.x;
-      const fromZ = mark.position.z;
-      for (let step = 1; step <= 16; step++) {
-        const x = fromX + ((this.here.x - fromX) * step) / 16;
-        const z = fromZ + ((this.here.z - fromZ) * step) / 16;
-        if (this.blocked(x, z, SOLID_MARGIN)) continue;
-        mark.position.x = x;
-        mark.position.z = z;
-        this.hit.set(x, 0, z);
-        object.localToWorld(this.hit);
-        break;
-      }
-    }
-    mark.position.y = 0.0006;
     // The ring breathes, so it reads as a place to go and not as part of the set.
     this.pulse = (this.pulse + delta * 5) % (Math.PI * 2);
     mark.scale.setScalar(1 + 0.1 * Math.sin(this.pulse));
-    const pad = this.input.xr.gamepads[this.aimed];
-    if (pad?.getSelectStart() === true) this.armed = this.aimed;
-    if (this.armed === this.aimed && pad?.getSelectEnd() === true) {
-      this.armed = null;
-      // The spot comes to the wearer's feet; the set keeps its turn.
-      this.player.head.getWorldPosition(this.head);
-      this.head.y = this.floor.y;
-      this.offset.copy(this.head).sub(this.hit);
-      this.offset.y = 0;
-      this.walkFrom.copy(this.floor);
-      this.walkTo.copy(this.floor).add(this.offset);
-      this.walkFor = Math.min(WALK_LONGEST, WALK_SECONDS + Math.max(0, this.offset.length() - 1) * WALK_SECONDS_A_METRE);
-      this.walkT = 0;
-      if (this.steps != null) AudioUtils.play(this.steps);
+    // Either hand's pinch walks there, unless that hand is at the panel.
+    let pinched = false;
+    for (let i = 0; i < SIDES.length; i++) {
+      const side = SIDES[i];
+      if (this.input.xr.gamepads[side]?.getSelectStart() === true && controls?.panelWanted(side) !== true) pinched = true;
     }
+    if (!pinched) return;
+    // The spot comes to the wearer's feet; the set keeps its turn.
+    this.hit.copy(mark.position);
+    this.hit.y = 0;
+    object.localToWorld(this.hit);
+    this.head.y = this.floor.y;
+    this.offset.copy(this.head).sub(this.hit);
+    this.offset.y = 0;
+    this.walkFrom.copy(this.floor);
+    this.walkTo.copy(this.floor).add(this.offset);
+    this.walkFor = Math.min(WALK_LONGEST, WALK_SECONDS + Math.max(0, this.offset.length() - 1) * WALK_SECONDS_A_METRE);
+    this.walkT = 0;
+    if (this.steps != null) AudioUtils.play(this.steps);
   }
 
   private ensureMark(object: Object3D): Mesh {
