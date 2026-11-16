@@ -64,8 +64,8 @@ html,body{{margin:0;width:{w}px;height:{h}px;background:{cloth};overflow:hidden}
 .small{{margin-top:16px;font-family:SetGrotesk;font-size:25px;line-height:1.3;color:{muted}}}
 .art{{position:absolute;right:54px;top:62px;height:506px;width:auto}}
 </style></head><body><div class="card">
-<div class="words">{wordmark}<div class="stripe"></div><div class="line">Block the shot on your kitchen table</div>
-<div class="small">Hands-first previs for Meta Quest. Runs in the headset's browser.</div></div>
+<div class="words">{wordmark}<div class="stripe"></div><div class="line">Say the shot. It builds on your table.</div>
+<div class="small">Hands-first film previs for Meta Quest. Runs in the headset's browser.</div></div>
 <img class="art" src="{art}" alt=""></div></body></html>"""
 
 

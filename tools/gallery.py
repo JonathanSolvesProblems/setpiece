@@ -39,6 +39,7 @@ checks = (ROOT / 'devpost/checks/last-run.md').read_text(encoding='utf-8')
 catalog = (ROOT / 'src/catalog.ts').read_text(encoding='utf-8')
 designer = json.loads((ROOT / 'devpost/results/designer-latency.json').read_text(encoding='utf-8'))
 quest_designer = json.loads((ROOT / 'devpost/results/quest-voice-designer.json').read_text(encoding='utf-8'))
+hurry = json.loads((ROOT / 'devpost/results/designer-hurry.json').read_text(encoding='utf-8'))['summary']['with']
 designer_frames = json.loads((ROOT / 'devpost/results/quest-frame-time-designer.json').read_text(encoding='utf-8'))
 designer_sets = [designer_frames['second_run_hands_open']['night_chase'], designer_frames['second_run_hands_open']['funeral_in_the_rain'], designer_frames['first_run_hands_pointing']['castle_gate']]
 spoken_lines = json.loads((ROOT / 'public/audio/voice/lines.json').read_text(encoding='utf-8'))['lines']
@@ -92,11 +93,11 @@ SLIDES = [
     dict(slug='made', badge=LIVE_BADGE, headline='It makes what the library lacks', picture=('live', 'castle'),
          caption='Asked for a castle gate, it built the gate and two towers from simple wooden shapes, then two guards and a horse, low and wide.'),
     dict(slug='look', badge=LIVE_BADGE, headline='It checks its own frame', picture=('live', 'look'),
-         caption="It is shown the camera's picture and what each piece covers. A truck in the way, a dragon cut off: it moves the camera and looks again."),
+         caption="Once the set is up it is shown its own camera's picture and how much of the frame each piece takes. It moves the camera if the shot is off."),
     dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
          caption="The designer's own plan stood two actors inside a car parked side-on. Code stepped them out beside it before the camera was placed."),
-    dict(slug='speed', badge='Result · devpost/results/designer-latency.json and quest-voice-designer.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
-         caption='First piece a median {designer_first_s} s from a desktop, {quest_first_s} s spoken on the headset, where its sets ran at {sets_standing} frames a second.'),
+    dict(slug='speed', badge='Measured on a Quest 3S · devpost/results/quest-voice-designer.json', headline='{quest_first_s} s from your last word', picture=('result', 'designer'),
+         caption='Spoken on the headset: the first piece {quest_first_s} s after the last word, the whole set inside 4 s, at {sets_standing} frames a second.'),
     dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'lines'),
          caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
     dict(slug='light', badge=LIVE_BADGE, headline='It lights the scene', picture=('live', 'light'),
@@ -141,6 +142,7 @@ html,body{{margin:0;width:{w}px;height:{h}px;background:#1b1411;color:#f6f7ef;ov
 h1{{font-family:SetStencil;font-size:88px;line-height:.92;margin:14px 0 26px;letter-spacing:.005em;text-transform:uppercase}}
 .pic{{flex:1;min-height:0;border:2px solid #5a4b3d;background:#2a211c;display:flex;align-items:center;justify-content:center;overflow:hidden}}
 .pic img{{width:100%;height:100%;object-fit:contain;display:block}}
+.pic.fill img{{object-fit:cover}}
 .caption{{font-family:SetGrotesk;font-size:30px;line-height:1.3;color:#f6f7ef;margin-top:24px}}
 .result{{width:100%;height:100%;padding:28px 36px;box-sizing:border-box;font-family:SetGrotesk;font-size:28px;line-height:1.35;color:#f6f7ef}}
 .result table{{border-collapse:collapse;width:100%}}
@@ -149,6 +151,8 @@ h1{{font-family:SetStencil;font-size:88px;line-height:.92;margin:14px 0 26px;let
 .big{{font-family:SetStencil;font-size:150px;line-height:1;color:#d6e13c;margin:10px 0 0}}
 .muted{{color:#c7c7b7}} .yes{{color:#d6e13c}} .pair{{display:flex;gap:16px;height:100%}} .pair img{{flex:1;min-width:0;object-fit:contain}}
 .unit{{font-family:SetShoulders;font-size:40px;color:#c7c7b7;margin-left:14px}}
+.result.stats{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 44px;align-content:center;padding:20px 48px}}
+.stat .big{{font-size:170px}} .stat p{{margin:18px 0 0;font-size:30px;line-height:1.3}} .foot{{grid-column:1 / -1;margin:44px 0 0;font-size:26px}}
 .result.rows5 .big{{font-size:112px;margin:0}} .result.rows5 p{{margin:14px 0 16px}}
 </style></head><body><div class="slide"><div class="badge">{badge}</div><h1>{headline}</h1><div class="pic">{body}</div><div class="caption">{caption}</div></div></body></html>"""
 
@@ -180,15 +184,13 @@ def result_body(kind: str) -> str:
         return (f'<div class="result"><p class="muted">Recorded sentences fed to the recogniser the app ships, inside the Quest Browser on a Quest 3S. No microphone was open and nobody spoke. The right column is what it wrote down.</p>'
                 f'<table><tr><th>Said</th><th>Written on the headset</th></tr>{rows}</table></div>')
     if kind == 'designer':
-        rows = ''.join(
-            f"<tr><td>{run['said']}</td><td class='yes'>{run['firstPieceMs'] / 1000:.1f} s</td><td>{run['wholeMs'] / 1000:.1f} s</td></tr>"
-            for run in designer['runs']
-        )
-        return (f'<div class="result"><div class="big">{N["designer_first_s"]}<span class="unit">s to the first piece, median of {N["designer_sentences"]} sets</span></div>'
-                f'<p class="muted">From the request to the first piece of a fresh set, and to the whole set: the app\'s own server function, from a desktop on home broadband. '
-                f'On the headset, {len(quest_designer["runs"])} sentences in my own words, the last on the live site: {N["quest_first_s"]} s from the end of the sentence to the first piece each time, {" and ".join(f"{run["wholeSetMs"] / 1000:.1f}" for run in quest_designer["runs"])} s to the whole set.</p>'
-                f'<p>With both hands tracked, the designer\'s sets ran at {N["sets_standing"]} frames a second standing and {N["sets_moving"]} with a piece moving.</p>'
-                f'<table><tr><th>Said</th><th>First piece</th><th>Whole set</th></tr>{rows}</table></div>')
+        wholes = [run['wholeSetMs'] / 1000 for run in quest_designer['runs']]
+        cell = lambda big, unit, words: (f'<div class="stat"><div class="big">{big}<span class="unit">{unit}</span></div><p>{words}</p></div>')
+        return ('<div class="result stats">'
+                + cell(N['quest_first_s'], 's', f'from my last word to the first piece on the table. Spoken on a Quest 3S, {len(quest_designer["runs"])} sentences in my own words.')
+                + cell(f'{max(wholes):.1f}', 's', f'at most to the whole set standing ({" and ".join(f"{v:.1f}" for v in wholes)} s).')
+                + cell(N['sets_standing'].split(' to ')[0], 'fps', f'or more with its sets standing and both hands tracked ({N["sets_standing"]}); {N["sets_moving"]} with a piece moving.')
+                + f'<p class="muted foot">From a desktop, {hurry["plans"]} sentences: first piece a median {hurry["firstPieceMs"]["median"] / 1000:.1f} s, slowest {hurry["firstPieceMs"]["slowest"] / 1000:.1f} s.</p></div>')
     if kind == 'lines':
         when = {
             'land': 'The set has not landed yet',
@@ -292,7 +294,11 @@ async def stage_png(page, path: Path):
     await shot(page, path, '.stage')
     im = Image.open(path)
     w, h = im.size
-    im.crop((int(w * 0.14), int(h * 0.08), int(w * 0.86), int(h * 0.9))).save(path)
+    # As wide as the slide's picture frame (1356 by 632), so no dark bars stand beside it.
+    cw = int(w * 0.94)
+    ch = min(h, int(cw * 632 / 1356))
+    top = max(0, min(h - ch, int(h * 0.5 - ch / 2)))
+    im.crop(((w - cw) // 2, top, (w - cw) // 2 + cw, top + ch)).save(path)
 
 
 async def live_capture(browser, recipe: str, out: Path) -> Path:
@@ -362,9 +368,9 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         if recipe == 'designer':
             await stage_png(page, png)
         elif recipe == 'castle':
+            # From outside the set, so the gate and its towers show whole: the lens stands low and close to the guards.
             await page.wait_for_timeout(800)
-            url = await page.evaluate(lens)
-            png.write_bytes(base64.b64decode(url.split(',')[1]))
+            await stage_png(page, png)
         else:
             from PIL import Image, ImageDraw, ImageFont
             await page.wait_for_timeout(800)
@@ -384,16 +390,20 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             label = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'BigShoulders-Bold.ttf'), 40)
             draw.text((0, 740), 'WHAT IT SAW FIRST', font=label, fill=(214, 225, 60))
             draw.text((1360, 740), 'AFTER IT LOOKED', font=label, fill=(214, 225, 60))
+            import textwrap
+            # What it was told about its first frame: the first words of each piece's line, whole.
             y = 800
             for line in looks[0]['report'].split('\n')[:4]:
-                draw.text((0, y), cut(line[2:]), font=face, fill=(199, 199, 183))
+                draw.text((0, y), line[2:].split(';')[0].split(', ')[0] + ', ' + line[2:].split(', ')[1] if ', ' in line else line[2:], font=face, fill=(199, 199, 183))
                 y += 46
-            # Its note says what it changed; the lines under it are measured from the frame it left.
-            words = note.split('. ', 1)[-1]
-            draw.text((1360, 800), cut(words), font=face, fill=(246, 247, 239))
-            y = 846
-            for line in measured.split('\n')[:3]:
-                draw.text((1360, y), cut(line[2:]), font=face, fill=(199, 199, 183))
+            # Its own note says what it changed, in full; the lines under it are measured from the frame it left.
+            words = note.split(' | ', 1)[-1].split('. ', 1)[-1] if 'THROUGH THE LENS' not in note else note.split(' | ', 1)[-1]
+            y = 800
+            for row in textwrap.wrap(words, 70)[:3]:
+                draw.text((1360, y), row, font=face, fill=(246, 247, 239))
+                y += 46
+            for line in measured.split('\n')[:2]:
+                draw.text((1360, y), (line[2:].split(', ')[0] + ', ' + line[2:].split(', ')[1]) if ', ' in line else line[2:], font=face, fill=(199, 199, 183))
                 y += 46
             sheet.save(png)
     elif recipe == 'dresser':

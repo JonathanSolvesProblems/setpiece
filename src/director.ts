@@ -432,8 +432,48 @@ export class DirectorSystem extends createSystem({
    * Stands the camera for a shot the set designer planned in a coverage, as a plan's camera is stood
    * (src/coverage.ts). False when the camera could not move (it is held, or a take is running).
    */
-  frameShot(plan: CameraPlan, glide = 0): boolean {
-    return this.frame(this.fitted(plan), new Map(), glide);
+  frameShot(plan: CameraPlan, glide = 0, wide = false): boolean {
+    return this.frame(wide ? this.fittedWide(plan) : this.fitted(plan), new Map(), glide);
+  }
+
+  /**
+   * The wide of a coverage: aimed at the middle of everything standing on the set and stood back, or given a wider
+   * lens, until all of it is in the frame. Effects are seen through and do not count. With nothing on the set it
+   * is left as planned.
+   */
+  private fittedWide(plan: CameraPlan): CameraPlan {
+    const tray = this.world.getSystem(TraySystem);
+    if (tray == null) return plan;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    let top = 0;
+    for (const label of tray.onSet()) {
+      const entity = this.entityOf(label);
+      const object = entity?.object3D;
+      if (entity == null || object == null || !object.visible) continue;
+      const role = entity.getValue(SetPiece, 'role');
+      if (role === SetRole.Camera || role === SetRole.Stage || assetByLabel(label)?.shelf === 'Effects') continue;
+      const box = localBounds(object);
+      if (box.isEmpty()) continue;
+      const size = box.getSize(this.fitSize).multiplyScalar(object.scale.x * REAL);
+      // Turned any way, a piece stays inside the circle round its footprint.
+      const reach = Math.hypot(size.x, size.z) / 2;
+      const x = object.position.x * REAL;
+      const z = object.position.z * REAL;
+      minX = Math.min(minX, x - reach);
+      maxX = Math.max(maxX, x + reach);
+      minZ = Math.min(minZ, z - reach);
+      maxZ = Math.max(maxZ, z + reach);
+      top = Math.max(top, (object.position.y + box.max.y * object.scale.y) * REAL);
+    }
+    if (minX > maxX) return this.fitted(plan);
+    const subject = { x: (minX + maxX) / 2, y: top * 0.45, z: (minZ + maxZ) / 2, across: Math.max(maxX - minX, maxZ - minZ), up: top };
+    const g = this.globals as unknown as Globals;
+    const sensor = SENSORS[g.sensorIndex.peek()]?.heightMm ?? SENSORS[0].heightMm;
+    const aimed = { ...plan, look_at: '', look_x: subject.x, look_y: subject.y, look_z: subject.z };
+    return fitShot(aimed, subject, sensor, LENSES, CAMERA_STANDS);
   }
 
   /**

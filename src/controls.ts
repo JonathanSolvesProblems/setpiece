@@ -135,6 +135,7 @@ type Globals = {
   roomScanOffered: Signal<boolean>;
   lifeSize: Signal<boolean>;
   lifeSizeRequested: Signal<number>;
+  backToCamera: Signal<number>;
   recordRequested: Signal<number>;
   playRequested: Signal<number>;
   trayToggle: Signal<string>;
@@ -795,7 +796,13 @@ export class ControlsSystem extends createSystem({
       g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
     };
     wire('btn-life', pressLife);
-    wire('btn-inside', pressLife);
+    // On the table it is Step inside. At full size the big button is the way back to the table, so this one is the
+    // way back to the camera, for a wearer who has walked somewhere and lost the shot.
+    wire('btn-inside', () => {
+      if (!g.lifeSize.peek()) return pressLife();
+      if (performance.now() - wentIn < LIFE_DOUBLE_MS) return;
+      g.backToCamera.value = g.backToCamera.peek() + 1;
+    });
     // At full size the way back is the one big button, whichever tab is showing.
     wire('btn-back', () => {
       if (g.lifeSize.peek()) g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
@@ -803,7 +810,7 @@ export class ControlsSystem extends createSystem({
     this.cleanupFuncs.push(
       g.lifeSize.subscribe((on) => {
         life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
-        inside?.setProperties({ text: on ? 'Back out' : 'Step inside', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        inside?.setProperties({ text: on ? 'Back to camera' : 'Step inside', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         // A frame needs the slate under the actors, and the slate is back on the table.
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
         panel.getElementById('btn-back')?.setProperties({ display: on ? 'flex' : 'none' });

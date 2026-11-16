@@ -130,6 +130,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   // The light the set is in, kept from the last visit (src/set-light.ts).
   globals.setLight = signal<string>(loadJson<string>(StoreKey.Light) ?? 'studio');
   globals.lifeSizeRequested = signal(0);
+  // Back to camera, on the panel at full size: the wearer stands at the lens again (src/life-size.ts).
+  globals.backToCamera = signal(0);
   globals.removeSelected = signal(0);
   globals.clearSet = signal(0);
   globals.selectedIsActor = signal(false);
@@ -364,6 +366,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     button?.addEventListener('click', () => {
       startOver(globals, false);
       if (hint) hint.textContent = 'Started over: the next Enter XR is a first visit, walkthrough and all.';
+      if (button === fresh && fresh != null) fresh.textContent = 'Started over. Now press Enter XR';
     });
   }
   // A take on the page: drag a figure or the camera with the mouse while it records.

@@ -104,6 +104,12 @@ export class MadeSystem extends createSystem({
     return id == null ? null : (this.built.get(id)?.footprint ?? null);
   }
 
+  /** Each part of the made piece in this place as a box in the piece's own frame, on the slate's scale. */
+  surfacesOf(label: string): Box3[] | null {
+    const id = this.slots.get(label);
+    return id == null ? null : (this.built.get(id)?.surfaces ?? null);
+  }
+
   /** Places holding a made piece that is not on the set, each with its piece. */
   offSet(on: string[]): [string, MadeDef][] {
     // One of each, the latest place first: the designer needs one way to put each back.

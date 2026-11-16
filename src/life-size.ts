@@ -14,6 +14,7 @@ import {
   MeshBasicMaterial,
   Object3D,
   Quaternion,
+  CylinderGeometry,
   RingGeometry,
   setWorldPosition,
   setWorldQuaternion,
@@ -21,7 +22,9 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { assetByLabel, assetTitle } from './catalog.js';
+import { assetByLabel, assetTitle, isMade } from './catalog.js';
+import { localBounds } from './bounds.js';
+import { MadeSystem } from './made.js';
 import { SetPiece, SetRole, ShotCamera, StageAnchor } from './set-components.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { ControlsSystem } from './controls.js';
@@ -48,10 +51,39 @@ const SIDES = ['left', 'right'] as const;
 type Side = (typeof SIDES)[number];
 const OPTIC_YELLOW = 0xd6e13c;
 /** What the panel says on stepping inside: the call sheet stays behind on the table. */
-const INSIDE_NOTE = 'INSIDE THE SET | Point at the floor and pinch to walk. Pinch Back out to leave.';
+const INSIDE_NOTE = 'INSIDE THE SET | Point at the floor: a yellow ring shows where you will stand. Pinch to walk there. Back to the table leaves.';
+/**
+ * A walk is a short glide, not a jump: the wearer sees the set pass and knows where they have got to. It takes
+ * this long for the first metre and this much more for each metre after, and never longer than the last.
+ */
+const WALK_SECONDS = 0.35;
+const WALK_SECONDS_A_METRE = 0.09;
+const WALK_LONGEST = 0.9;
+/** The post that stands in the ring, so the spot shows from across the set: this tall and thick on the slate. */
+const MARK_POST = 0.11;
+const MARK_POST_WIDE = 0.0016;
 const LEFT_BEHIND = new Set(['Plate', 'Rim', 'ClapperStripe', 'Strip', 'Viewfinder', 'StoryboardCard', 'HandleLabel', 'StageHandle', 'LensBackdrop']);
 
-type Globals = { lifeSize: Signal<boolean>; lifeSizeRequested: Signal<number>; coachNote: Signal<string> };
+type Globals = {
+  lifeSize: Signal<boolean>;
+  lifeSizeRequested: Signal<number>;
+  coachNote: Signal<string>;
+  backToCamera: Signal<number>;
+  trayOn: Signal<string[]>;
+  layoutChanged: Signal<number>;
+  setsBuilt: Signal<number>;
+};
+
+/** Something solid on the set, as a turned rectangle on the slate and how high it stands, all in slate metres. */
+type Solid = { x: number; z: number; hx: number; hz: number; cos: number; sin: number; top: number };
+/** A walk stops this far short of anything solid (30 cm at full size). */
+const SOLID_MARGIN = 0.03;
+/** What stands lower than this is stepped over (a kerb, a floor); a part that begins above this is walked under. */
+const SOLID_LOW = 0.05;
+const SOLID_OVERHEAD = 0.2;
+/** A head inside a piece for this long is lost: the panel says the way out. */
+const LOST_SECONDS = 1;
+const LOST_NOTE = 'YOU ARE INSIDE A PIECE | Pinch Back to camera on the panel and you stand at the lens again.';
 
 
 export class LifeSizeSystem extends createSystem({
@@ -69,6 +101,18 @@ export class LifeSizeSystem extends createSystem({
   private growTo = new Vector3();
   private growTurn = new Quaternion();
   private growT = -1;
+  /** A walk under way: where the set stood, where it is going, how far through, and how long it takes. */
+  private walkFrom = new Vector3();
+  private walkTo = new Vector3();
+  private walkT = -1;
+  private walkFor = WALK_SECONDS;
+  private steps: Entity | null = null;
+  private solids: Solid[] = [];
+  private solidsStale = true;
+  private here = new Vector3();
+  private lostFor = 0;
+  private lostSaid = false;
+  private pulse = 0;
   private head = new Vector3();
   private forward = new Vector3();
   private offset = new Vector3();
@@ -87,6 +131,7 @@ export class LifeSizeSystem extends createSystem({
 
   init(): void {
     const g = this.globals as Globals;
+    this.watch();
     this.cleanupFuncs.push(
       g.lifeSizeRequested.subscribe((n) => {
         if (n <= this.seen) return;
@@ -105,12 +150,82 @@ export class LifeSizeSystem extends createSystem({
    * At full size, a hand pointing down at the floor marks where it would stand the wearer, and a pinch there
    * takes them: the set slides so that spot is under their feet. A hand at the panel is the panel's.
    */
+  /** True when this spot on the slate is inside something solid, with the walk's margin around it. */
+  private blocked(x: number, z: number, margin: number): boolean {
+    for (let i = 0; i < this.solids.length; i++) {
+      const solid = this.solids[i];
+      const dx = x - solid.x;
+      const dz = z - solid.z;
+      if (Math.abs(dx * solid.cos - dz * solid.sin) < solid.hx + margin && Math.abs(dx * solid.sin + dz * solid.cos) < solid.hz + margin) return true;
+    }
+    return false;
+  }
+
+  /** Every solid thing on the set: a library piece by its own box, a made piece part by part. */
+  private measureSolids(): void {
+    this.solids.length = 0;
+    const made = this.world.getSystem(MadeSystem);
+    for (const piece of this.queries.pieces.entities) {
+      const object = piece.object3D;
+      const role = piece.getValue(SetPiece, 'role');
+      const label = String(piece.getValue(SetPiece, 'label'));
+      if (object == null || !object.visible || role === SetRole.Stage || role === SetRole.Camera) continue;
+      // Rain and smoke are walked through; a tree's crown and a lamp's arm are overhead.
+      if (assetByLabel(label)?.shelf === 'Effects' || label.startsWith('Tree') || label.startsWith('Lamp post')) continue;
+      const scale = object.scale.x;
+      const cos = Math.cos(object.rotation.y);
+      const sin = Math.sin(object.rotation.y);
+      const boxes = isMade(label) ? (made?.surfacesOf(label) ?? []) : [localBounds(object)];
+      for (const box of boxes) {
+        if (box.isEmpty()) continue;
+        const low = object.position.y + box.min.y * scale;
+        const top = object.position.y + box.max.y * scale;
+        if (top < SOLID_LOW || low > SOLID_OVERHEAD) continue;
+        const cx = ((box.min.x + box.max.x) / 2) * scale;
+        const cz = ((box.min.z + box.max.z) / 2) * scale;
+        this.solids.push({
+          x: object.position.x + cx * cos + cz * sin,
+          z: object.position.z - cx * sin + cz * cos,
+          hx: ((box.max.x - box.min.x) / 2) * scale,
+          hz: ((box.max.z - box.min.z) / 2) * scale,
+          cos,
+          sin,
+          top,
+        });
+      }
+    }
+  }
+
+  /** What the set's changes and the panel's Back to camera ask of the full-size set. */
+  private watch(): void {
+    const g = this.globals as Globals;
+    const changed = (): void => {
+      this.solidsStale = true;
+    };
+    this.cleanupFuncs.push(
+      g.trayOn.subscribe(changed),
+      g.layoutChanged.subscribe(changed),
+      g.setsBuilt.subscribe(changed),
+      // Back to camera, from the panel: the wearer stands at the lens again, wherever they had walked to.
+      g.backToCamera.subscribe((asked) => {
+        if (asked === 0 || !g.lifeSize.peek()) return;
+        this.walkT = -1;
+        this.cutToCamera();
+        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Point at the floor and pinch to walk.';
+      }),
+    );
+  }
+
   update(delta: number): void {
     if (this.arrive == null) {
       const holder = new Object3D();
       holder.name = 'ArriveSound';
       this.arrive = this.world.createTransformEntity(holder);
       this.arrive.addComponent(AudioSource, { src: './audio/arrive.wav', volume: 0.55, positional: false });
+      const feet = new Object3D();
+      feet.name = 'StepsSound';
+      this.steps = this.world.createTransformEntity(feet);
+      this.steps.addComponent(AudioSource, { src: './audio/steps.wav', volume: 0.5, positional: false });
     }
     if (this.growT >= 0) this.grow(delta);
     const g = this.globals as Globals;
@@ -130,9 +245,38 @@ export class LifeSizeSystem extends createSystem({
       this.armed = null;
       return;
     }
+    // On the way to a spot: the set glides under the wearer, and nothing else is aimed at until they are there.
+    if (this.walkT >= 0) {
+      this.walkT = Math.min(1, this.walkT + delta / this.walkFor);
+      const t = this.walkT;
+      this.floor.lerpVectors(this.walkFrom, this.walkTo, t * t * (3 - 2 * t));
+      setWorldPosition(object, this.floor);
+      if (t < 1) return;
+      this.walkT = -1;
+      mark.visible = false;
+      this.aimed = null;
+      this.armed = null;
+      this.world.getSystem(ViewfinderSystem)?.refresh();
+      return;
+    }
     object.getWorldPosition(this.floor);
     const controls = this.world.getSystem(ControlsSystem);
     this.player.head.getWorldPosition(this.head);
+    if (this.solidsStale) {
+      this.solidsStale = false;
+      this.measureSolids();
+    }
+    // Where the wearer is on the slate, and how high their eyes are above it.
+    object.worldToLocal(this.here.copy(this.head));
+    let within = false;
+    for (let i = 0; i < this.solids.length && !within; i++) within = this.here.y < this.solids[i].top;
+    within = within && this.blocked(this.here.x, this.here.z, 0);
+    this.lostFor = within ? this.lostFor + delta : 0;
+    if (!within) this.lostSaid = false;
+    if (this.lostFor > LOST_SECONDS && !this.lostSaid) {
+      this.lostSaid = true;
+      g.coachNote.value = LOST_NOTE;
+    }
     this.aimed = null;
     // The hand that pinches is the one that walks; before a pinch, the right hand's aim shows, then the left's.
     // A hand hanging at the side points at the wearer's own feet, and that is not a place to go.
@@ -161,7 +305,26 @@ export class LifeSizeSystem extends createSystem({
     mark.visible = true;
     mark.position.copy(this.hit);
     object.worldToLocal(mark.position);
+    // Not into a wall: the spot comes back towards the wearer until it is clear of everything solid. (Someone
+    // already inside a piece goes wherever they point, which is how they get out.)
+    if (this.blocked(mark.position.x, mark.position.z, SOLID_MARGIN)) {
+      const fromX = mark.position.x;
+      const fromZ = mark.position.z;
+      for (let step = 1; step <= 16; step++) {
+        const x = fromX + ((this.here.x - fromX) * step) / 16;
+        const z = fromZ + ((this.here.z - fromZ) * step) / 16;
+        if (this.blocked(x, z, SOLID_MARGIN)) continue;
+        mark.position.x = x;
+        mark.position.z = z;
+        this.hit.set(x, 0, z);
+        object.localToWorld(this.hit);
+        break;
+      }
+    }
     mark.position.y = 0.0006;
+    // The ring breathes, so it reads as a place to go and not as part of the set.
+    this.pulse = (this.pulse + delta * 5) % (Math.PI * 2);
+    mark.scale.setScalar(1 + 0.1 * Math.sin(this.pulse));
     const pad = this.input.xr.gamepads[this.aimed];
     if (pad?.getSelectStart() === true) this.armed = this.aimed;
     if (this.armed === this.aimed && pad?.getSelectEnd() === true) {
@@ -171,9 +334,11 @@ export class LifeSizeSystem extends createSystem({
       this.head.y = this.floor.y;
       this.offset.copy(this.head).sub(this.hit);
       this.offset.y = 0;
-      this.floor.add(this.offset);
-      setWorldPosition(object, this.floor);
-      this.world.getSystem(ViewfinderSystem)?.refresh();
+      this.walkFrom.copy(this.floor);
+      this.walkTo.copy(this.floor).add(this.offset);
+      this.walkFor = Math.min(WALK_LONGEST, WALK_SECONDS + Math.max(0, this.offset.length() - 1) * WALK_SECONDS_A_METRE);
+      this.walkT = 0;
+      if (this.steps != null) AudioUtils.play(this.steps);
     }
   }
 
@@ -183,6 +348,13 @@ export class LifeSizeSystem extends createSystem({
       mark.name = 'WalkMark';
       mark.rotation.x = -Math.PI / 2;
       mark.raycast = () => {};
+      // The ring lies flat, so its own +Z is up: the post stands along it.
+      const post = new Mesh(new CylinderGeometry(MARK_POST_WIDE, MARK_POST_WIDE, MARK_POST, 8), mark.material);
+      post.name = 'WalkMarkPost';
+      post.rotation.x = Math.PI / 2;
+      post.position.z = MARK_POST / 2;
+      post.raycast = () => {};
+      mark.add(post);
       mark.visible = false;
       this.world.getSystem(ViewfinderSystem)?.hideFromLens(mark);
       this.mark = mark;
@@ -243,6 +415,7 @@ export class LifeSizeSystem extends createSystem({
   /** At full size, a cut: the wearer stands at the live camera where it now stands (coverage moves it shot by shot). */
   cutToCamera(): void {
     if (!(this.globals as Globals).lifeSize.peek()) return;
+    this.solidsStale = true;
     this.leave();
     this.enter(false);
   }
@@ -357,6 +530,7 @@ export class LifeSizeSystem extends createSystem({
     this.growT = -1;
     // Stepping out mid-growth, or the session ending, takes the rush of air with it.
     if (this.arrive != null) AudioUtils.stop(this.arrive);
+    this.walkT = -1;
     const object = this.stage()?.object3D;
     if (object == null) return;
     object.scale.setScalar(1);

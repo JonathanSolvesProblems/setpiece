@@ -23,7 +23,7 @@ Asked for a castle gate, it built the gate and two towers from simple wooden sha
 ## 04 look
 
 ```
-It is shown the camera's picture and what each piece covers. A truck in the way, a dragon cut off: it moves the camera and looks again.
+Once the set is up it is shown its own camera's picture and how much of the frame each piece takes. It moves the camera if the shot is off.
 ```
 
 ## 05 light
@@ -47,7 +47,7 @@ Put your fingers on a piece and pinch, or close a fist around it. The pointing r
 ## 08 speed
 
 ```
-First piece a median 1.3 s from a desktop, 1.6 s spoken on the headset, where its sets ran at 87 to 89 frames a second.
+Spoken on the headset: the first piece 1.6 s after the last word, the whole set inside 4 s, at 87 to 89 frames a second.
 ```
 
 ## 09 leave

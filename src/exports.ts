@@ -26,10 +26,11 @@ export function downloadBoard(viewfinder: ViewfinderSystem): void {
 const field = (value: string | number): string => `"${String(value).replace(/"/g, '""')}"`;
 
 export function downloadShotList(shots: readonly Shot[]): void {
-  const head = ['Frame', 'Lens mm', 'Format', 'Camera height m', 'Distance to creature m', 'Eyelines', 'Printed as'];
+  const head = ['Frame', 'Shot', 'Lens mm', 'Format', 'Camera height m', 'Distance to creature m', 'Eyelines', 'Printed as'];
   const rows = shots.map((shot) =>
     [
       shot.index,
+      shot.title ?? '',
       shot.lensMm,
       shot.format ?? 'FF',
       shot.cameraHeightM.toFixed(2),

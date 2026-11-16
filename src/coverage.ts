@@ -166,7 +166,7 @@ export class CoverageSystem extends createSystem({
         speak(shotCall(shot, title), this.passes[shot] ?? '');
         // A camera that could not move is no new shot: nothing is snapped for it. On the table it glides to its
         // mark and the monitor plays the move; inside, the wearer is cut to it.
-        if (!director.frameShot(camera, life ? 0 : GLIDE)) continue;
+        if (!director.frameShot(camera, life ? 0 : GLIDE, shot === 0)) continue;
         if (life) {
           this.world.getSystem(LifeSizeSystem)?.cutToCamera();
           if (!(await this.wait(INSIDE_HOLD))) break;

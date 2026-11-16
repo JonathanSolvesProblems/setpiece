@@ -10,7 +10,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 // A clone on Windows may carry CRLF endings; the checks read one line ending.
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 // The README's short account and the long one it points to are read as one text.
-const readme = `${read('README.md')}\n${read('docs/what-it-does.md')}`;
+const readme = `${read('README.md')}\n${read('docs/what-it-does.md')}\n${read('docs/where-this-stands.md')}`;
 const count = (text, pattern) => (text.match(pattern) ?? []).length;
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen'];
 
@@ -106,7 +106,7 @@ expect(
 const runs = questDesigner.runs;
 expect(
   `the submission quotes the headset sentences: first piece ${(runs[0].firstPieceMs / 1000).toFixed(1)} s, whole set ${runs.map((run) => (run.wholeSetMs / 1000).toFixed(1)).join(' s and ')} s`,
-  submission.includes(`first piece down ${(runs[0].firstPieceMs / 1000).toFixed(1)} s`) && submission.includes(`whole set at ${runs.map((run) => (run.wholeSetMs / 1000).toFixed(1)).join(' s and ')} s`) && runs.every((run) => (run.firstPieceMs / 1000).toFixed(1) === (runs[0].firstPieceMs / 1000).toFixed(1)),
+  submission.includes(`first piece was on the table ${(runs[0].firstPieceMs / 1000).toFixed(1)} s`) && submission.includes(`whole set stood at ${runs.map((run) => (run.wholeSetMs / 1000).toFixed(1)).join(' s and ')} s`) && runs.every((run) => (run.firstPieceMs / 1000).toFixed(1) === (runs[0].firstPieceMs / 1000).toFixed(1)),
 );
 expect(`the submission says ${assets} pieces and ${lenses[0]} to ${lenses[lenses.length - 1]} mm`, submission.includes(`${assets} pieces`) && submission.includes(`${lenses[0]} to ${lenses[lenses.length - 1]} mm`));
 for (const file of readdirSync(new URL('../devpost/results/', import.meta.url))) {

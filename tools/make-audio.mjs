@@ -258,6 +258,18 @@ const LOOP = 4.5;
 }
 
 // The microphone: two soft notes, rising as it opens, falling as it closes.
+// Walking inside the full-size set: four soft steps on a studio floor, a heel then the sole, a little uneven.
+{
+  const rand = noise(53);
+  const at = [0.02, 0.2, 0.39, 0.57];
+  const step = (start, gain) => {
+    const heel = lowpass(render(0.75, (t) => (t < start ? 0 : rand() * Math.exp(-(t - start) / 0.012))), 520);
+    const sole = lowpass(render(0.75, (t) => (t < start + 0.035 ? 0 : rand() * 0.6 * Math.exp(-(t - start - 0.035) / 0.02))), 1500);
+    return mix(heel, sole).map((x) => x * gain);
+  };
+  write('steps', normalise(mix(...at.map((start, i) => step(start, i % 2 === 0 ? 1 : 0.85))), 0.55));
+}
+
 function notes(first, second) {
   const tone = (hz, at) => render(0.24, (t) => (t < at ? 0 : Math.sin(2 * Math.PI * hz * (t - at)) * Math.exp(-(t - at) / 0.05)));
   return normalise(mix(tone(first, 0), tone(second, 0.085)), 0.35);
