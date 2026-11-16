@@ -38,6 +38,8 @@ load = json.loads((ROOT / 'devpost/results/load-and-size.json').read_text(encodi
 checks = (ROOT / 'devpost/checks/last-run.md').read_text(encoding='utf-8')
 catalog = (ROOT / 'src/catalog.ts').read_text(encoding='utf-8')
 designer = json.loads((ROOT / 'devpost/results/designer-latency.json').read_text(encoding='utf-8'))
+quest_designer = json.loads((ROOT / 'devpost/results/quest-voice-designer.json').read_text(encoding='utf-8'))
+spoken_lines = json.loads((ROOT / 'public/audio/voice/lines.json').read_text(encoding='utf-8'))['lines']
 
 all_fps = [s['fps'] for s in fps['samples']]
 N = {
@@ -65,6 +67,10 @@ N = {
     'designer_first_s': f"{designer['summary']['firstPieceMs']['median'] / 1000:.1f}",
     'designer_whole_s': f"{designer['summary']['wholeMs']['median'] / 1000:.1f}",
     'designer_sentences': designer['summary']['sentences'],
+    # One sentence in the wearer's own words on the headset: from the end of the sentence to the first piece, and to the whole set.
+    'quest_first_s': f"{quest_designer['runs'][0]['firstPieceMs'] / 1000:.1f}",
+    'quest_whole_s': f"{quest_designer['runs'][0]['wholeSetMs'] / 1000:.1f}",
+    'spoken_lines': len(spoken_lines),
     'checks_passed': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(1),
     'checks_total': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(2),
 }
@@ -84,8 +90,14 @@ SLIDES = [
          caption="It is shown the camera's picture and what each piece covers. A truck in the way, a dragon cut off: it moves the camera and looks again."),
     dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
          caption="The designer's own plan stood two actors inside a car parked side-on. Code stepped them out beside it before the camera was placed."),
-    dict(slug='speed', badge='Result · devpost/results/designer-latency.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
-         caption='{designer_sentences} fresh sets from a desktop: the first piece a median {designer_first_s} s after asking, the whole set {designer_whole_s} s. Headset time is next.'),
+    dict(slug='speed', badge='Result · devpost/results/designer-latency.json and quest-voice-designer.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
+         caption='{designer_sentences} sets from a desktop: first piece a median {designer_first_s} s, whole set {designer_whole_s} s. Spoken on the headset: {quest_first_s} s and {quest_whole_s} s.'),
+    dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'voice'),
+         caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
+    dict(slug='light', badge=LIVE_BADGE, headline='It lights the scene', picture=('live', 'light'),
+         caption='The light comes from the sentence: a night chase is night, a duel at sunset golden hour. After dark the windows and the lamp are lit.'),
+    dict(slug='coverage', badge=LIVE_BADGE, headline='Say "cover it"', picture=('live', 'coverage'),
+         caption='The designer plans a wide and then closer shots, the camera goes to each one, and the board fills by itself while you watch.'),
     dict(slug='pinch', badge=QUEST, headline='Reach in and pick it up', picture='captures/quest-hands-card.jpg',
          caption='Put your fingers on a piece and pinch, or close a fist around it. The pointing ray steps aside when a hand is near a piece.'),
     dict(slug='board', badge=LIVE_BADGE, headline='Six setups, each with its numbers', picture=('live', 'board'),
@@ -163,8 +175,24 @@ def result_body(kind: str) -> str:
             for run in designer['runs']
         )
         return (f'<div class="result"><div class="big">{N["designer_first_s"]}<span class="unit">s to the first piece, median of {N["designer_sentences"]} sets</span></div>'
-                f'<p class="muted">From the request to the first piece of a fresh set, and to the whole set: the app\'s own server function, from a desktop on home broadband. The headset\'s time is still to be measured.</p>'
+                f'<p class="muted">From the request to the first piece of a fresh set, and to the whole set: the app\'s own server function, from a desktop on home broadband. '
+                f'On the headset, one sentence in my own words on {quest_designer["measured"]}: {N["quest_first_s"]} s from the end of the sentence to the first piece, {N["quest_whole_s"]} s to the whole set.</p>'
                 f'<table><tr><th>Said</th><th>First piece</th><th>Whole set</th></tr>{rows}</table></div>')
+    if kind == 'voice':
+        when = {
+            'land': 'The set has not landed yet',
+            'mine': 'It has built the first set itself',
+            'block': 'Your first set is up',
+            'frame': 'Your first frame is on the board',
+            'inside': 'You step inside',
+            'cover': 'You ask for coverage',
+            'full': 'The board is full',
+            'back': 'You come back another day',
+        }
+        rows = ''.join(f"<tr><td class='muted'>{moment}</td><td>{spoken_lines[key]}</td></tr>" for key, moment in when.items() if key in spoken_lines)
+        return (f'<div class="result rows5"><div class="big">{N["spoken_lines"]}<span class="unit">lines recorded, in two voices</span></div>'
+                f'<p class="muted">What it built and what it changed through the lens are read aloud as it writes them. These never change, so they ship as files and are said once each:</p>'
+                f'<table><tr><th>When</th><th>She says</th></tr>{rows}</table></div>')
     if kind == 'checks':
         lines = [l for l in checks.splitlines() if l.startswith('| ') and not l.startswith('| Check') and not l.startswith('|---')]
         rows = ''.join(f"<tr><td>{l.split('|')[1].strip()}</td><td class='{'yes' if 'pass' in l.split('|')[2] else ''}'>{l.split('|')[2].strip()}</td></tr>" for l in lines[:14])
@@ -465,6 +493,49 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         draw.text((0, y + 64), 'Two actors standing inside the car', font=face, fill=(199, 199, 183))
         draw.text((1360, y + 64), 'Stepped out beside it, before the camera is placed', font=face, fill=(246, 247, 239))
         sheet.save(png)
+    elif recipe in ('light', 'coverage'):
+        from PIL import Image
+        # One set from the real designer, let settle (its looks through the lens follow by themselves).
+        await page.fill('#page-ask-text', 'a night chase, a red car racing past a burning truck by a house and a street lamp, two actors running at camera')
+        await click('#page-ask-go')
+        await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === true', timeout=20000)
+        idle = 0
+        for _ in range(400):
+            await page.wait_for_timeout(500)
+            busy = await page.evaluate('globalThis.setpiece.world.globals.designing.peek()')
+            idle = 0 if busy else idle + 1
+            if idle >= 16:
+                break
+        lens = '''() => { const v = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.copyMonitor === 'function');
+          v.refresh(); const c = document.createElement('canvas'); v.copyMonitor(c); return c.toDataURL('image/png'); }'''
+        if recipe == 'light':
+            # The shot camera's own picture of that set in three of its lights.
+            frames = []
+            for light in ('day', 'golden hour', 'night'):
+                await page.evaluate('(light) => { globalThis.setpiece.world.globals.setLight.value = light; }', light)
+                await page.wait_for_timeout(2500)
+                url = await page.evaluate(lens)
+                frames.append(Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).convert('RGB'))
+            h = min(i.height for i in frames)
+            frames = [i.resize((int(i.width * h / i.height), h)) for i in frames]
+            sheet = Image.new('RGB', (sum(i.width for i in frames) + 16 * (len(frames) - 1), h), (27, 20, 17))
+            x = 0
+            for i in frames:
+                sheet.paste(i, (x, 0))
+                x += i.width + 16
+            sheet.save(png)
+        else:
+            # The designer plans the coverage and the app shoots it onto the board; the board is then saved by the
+            # page's own button, as the app saves it.
+            await page.evaluate('globalThis.setpiece.world.globals.coverageRequested.value += 1')
+            await page.wait_for_function('globalThis.setpiece.world.globals.coverageRunning.peek() === true', timeout=20000)
+            await page.wait_for_function('globalThis.setpiece.world.globals.coverageRunning.peek() === false', timeout=600000)
+            frames = await page.evaluate('globalThis.setpiece.world.globals.shotFrames.peek().length')
+            if frames < 3:
+                raise RuntimeError(f'coverage put only {frames} frames on the board')
+            async with page.expect_download(timeout=30000) as waiting:
+                await click('#page-save-board')
+            await (await waiting.value).save_as(str(png))
     elif recipe == 'standoff':
         await say('a mexican standoff after a car chase')
         await page.wait_for_timeout(1500)

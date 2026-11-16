@@ -124,6 +124,8 @@ export interface Shot {
   printed?: string;
   /** The format, when it is not full frame. */
   format?: string;
+  /** The shot's name, when coverage shot it: "Wide establishing". */
+  title?: string;
 }
 
 /** The blocking behind a frame: each piece's pose on the slate, the lens, and the camera head's tilt. */
@@ -157,6 +159,7 @@ type Globals = {
   designing?: Signal<boolean>;
   setsBuilt?: Signal<number>;
   coverageRunning?: Signal<boolean>;
+  shotTitle?: Signal<string>;
   snapRequested: Signal<number>;
   eyelineText: Signal<string[]>;
   shotList: Signal<string[]>;
@@ -606,7 +609,8 @@ export class ViewfinderSystem extends createSystem({
         line,
         INK,
       );
-      this.fitText(ctx, shot.eyelines, x + 2, y + frameH + line * 2.15, frameW - 4, line, INK_SOFT);
+      // The eyelines, when the eyeline ball is on the set; without it, the shot's name if coverage gave it one.
+      this.fitText(ctx, shot.distanceToCreatureM < 0 && shot.title ? shot.title : shot.eyelines, x + 2, y + frameH + line * 2.15, frameW - 4, line, INK_SOFT);
     }
     this.boardTexture.needsUpdate = true;
   }
@@ -1705,6 +1709,8 @@ export class ViewfinderSystem extends createSystem({
     };
     const sensor = SENSORS[sensorIndex];
     if (sensor && sensorIndex !== 0) shot.format = sensor.short;
+    const title = g.shotTitle?.peek() ?? '';
+    if (title !== '') shot.title = title;
     const verdict = this.judge(measured, shot);
     // A new frame is where the set is now.
     this.recalledIndex = shot.index;

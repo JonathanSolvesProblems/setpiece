@@ -16,6 +16,7 @@
     "check:claims": "node tools/check-claims.mjs",
     "test:words": "node tools/test-scene-words.mjs",
     "test:spoken": "node tools/test-spoken.mjs",
+    "test:fit": "node tools/test-coverage-fit.mjs",
     "voice:worker": "node tools/make-voice-worker.mjs"
   },
   "dependencies": {

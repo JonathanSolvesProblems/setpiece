@@ -49,6 +49,7 @@ type Globals = {
   coverageStopRequested: Signal<number>;
   setupRecalled: Signal<number>;
   resetStageRequested: Signal<number>;
+  shotTitle: Signal<string>;
 };
 
 type Shot = { title: string; says: string; camera: CameraPlan };
@@ -175,10 +176,13 @@ export class CoverageSystem extends createSystem({
         // Stepped inside meanwhile: a frame is only snapped at the table.
         if (g.lifeSize.peek()) continue;
         const before = g.shotFrames.peek().length;
+        // The frame carries the shot's name onto the board.
+        g.shotTitle.value = title;
         g.snapRequested.value = g.snapRequested.peek() + 1;
         // Counted once it is on the board.
         const until = performance.now() + FRAME_WAIT * 1000;
         while (g.shotFrames.peek().length === before && performance.now() < until && this.going()) await new Promise((ready) => window.setTimeout(ready, 100));
+        g.shotTitle.value = '';
         if (g.shotFrames.peek().length > before) done++;
         if (!(await this.wait(HOLD))) break;
       }
@@ -187,6 +191,7 @@ export class CoverageSystem extends createSystem({
       return;
     } finally {
       g.coverageRunning.value = false;
+      g.shotTitle.value = '';
       this.asking = null;
     }
     const inside = g.lifeSize.peek();

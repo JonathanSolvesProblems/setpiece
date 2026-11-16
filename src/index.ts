@@ -76,6 +76,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.setsBuilt = signal(0);
   // Cover it is shooting the designer's coverage (src/coverage.ts).
   globals.coverageRunning = signal(false);
+  // The name of the coverage shot being snapped, so its frame carries it onto the board.
+  globals.shotTitle = signal('');
   globals.coverageRequested = signal(0);
   globals.coverageStopRequested = signal(0);
   globals.talkOffered = signal(false);
@@ -444,7 +446,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
         const text = document.createElement('span');
         text.textContent =
           `${shot.lensMm} mm, camera ${shot.cameraHeightM.toFixed(1)} m high` +
-          (shot.distanceToCreatureM >= 0 ? `, ${shot.distanceToCreatureM.toFixed(1)} m from the creature` : ', no eyeline ball');
+          (shot.distanceToCreatureM >= 0 ? `, ${shot.distanceToCreatureM.toFixed(1)} m from the creature` : shot.title ? `, ${shot.title}` : ', no eyeline ball');
         row.append(index, text);
         return row;
       });

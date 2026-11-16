@@ -10,7 +10,8 @@ import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
 import { assetByLabel, assetTitle, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf } from './catalog.js';
 import type { Asset } from './catalog.js';
-import { LENSES } from './camera-formats.js';
+import { LENSES, SENSORS } from './camera-formats.js';
+import { fitShot } from './coverage-plan.js';
 import { cleanCamera, cleanThing, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
 import type { CameraPlan, Thing } from './director-plan.js';
 import { MadeSystem } from './made.js';
@@ -34,6 +35,7 @@ type Globals = {
   lastSpoken: Signal<string>;
   designing: Signal<boolean>;
   ownBuild: Signal<boolean>;
+  sensorIndex: Signal<number>;
   setsBuilt: Signal<number>;
   layoutChanged: Signal<number>;
 };
@@ -41,6 +43,11 @@ type Globals = {
 /** Real metres to the slate's, and back. */
 const SLATE = 0.1;
 const REAL = 10;
+/** The least of an actor a coverage shot holds: head to waist around the eyes, in real metres. */
+const CLOSE_UP_UP = 0.9;
+const CLOSE_UP_ACROSS = 0.7;
+/** Where a camera may stand, in real metres from the stage's middle: as cleanCamera allows (src/director-plan.ts). */
+const CAMERA_STANDS = { x: 3.5, back: 2.4, front: 4 };
 const DEG = Math.PI / 180;
 /** A piece put down by the designer drops this far onto the slate, over this long. */
 const DROP = 0.05;
@@ -124,6 +131,8 @@ export class DirectorSystem extends createSystem({
   /** Counts looks begun: a look still reading its picture when a newer one begins is dropped. */
   private lookGeneration = 0;
   private point = new Vector3();
+  private fitSize = new Vector3();
+  private fitMiddle = new Vector3();
   private lensAt = new Vector3();
   private lensWay = new Vector3();
 
@@ -402,7 +411,34 @@ export class DirectorSystem extends createSystem({
    * (src/coverage.ts). False when the camera could not move (it is held, or a take is running).
    */
   frameShot(plan: CameraPlan, glide = 0): boolean {
-    return this.frame(plan, new Map(), glide);
+    return this.frame(this.fitted(plan), new Map(), glide);
+  }
+
+  /**
+   * A coverage shot's camera, stood back or given a wider lens until its subject fits the frame (fitShot in
+   * src/coverage-plan.ts): an actor counts as head to waist around their eyes, anything else as the whole piece.
+   * A shot of no one piece is left as planned.
+   */
+  private fitted(plan: CameraPlan): CameraPlan {
+    const entity = plan.look_at === '' ? null : this.entityOf(plan.look_at);
+    const object = entity?.object3D;
+    if (entity == null || object == null) return plan;
+    const box = localBounds(object);
+    if (box.isEmpty()) return plan;
+    const size = box.getSize(this.fitSize).multiplyScalar(object.scale.x * REAL);
+    const eyes = Number(entity.getValue(SetPiece, 'eyeHeight') ?? 0);
+    const person = entity.getValue(SetPiece, 'role') === SetRole.Actor && eyes > 0;
+    const middle = person ? eyes : box.getCenter(this.fitMiddle).y;
+    const subject = {
+      x: object.position.x * REAL,
+      y: (object.position.y + middle * object.scale.y) * REAL,
+      z: object.position.z * REAL,
+      across: person ? CLOSE_UP_ACROSS : Math.max(size.x, size.z),
+      up: person ? CLOSE_UP_UP : size.y,
+    };
+    const g = this.globals as unknown as Globals;
+    const sensor = SENSORS[g.sensorIndex.peek()]?.heightMm ?? SENSORS[0].heightMm;
+    return fitShot(plan, subject, sensor, LENSES, CAMERA_STANDS);
   }
 
   /** Nothing of a set is still coming: no reply being read, no piece dropping, no camera or look waiting. */
