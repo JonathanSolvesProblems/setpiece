@@ -63,7 +63,7 @@ On Nov 16 I went through the walkthrough on the headset as a newcomer, from land
 ```
 Everything is done with hands. Reach out and pinch a piece, or close your fist on it, and it comes with you. Point and pinch for anything further away. A pinch held on the striped edge moves the whole set. Twisting your wrist turns what you're holding, and tilts the camera. I measured my own hand to set where a fist starts, because the first version only worked if you pointed in a straight line and pinched, and my hand kept trying to just grab the thing. Held actors squirm a little in your fingers, and you can turn that off.
 
-A newcomer is walked through once: the designer says each step out loud and a small arrow points at the button or the piece, and it can be skipped. Nobody has to be taught what to do with a tiny wooden actor, and building a set has no menu: it's one spoken sentence. At full size, you point at the floor and pinch to walk the set without standing up.
+A newcomer is walked through once: the designer says each step out loud and a small arrow points at the button or the piece, and it can be skipped. Nobody has to be taught what to do with a tiny wooden actor, and building a set has no menu: it's one spoken sentence. At full size, you pinch the air and pull to move through the set, and twist your wrist to turn it, without standing up.
 ```
 
 ## Target launch date

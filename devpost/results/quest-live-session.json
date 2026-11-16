@@ -1,0 +1,52 @@
+{
+ "what": "Readings taken over the cable from a Meta Quest 3S while its wearer went through Setpiece as a newcomer on the live site (setpiece.jonathansolvesproblems.com), on 16 November 2026. The sets were built by the set designer during the session from sentences the wearer spoke; nothing was replayed. Frame rates are frames counted over three or nine seconds of the session's own animation loop. Times are from the session's log (one line each time its state changed).",
+ "measured": "2026-11-16",
+ "device": "Meta Quest 3S, Quest Browser, both hands tracked",
+ "runs": [
+  {
+   "build": "2d75fa4",
+   "from_enter_xr": [
+    { "seconds": 2, "what": "the set landed where the wearer pointed" },
+    { "seconds": 6, "what": "the designer's own first set stood (7 pieces)" }
+   ],
+   "frames_per_second": [
+    { "where": "inside the full-size night chase, under the painted night sky", "value": 88.6, "over_seconds": 3 }
+   ]
+  },
+  {
+   "build": "58ce2b9",
+   "from_enter_xr": [
+    { "seconds": 2, "what": "the set landed" },
+    { "seconds": 6, "what": "the designer's own first set stood" },
+    { "seconds": 30, "what": "the wearer's own sentence was heard: a castle, three guards and a burglar hiding behind a bush" },
+    { "seconds": 34, "what": "that set stood (7 pieces, 2 of them made by the designer)" },
+    { "seconds": 68, "what": "the wearer's first frame was on the board, after moving an actor by hand" },
+    { "seconds": 74, "what": "the wearer was inside the set at full size" }
+   ],
+   "frames_per_second": [
+    { "where": "inside the full-size castle set at night", "value": 85.9, "over_seconds": 3 }
+   ]
+  },
+  {
+   "build": "8c03d3d",
+   "from_enter_xr": [
+    { "seconds": 1, "what": "the set landed" },
+    { "seconds": 5, "what": "the designer's own first set stood" },
+    { "seconds": 23, "what": "the wearer's own sentence was heard" },
+    { "seconds": 26, "what": "that set stood, the burglar in the Crouch pose 0.8 m in front of the bush with the three guards beyond it" },
+    { "seconds": 53, "what": "the wearer's first frame was on the board, after picking up a guard standing in front of the castle" },
+    { "seconds": 68, "what": "the wearer was inside the set at full size" }
+   ],
+   "frames_per_second": [
+    { "where": "inside the full-size castle set at night, with the floor grid, while the headset's own screen recorder was running", "value": 89.4, "over_seconds": 9 },
+    { "where": "the same, a second reading", "value": 89.5, "over_seconds": 9 }
+   ]
+  }
+ ],
+ "found": [
+  "A newcomer had a frame of their own shot on the board 53 and 68 seconds after Enter XR.",
+  "Inside a full-size set the designer had just built, the session held 86 to 89 frames a second.",
+  "The designer wrote one castle bigger than the stage (6.9 m across, 6.2 m high) and it stood into the panel: made pieces are now held to 5 by 3 by 4 metres. The next two castles stood inside the stage.",
+  "Walking by a ring on the floor did not work for a seated wearer: with eyes 0.9 m above the floor a slight downward look put the ring 6 to 12 m away. It was replaced by pulling the set by hand, which has run in the emulator only."
+ ]
+}
