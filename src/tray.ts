@@ -21,6 +21,9 @@ import { ViewfinderSystem } from './viewfinder.js';
 import { BARE_GRAIN, PAINTED_GRAIN, setGrain, withGrain } from './wood-grain.js';
 
 import { LOOKS, POSES } from './catalog.js';
+
+/** How high a crouched actor's eyes are, as a share of their standing eye height. */
+const CROUCH_EYES = 0.75;
 export { LOOKS, POSES };
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
 // The pelvis is worn under the trousers, so a suited actor has no band of wood at the waist.
@@ -769,9 +772,21 @@ export class TraySystem extends createSystem({
     this.save();
   }
 
+  /** Each actor's eye height standing, as the scene gave it: a crouch lowers it and standing up puts it back. */
+  private standingEyes = new Map<string, number>();
+
   /** One pose shows; its clothes are the look, tinted over the figure's own wood. */
   private dress(actor: Entity, [pose, look, build = 0]: Cast): void {
     const style = LOOKS[look] ?? LOOKS[0];
+    // A crouched actor's eyes are three quarters as high as when they stand (src/scene-assets/figures.scene-asset.ts):
+    // the camera aims there, a close-up is fitted there, and an eyeline is measured from there.
+    const key = this.key(actor);
+    let standing = this.standingEyes.get(key);
+    if (standing === undefined) {
+      standing = Number(actor.getValue(SetPiece, 'eyeHeight') ?? 0);
+      this.standingEyes.set(key, standing);
+    }
+    actor.setValue(SetPiece, 'eyeHeight', standing * (POSES[pose] === 'Crouch' ? CROUCH_EYES : 1));
     for (const child of actor.object3D!.children) {
       // A woman's poses are named with a W after the number.
       const match = /^Pose(\d)(W?)$/.exec(child.name);

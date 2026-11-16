@@ -16,6 +16,7 @@ import {
   Quaternion,
   CylinderGeometry,
   RingGeometry,
+  SphereGeometry,
   setWorldPosition,
   setWorldQuaternion,
   Vector3,
@@ -29,6 +30,7 @@ import { SetPiece, SetRole, ShotCamera, StageAnchor } from './set-components.js'
 import { ViewfinderSystem } from './viewfinder.js';
 import { ControlsSystem } from './controls.js';
 import { sayLineOnce } from './speech.js';
+import { HandTurn } from './hand-turn.js';
 
 /** The set is 1:10, so this is true scale. */
 const LIFE_SCALE = 10;
@@ -55,7 +57,17 @@ const SIDES = ['left', 'right'] as const;
 type Side = (typeof SIDES)[number];
 const OPTIC_YELLOW = 0xd6e13c;
 /** What the panel says on stepping inside: the call sheet stays behind on the table. */
-const INSIDE_NOTE = 'INSIDE THE SET | Look at the floor: a yellow ring shows where you will stand. Pinch to walk there. Back to the table leaves.';
+const INSIDE_NOTE = 'INSIDE THE SET | Pinch the air and pull: the set moves with your hand. Twist your wrist to turn it. Back to the table leaves.';
+/**
+ * Pulling the set: it moves this many times as far as the hand does (a comfortable seated pull of 30 cm is two
+ * metres), the hand is smoothed at this rate first so tracking noise is not multiplied into a shaking world, and
+ * the set turns this many times as far as the wrist.
+ */
+const PULL_GAIN = 7;
+const PULL_SMOOTH = 16;
+const PULL_TURN_GAIN = 2.2;
+/** The ring on the floor where the wearer looks, and a pinch to walk to it: retired for the pull, kept for a test. */
+const RING_WALK = false;
 /**
  * A walk is a short glide, not a jump: the wearer sees the set pass and knows where they have got to. It takes
  * this long for the first metre and this much more for each metre after, and never longer than the last.
@@ -127,6 +139,14 @@ export class LifeSizeSystem extends createSystem({
   /** The ring on the floor where a pinch would stand the wearer, and which hand is pointing there. */
   private mark: Mesh | null = null;
   private spot = new Vector3();
+  /** The hand pulling the set, where it is (smoothed) and was, the wrist's turn, and the marks that show the pinch took. */
+  private pulling: Side | null = null;
+  private handNow = new Vector3();
+  private handSmooth = new Vector3();
+  private handLast = new Vector3();
+  private wrist = new HandTurn();
+  private grip: Mesh | null = null;
+  private gripLine: Mesh | null = null;
   /** The ring was showing last frame: it glides to where the look moves, and appears at once where it was not. */
   private settled = false;
   private from = new Vector3();
@@ -216,7 +236,7 @@ export class LifeSizeSystem extends createSystem({
         if (asked === 0 || !g.lifeSize.peek()) return;
         this.walkT = -1;
         this.cutToCamera();
-        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Look at the floor and pinch to walk.';
+        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Pinch the air and pull to move.';
       }),
     );
   }
@@ -239,6 +259,7 @@ export class LifeSizeSystem extends createSystem({
     if (!life) {
       if (this.mark != null) this.mark.visible = false;
       this.settled = false;
+      this.endPull();
       return;
     }
     const mark = this.ensureMark(object);
@@ -271,13 +292,73 @@ export class LifeSizeSystem extends createSystem({
     // Where the wearer is on the slate, and how high their eyes are above it.
     object.worldToLocal(this.here.copy(this.head));
     let within = false;
-    for (let i = 0; i < this.solids.length && !within; i++) within = this.here.y < this.solids[i].top;
-    within = within && this.blocked(this.here.x, this.here.z, 0);
+    for (let i = 0; i < this.solids.length && !within; i++) {
+      const solid = this.solids[i];
+      const dx = this.here.x - solid.x;
+      const dz = this.here.z - solid.z;
+      within = this.here.y < solid.top && Math.abs(dx * solid.cos - dz * solid.sin) < solid.hx && Math.abs(dx * solid.sin + dz * solid.cos) < solid.hz;
+    }
     this.lostFor = within ? this.lostFor + delta : 0;
     if (!within) this.lostSaid = false;
     if (this.lostFor > LOST_SECONDS && !this.lostSaid) {
       this.lostSaid = true;
       g.coachNote.value = LOST_NOTE;
+    }
+    // Pinch the air and pull: the set comes with the hand, as it does on the table by its striped edge, and it
+    // turns with the wrist. A hand at the panel is the panel's.
+    if (this.pulling != null) {
+      const grip = this.player.gripSpaces[this.pulling];
+      if (this.input.xr.gamepads[this.pulling]?.getSelecting() !== true) {
+        this.endPull();
+      } else {
+        grip.getWorldPosition(this.handNow);
+        this.handSmooth.lerp(this.handNow, Math.min(1, PULL_SMOOTH * delta));
+        this.offset.copy(this.handSmooth).sub(this.handLast);
+        this.offset.y = 0;
+        this.handLast.copy(this.handSmooth);
+        this.offset.multiplyScalar(PULL_GAIN);
+        if (this.offset.lengthSq() > 1e-10) {
+          // Where that would put the wearer in the set: not into anything solid (someone inside a piece may pull out).
+          object.worldToLocal(this.spot.copy(this.head).sub(this.offset));
+          if (within || !this.blocked(this.spot.x, this.spot.z, SOLID_MARGIN / 2)) {
+            this.floor.add(this.offset);
+            setWorldPosition(object, this.floor);
+          }
+        }
+        // The wrist turns the set, and the set swings about the wearer, who stays where they are in it.
+        const turned = this.wrist.total;
+        this.wrist.apply(object, delta, PULL_TURN_GAIN);
+        const step = this.wrist.total - turned;
+        if (step !== 0) {
+          object.getWorldPosition(this.floor);
+          this.offset.set(this.floor.x - this.head.x, 0, this.floor.z - this.head.z).applyAxisAngle(UP, step);
+          this.floor.set(this.head.x + this.offset.x, this.floor.y, this.head.z + this.offset.z);
+          setWorldPosition(object, this.floor);
+        }
+        this.showGrip(this.handNow);
+      }
+      mark.visible = false;
+      this.settled = false;
+      return;
+    }
+    for (let i = 0; i < SIDES.length; i++) {
+      const side = SIDES[i];
+      if (this.input.xr.gamepads[side]?.getSelectStart() !== true || controls?.panelWanted(side) === true) continue;
+      this.pulling = side;
+      const grip = this.player.gripSpaces[side];
+      grip.getWorldPosition(this.handNow);
+      this.handSmooth.copy(this.handNow);
+      this.handLast.copy(this.handNow);
+      this.wrist.begin(grip);
+      this.beginGrip(this.handNow);
+      mark.visible = false;
+      this.settled = false;
+      return;
+    }
+    if (!RING_WALK) {
+      mark.visible = false;
+      this.settled = false;
+      return;
     }
     // Where the wearer looks on the floor is where they would stand. A head is steady and there is one of it: a
     // hand's ray swings metres across a far floor with a turn of the wrist, and two resting hands both point down.
@@ -336,7 +417,7 @@ export class LifeSizeSystem extends createSystem({
     }
     if (!pinched) return;
     // The spot comes to the wearer's feet; the set keeps its turn.
-    this.hit.copy(mark.position);
+    this.hit.copy(this.spot);
     this.hit.y = 0;
     object.localToWorld(this.hit);
     this.head.y = this.floor.y;
@@ -347,6 +428,50 @@ export class LifeSizeSystem extends createSystem({
     this.walkFor = Math.min(WALK_LONGEST, WALK_SECONDS + Math.max(0, this.offset.length() - 1) * WALK_SECONDS_A_METRE);
     this.walkT = 0;
     if (this.steps != null) AudioUtils.play(this.steps);
+  }
+
+  /** The dot where a pinch began and the line from it to the hand: a pinch that took is seen. */
+  private beginGrip(at: Vector3): void {
+    if (this.grip == null || this.gripLine == null) {
+      const yellow = new MeshBasicMaterial({ color: OPTIC_YELLOW, toneMapped: false });
+      const dot = new Mesh(new SphereGeometry(0.012, 12, 8), yellow);
+      dot.name = 'PullGrip';
+      // A unit length along its own +Z, so it is stretched and aimed from the dot to the hand.
+      const line = new Mesh(new CylinderGeometry(0.0025, 0.0025, 1, 6).rotateX(Math.PI / 2).translate(0, 0, 0.5), yellow);
+      line.name = 'PullLine';
+      const viewfinder = this.world.getSystem(ViewfinderSystem);
+      for (const mesh of [dot, line]) {
+        mesh.raycast = () => {};
+        mesh.frustumCulled = false;
+        const entity = this.world.createTransformEntity(mesh);
+        if (entity.object3D) entity.object3D.pointerEvents = 'none';
+        viewfinder?.hideFromLens(mesh);
+      }
+      this.grip = dot;
+      this.gripLine = line;
+    }
+    this.grip.position.copy(at);
+    this.grip.visible = true;
+    this.gripLine.position.copy(at);
+    this.gripLine.scale.set(1, 1, 0.001);
+    this.gripLine.visible = true;
+  }
+
+  private showGrip(hand: Vector3): void {
+    const line = this.gripLine;
+    if (line == null) return;
+    const far = line.position.distanceTo(hand);
+    line.scale.set(1, 1, Math.max(0.001, far));
+    if (far > 0.002) line.lookAt(hand);
+  }
+
+  private endPull(): void {
+    if (this.pulling == null) return;
+    this.pulling = null;
+    this.wrist.end();
+    if (this.grip != null) this.grip.visible = false;
+    if (this.gripLine != null) this.gripLine.visible = false;
+    this.world.getSystem(ViewfinderSystem)?.refresh();
   }
 
   private ensureMark(object: Object3D): Mesh {
@@ -377,6 +502,9 @@ export class LifeSizeSystem extends createSystem({
    */
   goTo(label: string): string {
     const g = this.globals as Globals;
+    this.walkT = -1;
+    this.endPull();
+    this.solidsStale = true;
     if (this.world.visibilityState.peek() === VisibilityState.NonImmersive) return 'IN THE HEADSET | Walking the set is done in the headset.';
     if (label === 'Camera') {
       if (g.lifeSize.peek()) this.leave();
@@ -423,6 +551,8 @@ export class LifeSizeSystem extends createSystem({
   cutToCamera(): void {
     if (!(this.globals as Globals).lifeSize.peek()) return;
     this.solidsStale = true;
+    this.settled = false;
+    this.endPull();
     this.leave();
     this.enter(false);
   }
@@ -470,6 +600,10 @@ export class LifeSizeSystem extends createSystem({
   }
 
   private enter(animate = true): void {
+    // A piece moved by hand on the table since the last time inside is where it is now, not where it was.
+    this.solidsStale = true;
+    this.walkT = -1;
+    this.endPull();
     const g = this.globals as Globals;
     const stage = this.stage();
     // Stand at the camera that is live.
