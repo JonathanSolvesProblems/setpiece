@@ -13,6 +13,7 @@ export const LINES = {
   frame: 'That is your first frame. Pinch Step inside twice to stand in it.',
   inside: 'You are inside the set. Point at the floor and pinch to walk.',
   cover: 'Planning the coverage.',
+  done: 'That is the walkthrough. The set is yours.',
   full: 'The board is full. Pinch Save the board, and it waits for you on the page.',
   back: 'Welcome back. Your set is where you left it.',
   voice: 'I will read you what I build, in this voice.',

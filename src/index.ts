@@ -16,6 +16,8 @@ import { PreviewCameraSystem } from './preview-camera.js';
 import { SetLightSystem } from './set-light.js';
 import { prefetchListener } from './voice.js';
 import { micAnswer } from './mic.js';
+import { startOver } from './start-over.js';
+import { WalkthroughPointerSystem } from './pointer.js';
 import { EffectSoundSystem } from './effect-sound.js';
 import { CoverageSystem } from './coverage.js';
 import { SetFinderSystem } from './set-finder.js';
@@ -83,6 +85,9 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.talkOffered = signal(false);
   // In a session with no microphone allowed: Talk is Next shot, and the call sheet says so.
   globals.micOff = signal(false);
+  // The walkthrough is on (a newcomer in a session, until it is skipped or done), and the panel's Skip was pressed.
+  globals.walkthrough = signal(false);
+  globals.walkthroughSkip = signal(0);
   // The designer is building a set by itself (the first one, as a newcomer lands the set): not the wearer's own.
   globals.ownBuild = signal(false);
   // Whether that first set is built at all: not on this machine's own address, where every test lands the set.
@@ -166,6 +171,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     .registerSystem(CoverageSystem, { priority: 27 })
     .registerSystem(CoachSystem, { priority: 28 })
     .registerSystem(SetFinderSystem, { priority: 29 })
+    .registerSystem(WalkthroughPointerSystem, { priority: 29 })
     .registerSystem(ControlsSystem, { priority: 30 });
 
   // The page's own controls: Enter XR, lenses, snap and reset, wired to the
@@ -330,14 +336,17 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     snapRequested.value += 1;
   });
   // On the page the stage never moves, so starting over means the board and the blocking.
-  document.getElementById('page-reset')?.addEventListener('click', () => {
-    newBoardRequested.value += 1;
-    clearKey(StoreKey.Stage);
-    clearKey(StoreKey.Coach);
-    clearKey(StoreKey.Light);
-    (globals.setLight as Signal<string>).value = 'studio';
-    (globals.startOver as Signal<number>).value += 1;
-  });
+  // Start over, in the strip under the set and again beside Enter XR, where a headset's window shows it without
+  // scrolling: only for a browser that has been here before.
+  const fresh = document.getElementById('page-fresh') as HTMLButtonElement | null;
+  const beenHere = (): boolean => [StoreKey.Coach, StoreKey.Tray, StoreKey.Board, StoreKey.Stage].some((key) => loadJson<unknown>(key) != null);
+  if (fresh != null) fresh.hidden = !beenHere();
+  for (const button of [document.getElementById('page-reset'), fresh]) {
+    button?.addEventListener('click', () => {
+      startOver(globals, false);
+      if (hint) hint.textContent = 'Started over: the next Enter XR is a first visit, walkthrough and all.';
+    });
+  }
   // A take on the page: drag a figure or the camera with the mouse while it records.
   const takeState = globals.takeState as Signal<string>;
   const takeLength = globals.takeLength as Signal<number>;

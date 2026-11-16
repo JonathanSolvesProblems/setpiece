@@ -31,13 +31,14 @@ import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
 import { micAnswer } from './mic.js';
+import { startOver } from './start-over.js';
 import { chooseSpoken, hush, micOpen, sayLine, sayLineOnce, SPOKEN, spokenChoice, talking } from './speech.js';
 
 /**
  * Where the panel sits relative to the stage, as the scene authors it: left of
  * the slate, a little above it, turned in toward the viewer.
  */
-const PANEL_OFFSET = new Vector3(-0.38, 0.33, -0.16);
+const PANEL_OFFSET = new Vector3(-0.46, 0.33, -0.06);
 /**
  * The panel hangs from its top edge, this far above the slate, so Snap frame
  * and the tabs stay put when a page changes the panel's height. Metres per
@@ -153,6 +154,9 @@ type Globals = {
   micOff: Signal<boolean>;
   ownBuild: Signal<boolean>;
   firstSetOn: Signal<boolean>;
+  walkthrough: Signal<boolean>;
+  walkthroughSkip: Signal<number>;
+  startOver: Signal<number>;
   designing: Signal<boolean>;
   coachLine: Signal<string>;
   shotFrames: Signal<unknown[]>;
@@ -611,6 +615,35 @@ export class ControlsSystem extends createSystem({
       showTry();
       this.heard(sentence);
     });
+    // The walkthrough can be skipped: the button is on the small panel for as long as the walkthrough is on.
+    const showSkip = (): void => {
+      panel.getElementById('btn-skip')?.setProperties({ display: g.walkthrough.peek() && !more && !g.lifeSize.peek() ? 'flex' : 'none' });
+    };
+    wire('btn-skip', () => {
+      g.walkthroughSkip.value = g.walkthroughSkip.peek() + 1;
+    });
+    this.cleanupFuncs.push(
+      g.walkthrough.subscribe(() => showSkip()),
+      g.lifeSize.subscribe(() => showSkip()),
+    );
+    // And started again, from More, Stage, without leaving the session: the board and the set are cleared and the
+    // set comes up to be landed, as for a first visitor. That cannot be taken back, so it takes two presses.
+    twice(
+      'btn-walkthrough',
+      'Walkthrough again',
+      () => 'This clears the board and the set and lands the set again, as for a first visit. Press it again to go ahead.',
+      () => {
+        if (g.lifeSize.peek()) {
+          says('', 'Step back out to the table first, then start the walkthrough again.', 5000);
+          return;
+        }
+        // The small panel is where the walkthrough's buttons are.
+        more = false;
+        saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), more });
+        showTab(openTab);
+        startOver(g, true);
+      },
+    );
     // The first time a newcomer lands the set, the set designer builds a first set by itself: the first of the
     // shots to try, asked of the real designer as if it had been said. The table comes alive before the panel has
     // been found, and the wearer has heard and seen what a sentence does before they are asked for one. Only for
@@ -632,6 +665,13 @@ export class ControlsSystem extends createSystem({
       () => {
         if (firstSetTimer != null) clearTimeout(firstSetTimer);
       },
+      // Started over: the next landing is a first visitor's again, with the first of the shots to try.
+      g.startOver.subscribe((n) => {
+        if (n === 0) return;
+        firstSetOffered = false;
+        tryNext = 0;
+        showTry();
+      }),
       g.stageStatus.subscribe((status) => {
         if (firstSetOffered || (status !== StageStatus.Table && status !== StageStatus.Touch)) return;
         if (this.world.visibilityState.peek() === VisibilityState.NonImmersive || !g.firstSetOn.peek()) return;
@@ -671,6 +711,7 @@ export class ControlsSystem extends createSystem({
       showPieceBar();
       panel.getElementById('tabs')?.setProperties({ display: more ? 'flex' : 'none' });
       showTry();
+      panel.getElementById('btn-skip')?.setProperties({ display: g.walkthrough.peek() && !more && !g.lifeSize.peek() ? 'flex' : 'none' });
       panel.getElementById<UIKit.Text>('btn-more')?.setProperties({ text: more ? 'Less' : 'More', borderColor: more ? OPTIC_YELLOW : CHALK_HAZE });
       for (const name of TABS) {
         panel.getElementById(`page-${name}`)?.setProperties({ display: more && name === tab ? 'flex' : 'none' });

@@ -22,7 +22,7 @@ import { Placement, Held, SetPiece, SetRole, ShotCamera, StageAnchor } from './s
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { BRIEFS } from './briefs.js';
 import { TAKE_MAX_SECONDS, TakeState } from './take.js';
-import { sayLineOnce } from './speech.js';
+import { forgetSaid, hush, sayLineOnce } from './speech.js';
 
 const W = 1536;
 const H = 300;
@@ -74,6 +74,9 @@ type Globals = {
   micOff: Signal<boolean>;
   ownBuild: Signal<boolean>;
   coverageRunning: Signal<boolean>;
+  walkthrough: Signal<boolean>;
+  walkthroughSkip: Signal<number>;
+  lifeSize: Signal<boolean>;
 };
 /** Seconds a passing note stays on the sheet: long enough to read a reason and act on it. */
 const NOTE_SECONDS = 6;
@@ -114,6 +117,14 @@ export class CoachSystem extends createSystem({
   private voicedShots = -1;
   /** Seconds the sheet has asked for the set to be landed: a room that knows its table lands it by itself first. */
   private landAsked = 0;
+  /**
+   * The walkthrough is on: a newcomer is being shown the steps, each said aloud and pointed at (src/pointer.ts).
+   * It ends when they skip it, when their second frame is on the board, or when they have stood in the set and
+   * come back; from then on this browser is not shown it again unless it is started again.
+   */
+  private guiding = false;
+  /** They have stepped inside during the walkthrough. */
+  private stoodIn = false;
   /** Up to two pieces in two hands: where each stood, and how it was turned and tipped, when it was picked up. */
   private watched: (Entity | null)[] = [null, null];
   private watchedFrom = [new Vector3(), new Vector3()];
@@ -211,6 +222,19 @@ export class CoachSystem extends createSystem({
         this.framed = false;
         this.said = false;
         this.mine = false;
+        // The walkthrough from its first step, with every line to be said again.
+        this.guiding = this.inSession;
+        this.stoodIn = false;
+        this.voiced = Step.Hidden;
+        this.voicedShots = -1;
+        forgetSaid();
+      }),
+      // Skip the walkthrough, on the panel: no more steps said or pointed at, here or on the next visit.
+      g.walkthroughSkip.subscribe((n) => {
+        if (n === 0 || !this.guiding) return;
+        this.endWalkthrough();
+        hush();
+        g.coachNote.value = 'WALKTHROUGH OFF | Start it again from More, Stage.';
       }),
       // A set the designer built by itself, as the set landed, is not the wearer's sentence: the step stays theirs.
       g.setsBuilt.subscribe((n) => {
@@ -244,6 +268,15 @@ export class CoachSystem extends createSystem({
     }
     if (this.timing && this.shots < BOARD_SLOTS) this.boardSeconds += delta;
     this.advance(delta);
+    // The walkthrough is done once a second frame is on the board, or they have stood in the set and come back.
+    if (this.guiding) {
+      if (g.lifeSize.peek()) this.stoodIn = true;
+      if (this.shots >= 2 || (this.stoodIn && !g.lifeSize.peek())) {
+        this.endWalkthrough();
+        sayLineOnce('done');
+      }
+    }
+    if (g.walkthrough.peek() !== this.guiding) g.walkthrough.value = this.guiding;
     const xr = this.input.xr;
     this.controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
     this.landAsked = this.step === Step.Land ? this.landAsked + delta : 0;
@@ -256,7 +289,9 @@ export class CoachSystem extends createSystem({
     this.takeSeconds = g.takeSeconds.peek();
     this.scanOffered = g.roomScanOffered.peek();
     const onTake = this.take !== TakeState.Idle;
-    const target = onTake ? '' : (TARGET[this.step] ?? '');
+    // With their first frame on the board, the next thing to try is standing in it.
+    const inside = this.guiding && this.step === Step.Fill && this.shots === 1 && !g.coverageRunning.peek();
+    const target = onTake ? '' : inside ? 'inside' : (TARGET[this.step] ?? '');
     if (g.coachTarget.peek() !== target) g.coachTarget.value = target;
     sheet.visible = this.step !== Step.Hidden || onTake || this.note !== '';
     if (!sheet.visible) {
@@ -298,10 +333,26 @@ export class CoachSystem extends createSystem({
     }
   }
 
+  /** The walkthrough ends, for this visit and the next: skipped, or done. */
+  private endWalkthrough(): void {
+    this.guiding = false;
+    if (this.seasoned) return;
+    this.seasoned = true;
+    saveJson(StoreKey.Coach, { done: true } satisfies CoachState);
+  }
+
   private onVisibility(state: VisibilityState): void {
     const entering = !this.inSession && state !== VisibilityState.NonImmersive;
     this.inSession = state !== VisibilityState.NonImmersive;
+    if (!this.inSession) {
+      this.guiding = false;
+      const g = this.globals as Globals;
+      if (g.walkthrough.peek()) g.walkthrough.value = false;
+    }
     if (!entering) return;
+    // A newcomer is walked through; someone who has been through it, or skipped it, is not.
+    this.guiding = !this.seasoned;
+    this.stoodIn = false;
     // The clock for "headset on to a full board" runs only from an empty board.
     this.timing = this.shots === 0;
     this.boardSeconds = 0;
@@ -335,7 +386,7 @@ export class CoachSystem extends createSystem({
       if (this.restored) sayLineOnce('back');
       return;
     }
-    if (this.seasoned && this.step !== Step.Done) return;
+    if (!this.guiding && this.step !== Step.Done) return;
     const deaf = g.micOff.peek();
     if (this.step === Step.Land) sayLineOnce('land');
     else if (this.step === Step.Say && !deaf) sayLineOnce(this.mine ? 'mine' : 'say');
@@ -377,14 +428,11 @@ export class CoachSystem extends createSystem({
       this.hold = DONE_SECONDS;
       this.doneSeconds = this.timing ? this.boardSeconds : 0;
       this.timing = false;
-      if (!this.seasoned) {
-        this.seasoned = true;
-        saveJson(StoreKey.Coach, { done: true } satisfies CoachState);
-      }
+      this.endWalkthrough();
       return;
     }
     if (this.shots > 0) this.step = Step.Fill;
-    else if (this.seasoned) this.step = Step.Snap;
+    else if (this.seasoned && !this.guiding) this.step = Step.Snap;
     // Say the shot, move what is not right by hand, snap. The set designer frames the camera, so framing it by
     // hand is no longer a step of its own; without a voice, the steps are the old ones.
     else if (!this.said && (this.globals as Globals).talkOffered.peek()) this.step = Step.Say;

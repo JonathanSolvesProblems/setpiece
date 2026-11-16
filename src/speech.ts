@@ -99,6 +99,11 @@ function queue(item: Waiting): void {
   if (!speaking) void sayAll();
 }
 
+/** A newcomer starts again: every recorded line may be said once more. */
+export function forgetSaid(): void {
+  saidOnce.clear();
+}
+
 /** Stop talking and forget what was waiting. */
 export function hush(): void {
   hushes++;

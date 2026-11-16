@@ -18,8 +18,10 @@ import { ControlsSystem } from './controls.js';
 import { Held, SetPiece } from './set-components.js';
 
 /** Further than this from where the wearer looks, the set is out of view; nearer than the second, it is found. */
-const LOST_AT = Math.cos((50 * Math.PI) / 180);
-const FOUND_AT = Math.cos((35 * Math.PI) / 180);
+const LOST_AT = Math.cos((55 * Math.PI) / 180);
+const FOUND_AT = Math.cos((40 * Math.PI) / 180);
+/** The set is looked for at this height above its slate: about the actors' chests, and under the monitor. */
+const SET_MIDDLE = 0.12;
 /** Seconds out of view before the arrow shows, so a glance away does not bring it up. */
 const LOST_FOR = 1.2;
 /** Where the arrow sits: this far ahead of the eyes, and this far across toward the set. */
@@ -130,7 +132,10 @@ export class SetFinderSystem extends createSystem({ held: { required: [SetPiece,
     head.getWorldPosition(this.eye);
     head.getWorldQuaternion(this.head);
     this.ahead.set(0, 0, -1).applyQuaternion(this.head);
-    stage.getWorldPosition(this.toSet).sub(this.eye);
+    // The middle of what stands on the slate, at the set's own size: where a wearer watching the set is looking.
+    stage.getWorldPosition(this.toSet);
+    this.toSet.y += SET_MIDDLE * stage.scale.y;
+    this.toSet.sub(this.eye);
     const distance = this.toSet.length();
     if (distance < 1e-3) {
       this.forget();
