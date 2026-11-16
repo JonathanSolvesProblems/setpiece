@@ -77,9 +77,11 @@ const lowest = Math.min(...everySample);
 // The tagline's time is the headset's: every sentence timed in a wearer's session put its first piece down inside it.
 const questDesigner = JSON.parse(read('devpost/results/quest-voice-designer.json'));
 const slowestFirst = Math.max(...questDesigner.runs.map((run) => run.firstPieceMs));
+// "About two seconds": inside two on the headset, and the desktop's median inside two with its slowest of 33 under three.
+const hurried = JSON.parse(read('devpost/results/designer-hurry.json')).summary.with.firstPieceMs;
 expect(
-  `the tagline's "within two seconds" holds for all ${questDesigner.runs.length} sentences timed on the headset (slowest first piece ${slowestFirst} ms)`,
-  tagline.includes('within two seconds') && slowestFirst < 2000,
+  `the tagline's "about two seconds" is what was timed: ${questDesigner.runs.length} headset sentences (slowest first piece ${slowestFirst} ms), 33 from a desktop (median ${hurried.median} ms, slowest ${hurried.slowest} ms)`,
+  tagline.includes('about two seconds later') && slowestFirst < 2000 && hurried.median < 2000 && hurried.slowest < 3000,
 );
 expect('the tagline no longer claims a frame-rate floor', !tagline.includes('never under 60'));
 expect(`every headset frame-rate sample the submission rests on is 60 or more (lowest ${lowest})`, lowest >= 60);

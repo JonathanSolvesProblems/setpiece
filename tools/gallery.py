@@ -39,6 +39,8 @@ checks = (ROOT / 'devpost/checks/last-run.md').read_text(encoding='utf-8')
 catalog = (ROOT / 'src/catalog.ts').read_text(encoding='utf-8')
 designer = json.loads((ROOT / 'devpost/results/designer-latency.json').read_text(encoding='utf-8'))
 quest_designer = json.loads((ROOT / 'devpost/results/quest-voice-designer.json').read_text(encoding='utf-8'))
+designer_frames = json.loads((ROOT / 'devpost/results/quest-frame-time-designer.json').read_text(encoding='utf-8'))
+designer_sets = [designer_frames['second_run_hands_open']['night_chase'], designer_frames['second_run_hands_open']['funeral_in_the_rain'], designer_frames['first_run_hands_pointing']['castle_gate']]
 spoken_lines = json.loads((ROOT / 'public/audio/voice/lines.json').read_text(encoding='utf-8'))['lines']
 
 all_fps = [s['fps'] for s in fps['samples']]
@@ -71,6 +73,9 @@ N = {
     'quest_first_s': f"{quest_designer['runs'][0]['firstPieceMs'] / 1000:.1f}",
     'quest_whole_s': f"{quest_designer['runs'][0]['wholeSetMs'] / 1000:.1f}",
     'spoken_lines': len(spoken_lines),
+    # The designer's sets on the headset, as the submission quotes them (tools/check-claims.mjs reads the same three).
+    'sets_standing': (lambda v: f'{min(v)} to {max(v)}')([round(s['frames_per_second']['idle']) for s in designer_sets]),
+    'sets_moving': (lambda v: f'{min(v)} to {max(v)}')([round(s['frames_per_second']['one_piece_moving']) for s in designer_sets]),
     'checks_passed': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(1),
     'checks_total': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(2),
 }
@@ -91,7 +96,7 @@ SLIDES = [
     dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
          caption="The designer's own plan stood two actors inside a car parked side-on. Code stepped them out beside it before the camera was placed."),
     dict(slug='speed', badge='Result · devpost/results/designer-latency.json and quest-voice-designer.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
-         caption='{designer_sentences} sets from a desktop: first piece a median {designer_first_s} s, whole set {designer_whole_s} s. Spoken on the headset: first piece {quest_first_s} s.'),
+         caption='First piece a median {designer_first_s} s from a desktop, {quest_first_s} s spoken on the headset, where its sets ran at {sets_standing} frames a second.'),
     dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'lines'),
          caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
     dict(slug='light', badge=LIVE_BADGE, headline='It lights the scene', picture=('live', 'light'),
@@ -115,14 +120,14 @@ SLIDES = [
     dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json and quest-frame-time.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
          caption='{fps_samples} one-second samples, {fps_days} Nov: median {fps_median}, lowest {fps_min}. A heavier set on 11 Nov ran at {heavy_fps}, {heavy_then}.'),
     dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
-         caption='Saved from the page: the board as an image with each frame’s numbers, and the shot list as a CSV. A take saves as a short video too.'),
+         caption='Saved from the page: the board the designer shot, each frame with its numbers and its name, and the shot list as a CSV for the crew.'),
     dict(slug='camera', badge=QUEST, headline='Format, rig, second camera', picture='captures/quest-camera-tab.jpg',
          caption='Four sensor formats, a tripod or a drone up to 11 m on the real set, and a second camera you can cut to while a take records.'),
 ]
 
 # The gallery as it is submitted: eleven slides in the order of a first visit. A cold judge read on 15 Nov found
-# nineteen too many, with some repeating others; the rest stay above for anyone who wants to render them.
-SUBMITTED = ['say', 'table', 'voice', 'made', 'look', 'light', 'coverage', 'pinch', 'speed', 'fps', 'leave']
+# nineteen too many, with some repeating others, and a second on 16 Nov asked for the numbers on one slide; the rest stay above for anyone who wants to render them.
+SUBMITTED = ['say', 'table', 'made', 'look', 'light', 'coverage', 'pinch', 'speed', 'leave']
 SLIDES = [next(slide for slide in SLIDES if slide['slug'] == slug) for slug in SUBMITTED]
 
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -182,6 +187,7 @@ def result_body(kind: str) -> str:
         return (f'<div class="result"><div class="big">{N["designer_first_s"]}<span class="unit">s to the first piece, median of {N["designer_sentences"]} sets</span></div>'
                 f'<p class="muted">From the request to the first piece of a fresh set, and to the whole set: the app\'s own server function, from a desktop on home broadband. '
                 f'On the headset, {len(quest_designer["runs"])} sentences in my own words, the last on the live site: {N["quest_first_s"]} s from the end of the sentence to the first piece each time, {" and ".join(f"{run["wholeSetMs"] / 1000:.1f}" for run in quest_designer["runs"])} s to the whole set.</p>'
+                f'<p>With both hands tracked, the designer\'s sets ran at {N["sets_standing"]} frames a second standing and {N["sets_moving"]} with a piece moving.</p>'
                 f'<table><tr><th>Said</th><th>First piece</th><th>Whole set</th></tr>{rows}</table></div>')
     if kind == 'lines':
         when = {
@@ -271,6 +277,13 @@ async def shot(page, path: Path, selector: str | None = None, bottom: int | None
     x, y, w, h = [int(v * scale) for v in box]
     bottom = None if bottom is None else int(bottom * scale)
     im.crop((x, y + h - bottom, x + w, y + h) if bottom else (x, y, x + w, y + h)).save(path)
+
+
+def cut(text: str, most: int = 66) -> str:
+    """A line no longer than fits under a picture, ended at a word, with three points when it was cut."""
+    if len(text) <= most:
+        return text
+    return text[:most].rsplit(' ', 1)[0].rstrip(',;:') + '...'
 
 
 async def stage_png(page, path: Path):
@@ -373,14 +386,14 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             draw.text((1360, 740), 'AFTER IT LOOKED', font=label, fill=(214, 225, 60))
             y = 800
             for line in looks[0]['report'].split('\n')[:4]:
-                draw.text((0, y), line[2:][:68], font=face, fill=(199, 199, 183))
+                draw.text((0, y), cut(line[2:]), font=face, fill=(199, 199, 183))
                 y += 46
             # Its note says what it changed; the lines under it are measured from the frame it left.
             words = note.split('. ', 1)[-1]
-            draw.text((1360, 800), words[:68], font=face, fill=(246, 247, 239))
+            draw.text((1360, 800), cut(words), font=face, fill=(246, 247, 239))
             y = 846
             for line in measured.split('\n')[:3]:
-                draw.text((1360, y), line[2:][:68], font=face, fill=(199, 199, 183))
+                draw.text((1360, y), cut(line[2:]), font=face, fill=(199, 199, 183))
                 y += 46
             sheet.save(png)
     elif recipe == 'dresser':
@@ -494,7 +507,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         draw.text((0, y + 64), 'Two actors standing inside the car', font=face, fill=(199, 199, 183))
         draw.text((1360, y + 64), 'Stepped out beside it, before the camera is placed', font=face, fill=(246, 247, 239))
         sheet.save(png)
-    elif recipe in ('light', 'coverage'):
+    elif recipe in ('light', 'coverage', 'exports'):
         from PIL import Image
         # One set from the real designer, let settle (its looks through the lens follow by themselves).
         await page.fill('#page-ask-text', 'a night chase, a red car racing past a burning truck by a house and a street lamp, two actors running at camera')
@@ -551,16 +564,45 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             sheet.save(png)
         else:
             # The designer plans the coverage and the app shoots it onto the board; the board is then saved by the
-            # page's own button, as the app saves it.
+            # page's own button, as the app saves it (and, for the slide of what leaves, the shot list with it).
             await page.evaluate('globalThis.setpiece.world.globals.coverageRequested.value += 1')
             await page.wait_for_function('globalThis.setpiece.world.globals.coverageRunning.peek() === true', timeout=20000)
             await page.wait_for_function('globalThis.setpiece.world.globals.coverageRunning.peek() === false', timeout=600000)
             frames = await page.evaluate('globalThis.setpiece.world.globals.shotFrames.peek().length')
             if frames < 3:
                 raise RuntimeError(f'coverage put only {frames} frames on the board')
+            board_path = png if recipe == 'coverage' else out / 'saved-board.png'
             async with page.expect_download(timeout=30000) as waiting:
                 await click('#page-save-board')
-            await (await waiting.value).save_as(str(png))
+            await (await waiting.value).save_as(str(board_path))
+            if recipe == 'exports':
+                # What a director leaves with: that board and its shot list, saved by the page's own buttons.
+                from PIL import ImageDraw, ImageFont
+                import csv
+                async with page.expect_download(timeout=30000) as waiting:
+                    await click('#page-save-list')
+                csv_path = out / 'saved-shot-list.csv'
+                await (await waiting.value).save_as(str(csv_path))
+                board = Image.open(board_path).convert('RGB')
+                rows = list(csv.reader(io.StringIO(csv_path.read_text(encoding='utf-8'))))[:4]
+                width, height = 2400, 1300
+                sheet = Image.new('RGB', (width, height), (42, 33, 28))
+                bw = 1500
+                bh = int(board.height * bw / board.width)
+                sheet.paste(board.resize((bw, bh)), (0, (height - bh) // 2))
+                draw = ImageDraw.Draw(sheet)
+                font = ImageFont.truetype(str(ROOT / 'public/ui/fonts/SchibstedGrotesk-Medium.ttf'), 30)
+                head = ImageFont.truetype(str(ROOT / 'public/ui/fonts/BigShoulders-Bold.ttf'), 40)
+                draw.text((1560, 60), 'SETPIECE-SHOT-LIST.CSV', font=head, fill=(199, 199, 183))
+                y = 140
+                header, body = rows[0], rows[1:]
+                for record in body:
+                    for name, cell in list(zip(header, record))[:5]:
+                        draw.text((1560, y), name, font=font, fill=(199, 199, 183))
+                        draw.text((1990, y), cell, font=font, fill=(246, 247, 239))
+                        y += 40
+                    y += 30
+                sheet.save(png)
     elif recipe == 'standoff':
         await say('a mexican standoff after a car chase')
         await page.wait_for_timeout(1500)
