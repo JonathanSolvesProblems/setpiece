@@ -3,6 +3,9 @@
  * board from the wearer ("the panel that shows frames was blocked in a house"). They rise so the card's foot clears
  * the tallest piece on the set, and come back down when it goes. Measured when the set changes (a piece added,
  * removed, sized or put down), never in a frame; the frames only ease the two toward where they should be.
+ *
+ * The same measuring finds a piece hanging past the slate's left edge, where the panel stands, and the panel moves
+ * left by as much (src/controls.ts reads `aside`), so a wall beside it is never between the wearer and a button.
  */
 import { createSystem, Object3D } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
@@ -13,7 +16,10 @@ import { Held, SetPiece, SetRole } from './set-components.js';
 /** The card's foot stands this far above the tallest piece. */
 const CLEAR = 0.03;
 /** The most the two rise: beyond this the monitor is out of a seated wearer's view. */
-const MOST = 0.34;
+const MOST = 0.36;
+/** The slate's left edge, and the most the panel moves left for a piece hanging past it. */
+const SLATE_LEFT = -0.3;
+const ASIDE_MOST = 0.26;
 /** How fast they rise and settle, as a share of what is left each second. */
 const RATE = 5;
 
@@ -31,6 +37,8 @@ export class SightlineSystem extends createSystem({
   private cardFoot = 0;
   private lift = 0;
   private wanted = 0;
+  /** How far left of its usual place the panel should stand, metres: a piece hangs that far past the slate's left edge. */
+  aside = 0;
   private stale = true;
 
   init(): void {
@@ -75,6 +83,7 @@ export class SightlineSystem extends createSystem({
   /** How far the monitor and the card have to rise for the card's foot to clear the tallest piece on the set. */
   private measure(): number {
     let tallest = 0;
+    let leftmost = 0;
     for (const piece of this.queries.pieces.entities) {
       const object = piece.object3D;
       const role = piece.getValue(SetPiece, 'role');
@@ -84,7 +93,15 @@ export class SightlineSystem extends createSystem({
       const box = localBounds(object);
       if (box.isEmpty()) continue;
       tallest = Math.max(tallest, object.position.y + box.max.y * object.scale.y);
+      // The piece's left edge on the slate, turned as it stands: the farthest left of its box's four corners.
+      const c = Math.cos(object.rotation.y) * object.scale.x;
+      const s = Math.sin(object.rotation.y) * object.scale.x;
+      leftmost = Math.min(
+        leftmost,
+        object.position.x + Math.min(box.min.x * c + box.min.z * s, box.min.x * c + box.max.z * s, box.max.x * c + box.min.z * s, box.max.x * c + box.max.z * s),
+      );
     }
+    this.aside = Math.max(0, Math.min(ASIDE_MOST, SLATE_LEFT - leftmost));
     return Math.max(0, Math.min(MOST, tallest + CLEAR - this.cardFoot));
   }
 }

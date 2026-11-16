@@ -112,7 +112,7 @@ function question(asked: Asked): string | null {
     `The director said: "${said}"`,
     // The headset says when the set standing is the designer's own example and this is the wearer's first sentence.
     asked.first === true
-      ? 'The set standing now is an example you built by yourself to show how this works. This is the director\'s own first shot: build it as a new scene (fresh true), unless they plainly ask to change what stands there.'
+      ? 'The set standing now is an example you built by yourself to show how this works. This is the director\'s own first shot: build it as a new scene (fresh true), unless they plainly ask to change what stands there. A greeting or a question is still only answered, and changes nothing.'
       : '',
     others.length > 0 ? `The recogniser's other guesses: ${others.map((guess) => `"${guess.slice(0, LONGEST_SAID)}"`).join('; ')}` : '',
   ]

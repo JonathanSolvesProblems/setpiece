@@ -32,6 +32,7 @@ import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
 import { micAnswer } from './mic.js';
 import { startOver } from './start-over.js';
+import { SightlineSystem } from './sightline.js';
 import { chooseSpoken, hush, micOpen, sayLine, sayLineOnce, SPOKEN, spokenChoice, talking } from './speech.js';
 
 /**
@@ -48,6 +49,12 @@ const PANEL_TOP = 0.725;
 /** The least the panel's bottom stands above the slate. */
 const PANEL_CLEAR = 0.035;
 const LIFE_CONFIRM_MS = 3000;
+/** A second pinch this soon after the set went full size is the same press, not a wish to go back. */
+const LIFE_DOUBLE_MS = 1500;
+/** The two halves of one double pinch are closer together than this. */
+const LIFE_PINCH_MS = 500;
+/** How fast the panel moves aside for a piece, as a share of what is left each second. */
+const ASIDE_RATE = 4;
 /** Search keeps the keys on the panel, so it shows fewer results at once. */
 const SEARCH_SLOTS = 4;
 const SEARCH_LONGEST = 12;
@@ -213,6 +220,8 @@ export class ControlsSystem extends createSystem({
 }) {
   private stage: Entity | null = null;
   private panelObject: Object3D | null = null;
+  private sightline: SightlineSystem | null = null;
+  private asideNow = 0;
   private panelPosition = new Vector3();
   private head = new Vector3();
   private forward = new Vector3();
@@ -270,6 +279,11 @@ export class ControlsSystem extends createSystem({
     if (panel == null) return;
     stageObject.updateWorldMatrix(true, false);
     this.panelPosition.copy(PANEL_OFFSET);
+    // A piece hanging past the slate's left edge would stand in the panel: the panel moves left by as much.
+    if (this.sightline == null) this.sightline = this.world.getSystem(SightlineSystem) ?? null;
+    const aside = this.sightline?.aside ?? 0;
+    this.asideNow += (aside - this.asideNow) * Math.min(1, ASIDE_RATE * delta);
+    this.panelPosition.x -= this.asideNow;
     const height = this.panelHeight();
     // It hangs from its top; a page tall enough to reach the slate lifts it instead, so it never sinks into the set.
     if (height > 0) this.panelPosition.y = Math.max(PANEL_TOP - (height * PANEL_UNIT) / 2, PANEL_CLEAR + (height * PANEL_UNIT) / 2);
@@ -752,8 +766,19 @@ export class ControlsSystem extends createSystem({
       lifeArmed = null;
     };
     this.cleanupFuncs.push(disarmLife);
+    let wentIn = -LIFE_DOUBLE_MS;
+    let pressedGo = -LIFE_DOUBLE_MS;
+    this.cleanupFuncs.push(
+      g.lifeSize.subscribe(() => {
+        wentIn = performance.now();
+      }),
+    );
     const pressLife = (): void => {
-      if (!g.lifeSize.peek() && lifeArmed == null) {
+      // The walkthrough has just asked for this press, so one is enough; a stray pinch any other time still takes two.
+      const askedFor = g.coachTarget.peek() === 'inside';
+      // A second pinch straight after the one that went in (or came back) is the same press.
+      if (performance.now() - wentIn < LIFE_DOUBLE_MS || performance.now() - pressedGo < LIFE_PINCH_MS) return;
+      if (!g.lifeSize.peek() && lifeArmed == null && !askedFor) {
         life?.setProperties({ text: 'Press again to go full size', borderColor: OPTIC_YELLOW });
         inside?.setProperties({ text: 'Press again', borderColor: OPTIC_YELLOW });
         says('', 'Step inside grows the set to full size around you. Press again to go in.', LIFE_CONFIRM_MS);
@@ -766,6 +791,7 @@ export class ControlsSystem extends createSystem({
         return;
       }
       disarmLife();
+      pressedGo = performance.now();
       g.lifeSizeRequested.value = g.lifeSizeRequested.peek() + 1;
     };
     wire('btn-life', pressLife);

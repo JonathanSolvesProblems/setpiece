@@ -87,6 +87,21 @@ const number = { type: 'number' } as const;
  * The light a set is in, chosen by the designer from the sentence: studio is the look of an interior or a sound
  * stage, and the default. "" in a reply keeps the light as it is.
  */
+/** The most room a made piece takes on the 6 m by 4 m stage, in metres at full scale: across, front to back, high. */
+export const MADE_MOST = { w: 5, d: 3, h: 4 };
+
+/**
+ * The largest size (1 is as written) at which a made piece of these metres still fits the stage, turned yawDeg
+ * about up: side-on, its width runs front to back.
+ */
+export function fitMade(w: number, d: number, h: number, yawDeg = 0): number {
+  const sideOn = Math.abs(Math.sin((yawDeg * Math.PI) / 180)) > Math.SQRT1_2;
+  const across = sideOn ? d : w;
+  const deep = sideOn ? w : d;
+  const most = Math.min(MADE_MOST.w / Math.max(across, 0.01), MADE_MOST.d / Math.max(deep, 0.01), MADE_MOST.h / Math.max(h, 0.01));
+  return Math.round(most * 100) / 100;
+}
+
 export const LIGHTS = ['studio', 'day', 'golden hour', 'night', 'overcast', 'spotlight'] as const;
 export type LightName = (typeof LIGHTS)[number];
 export const isLight = (value: unknown): value is LightName => typeof value === 'string' && (LIGHTS as readonly string[]).includes(value);

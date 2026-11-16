@@ -85,5 +85,16 @@ const told = (shot, subject) => `${shot.lens} mm from ${far(shot, subject).toFix
   check('and one that already holds head and shoulders is left as planned', held.lens === 50 && Math.abs(held.z - 4.1) < 1e-6 || held.z === 4);
 }
 
+// A made piece is held to the stage (fitMade in src/director-plan.ts): the castle the designer wrote on the headset
+// on Nov 16 was 6.9 m across, 6.5 m deep and 6.2 m high, and stood over the whole slate, into the panel.
+{
+  await build({ entryPoints: ['src/director-plan.ts'], bundle: true, platform: 'node', format: 'esm', outdir: 'tmp/fit', logLevel: 'error' });
+  const { fitMade, MADE_MOST } = await import(`../tmp/fit/director-plan.js?${Date.now()}`);
+  const keep = fitMade(6.9, 6.5, 6.2);
+  check('the castle written bigger than the stage is shrunk whole until it fits', keep < 1 && 6.9 * keep <= MADE_MOST.w + 0.05 && 6.5 * keep <= MADE_MOST.d + 0.05 && 6.2 * keep <= MADE_MOST.h + 0.05, keep);
+  check('a gate front inside the limits is left as written', fitMade(5, 1, 4) >= 1);
+  check('turned side-on, its width is measured front to back', fitMade(5, 1, 4, 90) < 1 && Math.abs(fitMade(5, 1, 4, 90) - MADE_MOST.d / 5) < 0.011 && fitMade(5, 1, 4, 180) >= 1);
+}
+
 console.log(failed === 0 ? '\nAll coverage fits hold.' : `\n${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

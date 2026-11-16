@@ -12,7 +12,7 @@ import { assetByLabel, assetTitle, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf
 import type { Asset } from './catalog.js';
 import { LENSES, SENSORS } from './camera-formats.js';
 import { fitShot } from './coverage-plan.js';
-import { cleanCamera, cleanThing, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
+import { cleanCamera, cleanThing, fitMade, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
 import type { CameraPlan, Thing } from './director-plan.js';
 import { MadeSystem } from './made.js';
 import type { MadeDef } from './made.js';
@@ -143,6 +143,16 @@ export class DirectorSystem extends createSystem({
 
   init(): void {
     void this.check();
+    // Starting over or resetting the stage takes the designer's example away: the next sentence is not about it.
+    const g = this.globals as unknown as Globals & { resetStageRequested: Signal<number> };
+    this.cleanupFuncs.push(
+      g.setsBuilt.subscribe((built) => {
+        if (built === 0) this.exampleStands = false;
+      }),
+      g.resetStageRequested.subscribe(() => {
+        this.exampleStands = false;
+      }),
+    );
   }
 
   /** Whether the designer can be asked. Until it is known, it is tried; a server with no key says so, and is asked again now and then. */
@@ -239,9 +249,11 @@ export class DirectorSystem extends createSystem({
     const first = !own && this.exampleStands;
     // A set the designer builds by itself (the first, as a newcomer lands the set) is marked as its own until it is up.
     g.ownBuild.value = own;
+    const built = g.setsBuilt.peek();
     try {
       const outcome = await this.request(said, { said, heard, set: this.describe(), first }, false, own);
-      if (outcome === 'built') this.exampleStands = own;
+      // A greeting or a question changes nothing, and the example still stands after it.
+      if (outcome === 'built' && g.setsBuilt.peek() !== built) this.exampleStands = own;
       return outcome;
     } finally {
       if (own) g.ownBuild.value = false;
@@ -833,6 +845,21 @@ class PlanBuild {
     } else if (thing.size > 0) {
       finish[1] = 0;
       finish[3] = thing.size;
+    }
+    // A made piece is held to the stage: a castle written 7 m across and 6 m high stood over the whole slate, into
+    // the panel and through the board (headset, 16 Nov). It is shrunk whole, so it keeps its proportions.
+    // Only as the designer writes or sizes it: a piece the wearer sized by hand is not cut back by a later "paint it".
+    if (isMade(label) && (thing.size > 0 || thing.parts.length > 0)) {
+      const size = this.world.getSystem(MadeSystem)?.footprintOf(label);
+      if (size != null) {
+        const most = fitMade(size.w, size.d, size.h, thing.yaw);
+        const asked = (finish[3] ?? 0) > 0 ? finish[3]! : (SIZES[finish[1]]?.scale ?? 1);
+        // A piece written inside the limits takes whatever size was asked, as a library piece does (a giant).
+        if (most < 1 && asked > most) {
+          finish[1] = 0;
+          finish[3] = most;
+        }
+      }
     }
     if (thing.fitting !== '' && asset?.styles) {
       const style = asset.styles.findIndex((name) => name.toLowerCase() === thing.fitting.toLowerCase());

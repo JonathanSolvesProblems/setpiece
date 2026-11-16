@@ -562,7 +562,7 @@ export class CoachSystem extends createSystem({
   private fillLine(): [string, string] {
     const brief = BRIEFS[(this.globals as Globals).briefIndex.peek()];
     // The first frame is the moment to stand in it: the set grows around the wearer, in its own light.
-    if (this.shots === 1) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Now stand in it: pinch Step inside twice and the set grows around you.'];
+    if (this.shots === 1) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Now stand in it: pinch Step inside, or say "step inside", and the set grows around you.'];
     if (this.shots === 2) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Pinch a frame on the board to go back to its setup.'];
     if (this.said || this.mine) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Snap again, or pinch Shoot coverage and the designer shoots the rest.'];
     if (brief == null) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Every shot is printed. Shoot what you like.'];
