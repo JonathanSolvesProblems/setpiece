@@ -335,8 +335,11 @@ export class TraySystem extends createSystem({
    * so a take that is recording or playing is stopped first. (On the headset a take nobody meant to
    * record was looping, and a spoken set was refused with a line the wearer never saw.)
    */
-  private readyToRebuild(): boolean {
+  private readyToRebuild(quiet = false): boolean {
     const g = this.globals as Globals;
+    // The designer's own look through the lens, which nobody asked for: it gives way to a take or a hand on a
+    // piece without stopping the one or telling the other to let go.
+    if (quiet) return g.takeState.peek() === 'idle' && this.queries.held.entities.size === 0;
     // Asked directly: this runs inside a signal's effect, where a signal set here is only acted on afterwards.
     if (g.takeState.peek() !== 'idle') this.world.getSystem(TakeSystem)?.halt();
     if (g.takeState.peek() !== 'idle') {
@@ -921,8 +924,8 @@ export class TraySystem extends createSystem({
    * strikes the old take and undresses the pieces; an edit leaves the set as it is. False when the set cannot
    * change now, and the reason is on the call sheet.
    */
-  planBegin(fresh: boolean): boolean {
-    if (!this.ready || !this.readyToRebuild()) return false;
+  planBegin(fresh: boolean, quiet = false): boolean {
+    if (!this.ready || !this.readyToRebuild(quiet)) return false;
     // The set as it stood before the plan is kept for Undo now, while the plan is not; see ViewfinderSystem.remember.
     this.world.getSystem(ViewfinderSystem)?.rememberNow();
     if (!fresh) return true;

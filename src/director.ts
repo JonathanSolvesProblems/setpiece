@@ -578,7 +578,8 @@ class PlanBuild {
     if (this.begun || this.refused) return;
     const tray = this.world.getSystem(TraySystem);
     if (tray != null) for (const label of tray.onSet()) this.before.add(label);
-    if (tray == null || !tray.planBegin(fresh)) {
+    // A look gives way quietly: the wearer did not ask for it, so they are not told to let go for it.
+    if (tray == null || !tray.planBegin(fresh, this.looking)) {
       this.refused = true;
       return;
     }

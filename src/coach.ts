@@ -444,8 +444,8 @@ export class CoachSystem extends createSystem({
         }
         const press = this.controllers ? 'Pull the trigger on' : 'Pinch';
         // The designer built the set standing by itself, to show how it goes.
-        if (this.mine) return ['2 OF 4 · SAY YOUR SHOT', `That one was mine. ${press} Talk and say yours.`];
-        return ['2 OF 4 · SAY THE SHOT', `${press} Talk and say the shot. Or ${this.controllers ? 'pull it on' : 'pinch'} Try a shot.`];
+        if (this.mine) return ['2 OF 4 · SAY YOUR SHOT', `That one was mine. ${press} Talk, on the panel to the left, and say yours.`];
+        return ['2 OF 4 · SAY THE SHOT', `${press} Talk, on the panel to the left, and say the shot. Or ${this.controllers ? 'pull it on' : 'pinch'} Try a shot.`];
       }
       case Step.Move:
         return this.said

@@ -10,8 +10,8 @@
  },
  "lines": {
   "land": "Point at a table, or the floor, and pinch. The set lands there.",
-  "mine": "That one was mine. Now pinch Talk, and tell me yours.",
-  "say": "Pinch Talk, and tell me the shot.",
+  "mine": "That one was mine. Now pinch Talk, on the panel to the left of the set, and tell me yours.",
+  "say": "Pinch Talk, on the panel to the left of the set, and tell me the shot.",
   "block": "Move anything by hand, or pinch Talk and tell me what to change. When you like the frame, pinch Snap frame.",
   "frame": "That is your first frame. Pinch Step inside twice to stand in it.",
   "inside": "You are inside the set. Point at the floor and pinch to walk.",
