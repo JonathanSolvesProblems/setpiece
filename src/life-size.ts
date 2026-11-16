@@ -63,6 +63,11 @@ const INSIDE_NOTE = 'INSIDE THE SET | Pinch the air and pull: the set moves with
  * metres), the hand is smoothed at this rate first so tracking noise is not multiplied into a shaking world, and
  * the set turns this many times as far as the wrist.
  */
+/**
+ * Where a wearer's eyes are above the set's ground once inside, in metres: a standing person's. Someone seated at a
+ * table has their eyes a metre from the floor, and from there the actors tower and a wall is a cliff (headset, 16 Nov).
+ */
+const STANDING_EYES = 1.6;
 const PULL_GAIN = 7;
 const PULL_SMOOTH = 16;
 const PULL_TURN_GAIN = 2.2;
@@ -539,7 +544,9 @@ export class LifeSizeSystem extends createSystem({
     const headYaw = Math.atan2(-this.forward.x, -this.forward.z);
     this.turn.setFromAxisAngle(UP, headYaw - lookYaw);
     this.offset.copy(this.stand).multiplyScalar(LIFE_SCALE).applyQuaternion(this.turn);
-    this.head.y = 0;
+    // Their eyes come to a standing person's height in the set (STANDING_EYES): the set's ground goes below the
+    // room's floor by what a seated wearer is short of standing.
+    this.head.y = Math.min(0, this.head.y - STANDING_EYES);
     this.head.sub(this.offset);
     setWorldQuaternion(object, this.turn);
     setWorldPosition(object, this.head);
@@ -627,7 +634,9 @@ export class LifeSizeSystem extends createSystem({
     this.offset.set(0, 0, LENS_AHEAD).applyQuaternion(rig.quaternion).add(rig.position);
     this.offset.y = 0;
     this.offset.multiplyScalar(LIFE_SCALE).applyQuaternion(this.turn);
-    this.head.y = 0;
+    // Their eyes come to a standing person's height in the set (STANDING_EYES): the set's ground goes below the
+    // room's floor by what a seated wearer is short of standing.
+    this.head.y = Math.min(0, this.head.y - STANDING_EYES);
     this.head.sub(this.offset);
     object.scale.setScalar(LIFE_SCALE);
     setWorldQuaternion(object, this.turn);
