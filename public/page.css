@@ -499,6 +499,11 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
   overflow: hidden;
 }
 .board li.filled { border: 1px solid var(--rule); }
+/* Under the board once it has a frame: what to do with it, where the eye already is. */
+.board-keep { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--unit) * 2); margin-top: calc(var(--unit) * 3); }
+.board-keep[hidden] { display: none; }
+.board-keep-note { flex-basis: 100%; margin: 0; font-size: 0.95rem; line-height: 1.4; text-wrap: pretty; }
+.board-keep-note:empty { display: none; }
 .board img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .board .n {
   position: absolute;

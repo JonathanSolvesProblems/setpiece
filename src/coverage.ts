@@ -6,15 +6,14 @@
  * pinch Stop coverage), when a piece is picked up, when something new is asked of the designer, or when the session
  * ends, and keeps what it has shot.
  */
-import { speak } from './speech.js';
+import { sayLine, speak } from './speech.js';
 import { createSystem, VisibilityState } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { cleanCamera } from './director-plan.js';
 import type { CameraPlan } from './director-plan.js';
 import { DirectorSystem } from './director.js';
 import { LifeSizeSystem } from './life-size.js';
 import { Held, SetPiece } from './set-components.js';
-import { MOST_SHOTS } from './coverage-plan.js';
+import { coverageShots, shotCall } from './coverage-plan.js';
 
 const ENDPOINT = '/api/director';
 const BOARD_SLOTS = 6;
@@ -32,6 +31,9 @@ const WAIT_MS = 30000;
 const SETTLE_WAIT = 25;
 /** The longest a snapped frame is waited for on the board. */
 const FRAME_WAIT = 4;
+/** What the sheet says while the designer plans the shots, and how often it is put back up while it waits. */
+const PLANNING_NOTE = 'PLANNING COVERAGE | The set designer is choosing the shots.';
+const PLANNING_REPEAT_MS = 5000;
 
 type Globals = {
   coachNote: Signal<string>;
@@ -45,6 +47,8 @@ type Globals = {
   takeState: Signal<string>;
   coverageRequested: Signal<number>;
   coverageStopRequested: Signal<number>;
+  setupRecalled: Signal<number>;
+  resetStageRequested: Signal<number>;
 };
 
 type Shot = { title: string; says: string; camera: CameraPlan };
@@ -53,6 +57,8 @@ export class CoverageSystem extends createSystem({
   held: { required: [SetPiece, Held] },
 }) {
   private stopAsked = false;
+  /** The server's passes for this coverage's shot calls, in order. */
+  private passes: string[] = [];
   private asking: AbortController | null = null;
   /** The visibility coverage started in: a session ending or blurred stops it. */
   private startedIn: string = VisibilityState.NonImmersive;
@@ -74,6 +80,14 @@ export class CoverageSystem extends createSystem({
         this.stop();
       }),
       this.queries.held.subscribe('qualify', () => {
+        if (this.running()) this.stop();
+      }),
+      // A frame pinched on the board, an undo, or the set sent to be landed again: the set is no longer the one
+      // being covered, so the coverage ends rather than shoot over it.
+      g.setupRecalled.subscribe(() => {
+        if (this.running()) this.stop();
+      }),
+      g.resetStageRequested.subscribe(() => {
         if (this.running()) this.stop();
       }),
       () => this.asking?.abort(),
@@ -103,7 +117,7 @@ export class CoverageSystem extends createSystem({
     const life = g.lifeSize.peek();
     if (!life && g.shotFrames.peek().length >= BOARD_SLOTS) return 'THE BOARD IS FULL | Pinch New board, then say cover it again.';
     void this.run(director);
-    return 'PLANNING COVERAGE | The set designer is choosing the shots.';
+    return PLANNING_NOTE;
   }
 
   private async run(director: DirectorSystem): Promise<void> {
@@ -115,16 +129,27 @@ export class CoverageSystem extends createSystem({
     let done = 0;
     let shots: Shot[] = [];
     try {
-      // A set still being built, framed or looked at is let finish: its own camera would fight the coverage's.
-      const waitedFrom = performance.now();
-      while (!director.settled() && !this.stopAsked && performance.now() - waitedFrom < SETTLE_WAIT * 1000) {
-        await new Promise((ready) => window.setTimeout(ready, 150));
+      // The wait for a set to finish and then for the plan, which arrives whole, takes some seconds: the designer
+      // says it is planning, and the note is put back up while it does, so the wait is never a silent sheet back
+      // on its last step.
+      sayLine('cover');
+      const planning = window.setInterval(() => {
+        if (!this.stopAsked) g.coachNote.value = PLANNING_NOTE;
+      }, PLANNING_REPEAT_MS);
+      try {
+        // A set still being built, framed or looked at is let finish: its own camera would fight the coverage's.
+        const waitedFrom = performance.now();
+        while (!director.settled() && !this.stopAsked && performance.now() - waitedFrom < SETTLE_WAIT * 1000) {
+          await new Promise((ready) => window.setTimeout(ready, 150));
+        }
+        if (this.stopAsked || !director.settled()) {
+          if (!this.stopAsked) g.coachNote.value = 'STILL BUILDING | Say cover it again once the set is up.';
+          return;
+        }
+        shots = await this.plan(director, g.lastSpoken.peek() || 'cover the scene');
+      } finally {
+        window.clearInterval(planning);
       }
-      if (this.stopAsked || !director.settled()) {
-        if (!this.stopAsked) g.coachNote.value = 'STILL BUILDING | Say cover it again once the set is up.';
-        return;
-      }
-      shots = await this.plan(director, g.lastSpoken.peek() || 'cover the scene');
       if (shots.length === 0) {
         if (!this.stopAsked) g.coachNote.value = 'NO COVERAGE | The set designer did not plan any shots. Say cover it again.';
         return;
@@ -136,7 +161,7 @@ export class CoverageSystem extends createSystem({
         const { title, says, camera } = shots[shot];
         g.coachNote.value = `SHOT ${shot + 1} OF ${shots.length}: ${title.toUpperCase()} | ${says}`;
         // Called as a first assistant director would, while the camera goes to it.
-        speak(`Shot ${shot + 1}. ${title}.`);
+        speak(shotCall(shot, title), this.passes[shot] ?? '');
         // A camera that could not move is no new shot: nothing is snapped for it. On the table it glides to its
         // mark and the monitor plays the move; inside, the wearer is cut to it.
         if (!director.frameShot(camera, life ? 0 : GLIDE)) continue;
@@ -178,6 +203,7 @@ export class CoverageSystem extends createSystem({
   private async plan(director: DirectorSystem, said: string): Promise<Shot[]> {
     const asking = new AbortController();
     this.asking = asking;
+    this.passes = [];
     const timer = window.setTimeout(() => asking.abort(), WAIT_MS);
     try {
       const response = await fetch(ENDPOINT, {
@@ -190,26 +216,16 @@ export class CoverageSystem extends createSystem({
       let whole = '';
       for (const line of text.split('\n')) {
         if (line.trim() === '') continue;
-        const event = JSON.parse(line) as { t: string; s?: string };
+        const event = JSON.parse(line) as { t: string; s?: string; shots?: unknown };
         if (event.t === 'd' && event.s != null) whole += event.s;
+        // The server's passes for the shot calls, one for each shot in order: the voice reads a call only with its pass.
+        if (event.t === 'v' && Array.isArray(event.shots)) this.passes = event.shots.map((pass) => (typeof pass === 'string' ? pass : ''));
         if (event.t === 'error') {
           director.noteRefusal(String((event as { m?: unknown }).m ?? ''));
           throw new Error('refused');
         }
       }
-      const reply = JSON.parse(whole) as { shots?: unknown };
-      const shots: Shot[] = [];
-      for (const raw of Array.isArray(reply.shots) ? reply.shots.slice(0, MOST_SHOTS) : []) {
-        const item = raw as { title?: unknown; says?: unknown; camera?: unknown };
-        const camera = cleanCamera(item.camera);
-        if (camera == null) continue;
-        shots.push({
-          title: typeof item.title === 'string' ? item.title.slice(0, 32) : 'Shot',
-          says: typeof item.says === 'string' ? item.says.slice(0, 110) : '',
-          camera: { ...camera, keep: false },
-        });
-      }
-      return shots;
+      return coverageShots(JSON.parse(whole));
     } finally {
       window.clearTimeout(timer);
     }

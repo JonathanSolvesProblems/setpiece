@@ -23,7 +23,7 @@ import type { Spoken } from './scene-request.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
 import { TraySystem } from './tray.js';
 import type { Cast, Finish } from './tray.js';
-import { speak } from './speech.js';
+import { hush, speak } from './speech.js';
 import { jpegOf, ViewfinderSystem } from './viewfinder.js';
 
 type Globals = {
@@ -33,6 +33,7 @@ type Globals = {
   sceneRequest: Signal<Spoken | null>;
   lastSpoken: Signal<string>;
   designing: Signal<boolean>;
+  ownBuild: Signal<boolean>;
   setsBuilt: Signal<number>;
   layoutChanged: Signal<number>;
 };
@@ -45,12 +46,20 @@ const DEG = Math.PI / 180;
 const DROP = 0.05;
 const DROP_SECONDS = 0.28;
 const MOST_DROPS = 64;
-/** No word from the designer in this long and the words go to the library's reader instead. */
-const FIRST_WORD_MS = 25000;
+/**
+ * No word from the designer in this long and the words go to the library's reader instead. Its first word has
+ * never taken longer than 2.5 s in 33 measured sentences (devpost/results/designer-hurry.json); twelve seconds is
+ * a server that is not going to answer, and the call sheet's "thinking it through" line is still up when it ends.
+ */
+const FIRST_WORD_MS = 12000;
+/** A look through the lens carries a picture and is not asked to hurry: it is given longer for its first word. */
+const FIRST_LOOK_MS = 25000;
 const WHOLE_MS = 90000;
 /** How long an empty table waits before the call sheet says the designer is still thinking, and what it says. */
 const THINKING_NOTE_MS = 3500;
 const THINKING_NOTE = 'DESIGNING THE SET | A busy set takes a few seconds to think through. The pieces land as they are written.';
+/** The first set, which the designer builds by itself as a newcomer lands the set, to show how it goes. */
+const FIRST_SET_NOTE = 'A FIRST SET | The set designer builds one to show you. Then it is your turn.';
 const ENDPOINT = '/api/director';
 /** Long enough after the camera stands for the monitor to show what it sees. */
 const LOOK_AFTER_MS = 700;
@@ -204,11 +213,20 @@ export class DirectorSystem extends createSystem({
    * Asks the designer for a set from these words, and builds it as it arrives. Says what came of it: a set
    * went up, the words went to the library's reader instead, or a newer request took over.
    */
-  async ask(said: string, heard: string[] = []): Promise<Outcome> {
+  async ask(said: string, heard: string[] = [], own = false): Promise<Outcome> {
+    const g = this.globals as unknown as Globals;
     this.lookFor = '';
     this.lookAt = 0;
     this.looks = 0;
-    return this.request(said, { said, heard, set: this.describe() }, false);
+    // Whatever was being said about the last set stops: this is a new one.
+    hush();
+    // A set the designer builds by itself (the first, as a newcomer lands the set) is marked as its own until it is up.
+    g.ownBuild.value = own;
+    try {
+      return await this.request(said, { said, heard, set: this.describe() }, false, own);
+    } finally {
+      if (own) g.ownBuild.value = false;
+    }
   }
 
   /**
@@ -232,17 +250,17 @@ export class DirectorSystem extends createSystem({
     await this.request(said, { said, set, image, report, subject }, true);
   }
 
-  private async request(said: string, body: Record<string, unknown>, looking: boolean): Promise<Outcome> {
+  private async request(said: string, body: Record<string, unknown>, looking: boolean, own = false): Promise<Outcome> {
     const g = this.globals as unknown as Globals;
     this.asking?.abort();
     const asking = new AbortController();
     this.asking = asking;
     if (!looking) {
       g.lastSpoken.value = said;
-      g.coachNote.value = 'DESIGNING THE SET | The pieces arrive in a moment.';
+      g.coachNote.value = own ? FIRST_SET_NOTE : 'DESIGNING THE SET | The pieces arrive in a moment.';
     }
     g.designing.value = true;
-    let timer = window.setTimeout(() => asking.abort(), FIRST_WORD_MS);
+    let timer = window.setTimeout(() => asking.abort(), looking ? FIRST_LOOK_MS : FIRST_WORD_MS);
     const whole = window.setTimeout(() => asking.abort(), WHOLE_MS);
     const build = new PlanBuild(this.world, (label) => this.entityOf(label), this.keys, looking);
     // A busy sentence can be thought through before its first piece is written (the night chase took 7 to 9 s before the
@@ -279,8 +297,10 @@ export class DirectorSystem extends createSystem({
           const line = carry.slice(0, nl);
           carry = carry.slice(nl + 1);
           if (line.trim() === '') continue;
-          const event = JSON.parse(line) as { t: string; s?: string; m?: string; stop?: string };
-          if (event.t === 'd' && event.s != null) {
+          const event = JSON.parse(line) as { t: string; s?: string; m?: string; stop?: string; pass?: string };
+          if (event.t === 'v' && typeof event.pass === 'string') {
+            build.voice(event.pass);
+          } else if (event.t === 'd' && event.s != null) {
             if (timer !== 0) {
               window.clearTimeout(timer);
               timer = 0;
@@ -470,6 +490,8 @@ export class DirectorSystem extends createSystem({
 /** One reply's worth of building: what has gone up, under which labels, and what is left to say. */
 class PlanBuild {
   begun = false;
+  private spoke = false;
+  private pass = '';
   /** The set could not change when the plan began; the reason is on the call sheet. */
   refused = false;
   fresh = false;
@@ -502,8 +524,7 @@ class PlanBuild {
     if (key === 'title') this.title = plainLine(value, 40);
     else if (key === 'says') {
       this.says = plainLine(value, 160);
-      // Said aloud as it arrives, so the wearer hears what is being built while the pieces go down.
-      if (!this.looking) speak(this.says);
+      this.sayIt();
     }
     else if (key === 'next') this.next = plainLine(value, 60);
     else if (key === 'fresh') this.begin(value === true && !this.looking);
@@ -527,6 +548,23 @@ class PlanBuild {
     }
     this.begun = true;
     this.fresh = fresh;
+    this.sayIt();
+  }
+
+  /**
+   * The designer's line, said aloud once the build has begun, so the wearer hears what is being built while the
+   * pieces go down. A plan that was refused (a piece is in a hand) says nothing: nothing was built.
+   */
+  private sayIt(): void {
+    if (this.looking || this.spoke || !this.begun || this.says === '' || this.pass === '') return;
+    this.spoke = true;
+    speak(this.says, this.pass);
+  }
+
+  /** The server's pass for this reply's line: the voice reads the line only with it. It arrives just after the line. */
+  voice(pass: string): void {
+    this.pass = pass;
+    this.sayIt();
   }
 
   thing(raw: unknown, drop: (entity: Entity, object: Object3D, y: number) => void): void {
@@ -790,11 +828,13 @@ class PlanBuild {
       if (!changed) return;
       if (this.placed.size > 0) this.world.getSystem(TraySystem)?.planEnd(false);
       g.coachNote.value = `THROUGH THE LENS | ${this.says || 'The frame is put right.'}`;
-      speak(this.says);
+      speak(this.says, this.pass);
       return;
     }
     this.world.getSystem(TraySystem)?.planEnd(this.fresh);
-    g.setsBuilt.value = g.setsBuilt.peek() + 1;
+    // A greeting or a question changes nothing on the set: it is answered, and it is not counted as a set built.
+    const changed = this.placed.size > 0 || this.removed.length > 0 || (this.camera != null && !this.camera.keep);
+    if (changed) g.setsBuilt.value = g.setsBuilt.peek() + 1;
     const title = (this.title || 'THE SET').toUpperCase();
     const lost = this.skipped > 0 ? ` ${this.skipped} of ${this.things} could not be built.` : '';
     const next = this.next !== '' ? ` Try: "${this.next}".` : '';

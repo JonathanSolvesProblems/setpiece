@@ -79,6 +79,12 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.coverageRequested = signal(0);
   globals.coverageStopRequested = signal(0);
   globals.talkOffered = signal(false);
+  // In a session with no microphone allowed: Talk is Next shot, and the call sheet says so.
+  globals.micOff = signal(false);
+  // The designer is building a set by itself (the first one, as a newcomer lands the set): not the wearer's own.
+  globals.ownBuild = signal(false);
+  // Whether that first set is built at all: not on this machine's own address, where every test lands the set.
+  globals.firstSetOn = signal(location.hostname !== 'localhost');
   // The last note the sheet took, and how many it has taken: the panel repeats each one where the hand is.
   globals.noteSaid = signal('');
   globals.notesPosted = signal(0);
@@ -181,11 +187,17 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     });
   }
   const hint = document.getElementById('xr-hint');
+  let restingHint = hint?.textContent ?? '';
   // A browser without passthrough cannot enter the session; the honest action
   // there is to carry the link to a headset that can.
   const xr = (navigator as Navigator & { xr?: { isSessionSupported(mode: string): Promise<boolean> } }).xr;
   Promise.resolve(xr ? xr.isSessionSupported('immersive-ar').catch(() => false) : false).then((supported) => {
     if (supported && mic != null && navigator.mediaDevices != null) mic.hidden = false;
+    // A headset that can enter is told what to do there, not which browser to open.
+    if (supported && hint != null && hint.textContent === restingHint) {
+      restingHint = 'Press Enter XR, then point at a table or the floor and pinch: the set lands there.';
+      hint.textContent = restingHint;
+    }
     if (supported || enter == null) return;
     enter.textContent = 'Copy the link for your Quest';
     enter.dataset.mode = 'copy';
@@ -195,7 +207,6 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   // Starting a session can stop on a question only the person in the headset can
   // answer: the first time, the headset asks whether this browser may use the
   // room's layout. Until they answer, nothing else happens, so the page says so.
-  const restingHint = hint?.textContent ?? '';
   let waiting: number | undefined;
   const watchRequest = (): void => {
     if (enter == null) return;
@@ -224,15 +235,18 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
       hint.textContent = restingHint;
     }
   });
+  // A second press while the microphone's question is still up is the same wish, not another session.
+  let answering = false;
   enter?.addEventListener('click', async () => {
     if (enter.dataset.mode !== 'copy') {
-      if (world.sessionRequestPending || world.session != null) return;
+      if (answering || world.sessionRequestPending || world.session != null) return;
       // The headset cannot show the microphone's question once the session has started, so a visitor who has not
       // answered it is asked here, on the page, first. Answering can take longer than the press may start a
       // session for; then the page asks for one more press.
       if (mic != null && !mic.hidden && !mic.disabled && (await micAnswer()) === 'prompt') {
         enter.textContent = 'Answer the microphone';
         if (hint) hint.textContent = 'Setpiece only listens while you pinch Talk, to hear the shot. Allow the microphone and the set comes up.';
+        answering = true;
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           for (const track of stream.getTracks()) track.stop();
@@ -240,14 +254,19 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
           mic.disabled = true;
         } catch {
           mic.textContent = 'Microphone not allowed';
+        } finally {
+          answering = false;
         }
-        enter.textContent = 'Enter XR';
+        // The answer can take longer than the press may start a session for: the button itself asks for one more.
         if ((navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive === false) {
-          if (hint) hint.textContent = 'Now press Enter XR.';
+          enter.textContent = 'Press again to enter';
+          if (hint) hint.textContent = 'The microphone is answered. Press the button once more and the set comes up.';
           return;
         }
+        enter.textContent = 'Enter XR';
         if (hint) hint.textContent = restingHint;
       }
+      if (world.sessionRequestPending || world.session != null) return;
       world.launchXR();
       watchRequest();
       return;
@@ -383,9 +402,29 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   (globals.takeSeconds as Signal<number>).subscribe((seconds) => {
     if (saveTake?.disabled) saveTake.textContent = `Filming the take, ${Math.floor(seconds)} of ${Math.round(takeLength.peek())} s`;
   });
+  // The same two, under the board itself: that is where the eye is when the headset comes off.
+  const keep = document.getElementById('board-keep');
+  const keepNote = document.getElementById('board-keep-note');
+  document.getElementById('board-keep-save')?.addEventListener('click', () => {
+    if (viewfinder) downloadBoard(viewfinder);
+  });
+  document.getElementById('board-keep-list')?.addEventListener('click', () => downloadShotList((globals.shotFrames as Signal<Shot[]>).peek()));
   (globals.shotFrames as Signal<Shot[]>).subscribe((shots) => {
     if (saveBoard) saveBoard.hidden = shots.length === 0;
     if (saveList) saveList.hidden = shots.length === 0;
+    if (keep) keep.hidden = shots.length === 0;
+    if (shots.length === 0 && keepNote) keepNote.textContent = '';
+  });
+  // Leaving a session with frames on the board: the page brings the board up and says what to do with it.
+  let wasInSession = false;
+  world.visibilityState.subscribe((state) => {
+    const inSession = state !== VisibilityState.NonImmersive;
+    const left = wasInSession && !inSession;
+    wasInSession = inSession;
+    const frames = (globals.shotFrames as Signal<Shot[]>).peek().length;
+    if (!left || frames === 0) return;
+    if (keepNote) keepNote.textContent = `Your storyboard: ${frames} frame${frames === 1 ? '' : 's'}. Save it as a picture, or save the shot list for the crew.`;
+    document.getElementById('board')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   const fieldShot = document.getElementById('f-shot');
   const fieldEyeline = document.getElementById('f-eyeline');
@@ -453,7 +492,13 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     if (!ready) return;
     requestAnimationFrame(setReady);
     // The listener's model, fetched quietly while the visitor looks around, so their first Talk is quick.
-    window.setTimeout(prefetchListener, 5000);
+    // Only where a session can start: a laptop that came to read the page is not sent 41 MB it may never use.
+    window.setTimeout(() => {
+      const api = (navigator as Navigator & { xr?: { isSessionSupported(mode: string): Promise<boolean> } }).xr;
+      void Promise.resolve(api ? api.isSessionSupported('immersive-ar').catch(() => false) : false).then((can) => {
+        if (can) prefetchListener();
+      });
+    }, 5000);
   });
 
   // Outside a session, a newer build replaces this one. Inside, it waits until the session ends.

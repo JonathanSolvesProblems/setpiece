@@ -5,13 +5,13 @@
  *
  *   npm run check:claims
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 // A clone on Windows may carry CRLF endings; the checks read one line ending.
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const readme = read('README.md');
 const count = (text, pattern) => (text.match(pattern) ?? []).length;
-const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen'];
 
 const lenses = /LENSES = \[([^\]]+)\]/.exec(read('src/camera-formats.ts'))[1].split(',').map((n) => n.trim());
 const formats = count(read('src/camera-formats.ts'), /\{ name: '/g);
@@ -98,6 +98,23 @@ for (const file of readdirSync(new URL('../devpost/results/', import.meta.url)))
 expect(`sources.md counts ${assets} pieces`, sources.includes(`${assets} pieces`));
 const retiredAt = sources.indexOf('are retired');
 expect('sources.md retires the two October rate cards and cites neither', retiredAt > 0 && !/Antoniou|StoryboardArt\.org/.test(sources.slice(retiredAt)));
+
+// The designer's recorded lines: every line in the source has a recording of the same words, in both voices, so
+// what is heard is what the source says.
+{
+  // The lines hold no apostrophes or backslashes, so each is everything between its two quotes.
+  const lines = Object.fromEntries([...read('src/spoken-lines.ts').matchAll(/^  (\w+): '([^']*)',$/gm)].map((m) => [m[1], m[2]]));
+  const recorded = existsSync(new URL('../public/audio/voice/lines.json', import.meta.url)) ? JSON.parse(read('public/audio/voice/lines.json')).lines : {};
+  const stale = Object.entries(lines).filter(
+    ([name, text]) => recorded[name] !== text || !['her', 'him'].every((voice) => existsSync(new URL(`../public/audio/voice/${voice}/${name}.mp3`, import.meta.url))),
+  );
+  expect(
+    `each of the designer's ${Object.keys(lines).length} recorded lines says the words in the source, in both voices${stale.length > 0 ? ` (run node tools/make-voice-lines.mjs: ${stale.map(([name]) => name).join(', ')})` : ''}`,
+    Object.keys(lines).length >= 8 && stale.length === 0,
+  );
+  const gone = Object.keys(recorded).filter((name) => !(name in lines));
+  expect(`no recording is kept for a line that is gone${gone.length > 0 ? ` (${gone.join(', ')})` : ''}`, gone.length === 0);
+}
 
 // Things that used to be true and must not come back.
 for (const retired of ['ray-and-pinch distance grab', 'lands where you carry it by the plate', 'gaze', 'sits on a QR', 'AI-generated video']) {

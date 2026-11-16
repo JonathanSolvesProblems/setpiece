@@ -29,6 +29,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   Object3D,
+  PlaybackMode,
   Quaternion,
   Raycaster,
   RingGeometry,
@@ -38,7 +39,7 @@ import {
 import type { Intersection, UIKitMLAsset } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
-import { assetByLabel, assetTitle } from './catalog.js';
+import { assetByLabel, assetTitle, isMade } from './catalog.js';
 import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
 import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
@@ -274,6 +275,8 @@ export class PiecesSystem extends createSystem({
   private toldFlies = false;
   /** A camera gliding to its new mark (coverage on the table), from where it stood to where it goes. */
   private gliding: Entity | null = null;
+  /** The lower knock of a big piece set down. */
+  private heavyCue: Entity | null = null;
   private glideFrom = new Vector3();
   private glideTo = new Vector3();
   private glideFromYaw = 0;
@@ -375,8 +378,10 @@ export class PiecesSystem extends createSystem({
       }),
       // The card sent every piece back to a frame's setup: that is the blocking to keep now.
       g.setupRecalled.subscribe((n) => {
-        // Every piece is on a new mark, so nothing carries on rolling from the old one.
+        // Every piece is on a new mark, so nothing carries on rolling from the old one, and a camera on its way
+        // to a coverage mark stays where the setup put it.
         this.rolling.length = 0;
+        this.gliding = null;
         if (n > 0 && this.ready) {
           this.knock(Cue.Place, this.dressed[0]);
           this.save();
@@ -388,6 +393,17 @@ export class PiecesSystem extends createSystem({
   update(delta: number, time: number): void {
     if (!this.ready) {
       this.ready = this.captureAndRestore();
+      // The heavier knock sits beside the lighter ones, under the stage; made now, so it has loaded by the first set.
+      if (this.ready && this.heavyCue == null) {
+        for (const piece of this.queries.pieces.entities) {
+          if (!this.isStage(piece)) continue;
+          const holder = new Object3D();
+          holder.name = 'Cue place heavy';
+          this.heavyCue = this.world.createTransformEntity(holder, { parent: piece });
+          this.heavyCue.addComponent(AudioSource, { src: './audio/place-heavy.wav', volume: 0.7, maxInstances: 3, playbackMode: PlaybackMode.Overlap });
+          break;
+        }
+      }
       return;
     }
     if (this.guard > 0) this.guard -= delta;
@@ -1515,12 +1531,24 @@ export class PiecesSystem extends createSystem({
 
   private knock(cue: string, piece: Entity): void {
     const at = piece.object3D;
+    // A set-down sounds like what was set down: a truck, a house or a made piece lands lower than an actor.
+    if (cue === Cue.Place && this.heavyCue?.object3D != null && this.weighty(piece)) {
+      if (at != null) this.heavyCue.object3D.position.copy(at.position);
+      AudioUtils.play(this.heavyCue);
+      return;
+    }
     for (const source of this.queries.cues.entities) {
       if (source.getValue(SoundCue, 'cue') !== cue) continue;
       if (at != null && source.object3D != null) source.object3D.position.copy(at.position);
       AudioUtils.play(source);
       return;
     }
+  }
+
+  /** Whether a piece is one of the big ones: something others can stand on, or a piece the designer made. */
+  private weighty(piece: Entity): boolean {
+    const label = String(piece.getValue(SetPiece, 'label') ?? '');
+    return assetByLabel(label)?.solid === true || isMade(label);
   }
 
   private save(): void {

@@ -128,6 +128,7 @@ You also place the shot camera: its x and z, the height of its lens, the lens, a
 - fresh is true when the director describes a new scene, place or moment, or says new scene, start over or reset. Then list everything that should be on the set; anything not listed comes off.
 - fresh is false when they change what is there: add, remove, move, paint, resize, re-pose or re-frame. Then list only what changes or is added; everything else stays as it is, and remove lists the ids to take off. "It" and "that" mean the selected piece, or the last thing talked about.
 - A request for something you cannot show (a sound, a smell, a feeling) is answered by the set and the shot that suggest it.
+- A greeting, or a question about what you do ("hello", "what can you do", "help"), is not a scene. Change nothing: fresh false, no things, remove empty, camera keep true, light "". Answer in says with what you do in a few words and one shot they could say.
 - Big places are suggested, not built whole: the stage is a 6 by 4 m set, so a castle is a gate and two towers, a city street is a house front, a lamp post and a parked car.
 
 ## The reply

@@ -25,6 +25,7 @@ import { assetByLabel, assetTitle } from './catalog.js';
 import { SetPiece, SetRole, ShotCamera, StageAnchor } from './set-components.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { ControlsSystem } from './controls.js';
+import { sayLineOnce } from './speech.js';
 
 /** The set is 1:10, so this is true scale. */
 const LIFE_SCALE = 10;
@@ -46,9 +47,11 @@ const AHEAD = 0.8;
 const SIDES = ['left', 'right'] as const;
 type Side = (typeof SIDES)[number];
 const OPTIC_YELLOW = 0xd6e13c;
+/** What the panel says on stepping inside: the call sheet stays behind on the table. */
+const INSIDE_NOTE = 'INSIDE THE SET | Point at the floor and pinch to walk. Pinch Back out to leave.';
 const LEFT_BEHIND = new Set(['Plate', 'Rim', 'ClapperStripe', 'Strip', 'Viewfinder', 'StoryboardCard', 'HandleLabel', 'StageHandle', 'LensBackdrop']);
 
-type Globals = { lifeSize: Signal<boolean>; lifeSizeRequested: Signal<number> };
+type Globals = { lifeSize: Signal<boolean>; lifeSizeRequested: Signal<number>; coachNote: Signal<string> };
 
 
 export class LifeSizeSystem extends createSystem({
@@ -341,6 +344,12 @@ export class LifeSizeSystem extends createSystem({
     if (card != null) card.pointerEvents = 'none';
     this.world.getSystem(ViewfinderSystem)?.refresh();
     g.lifeSize.value = true;
+    // The call sheet stays on the table, so the panel's line and the designer's voice say how to move and leave.
+    // Not on a cut from camera to camera while already inside: coverage's line for the shot keeps its place.
+    if (animate) {
+      g.coachNote.value = INSIDE_NOTE;
+      sayLineOnce('inside');
+    }
   }
 
   private leave(restorePose = true): void {

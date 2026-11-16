@@ -7,7 +7,9 @@
  * clap   the clapper sticks closing, on Snap
  * pick   a wooden piece lifted off the slate
  * place  a wooden piece set back down
+ * place-heavy  a big piece set down: a truck, a house, a piece the designer made
  * land   the slate landing on the table
+ * tick   a fingertip on the slate, for a panel press
  *
  * And, for the effects on the set and stepping inside, at half the rate (they are noise, and small that way):
  *
@@ -16,6 +18,7 @@
  * wind    a slow, swelling low wind, looped (smoke, fog, dust, snow)
  * water   a burble with bubbles, looped
  * arrive  a rising whoosh as the set grows around the wearer
+ * night   crickets over still air, looped: the air inside a night set at full size
  *
  * listen-on, listen-off   two soft notes rising as the microphone opens, falling as it closes
  */
@@ -119,6 +122,29 @@ function knock(hz, seed) {
 write('pick', knock(1180, 11));
 write('place', knock(760, 13));
 
+// A big piece set down (a truck, a house, something the designer made): lower and a little longer, with the slate
+// under it answering.
+{
+  const rand = noise(29);
+  const tap = lowpass(
+    render(0.22, (t) => rand() * Math.exp(-t / 0.006)),
+    1800,
+  );
+  const body = render(0.22, (t) => partial(310, 0.034, 0.9)(t) + partial(520, 0.02, 0.4)(t) + partial(96, 0.05, 0.5)(t));
+  write('place-heavy', normalise(mix(tap, body), 0.62));
+}
+
+// A fingertip on the slate: the tick of a panel press. Short and soft, so thirty of them in a minute do not tire.
+{
+  const rand = noise(23);
+  const tap = lowpass(
+    render(0.06, (t) => rand() * Math.exp(-t / 0.002)),
+    2600,
+  );
+  const body = render(0.06, (t) => partial(1320, 0.009, 0.8)(t) + partial(2900, 0.004, 0.25)(t));
+  write('tick', normalise(mix(tap, body), 0.4));
+}
+
 // The slate landing: a low thump with a little slap of the plate on top.
 {
   const rand = noise(17);
@@ -195,6 +221,25 @@ const LOOP = 4.5;
   });
   write('water', normalise(loopify(mix(normalise(burble, 0.4), bubbles), 0.5), 0.5), LOOP_RATE);
 }
+// Night, inside the set: three crickets a little apart in pitch and pace, over still air. Each cricket's chirps
+// fit the loop a whole number of times, so the loop has no seam in them; only the air is laid over itself.
+{
+  const rand = noise(59);
+  const cricket = (hz, chirps, lead, gain) =>
+    renderAt(LOOP, (t) => {
+      const cycle = ((t / LOOP) * chirps + lead) % 1;
+      // A chirp is four quick pulses in the first third of its cycle, then quiet.
+      if (cycle > 0.3) return 0;
+      const pulse = ((cycle / 0.3) * 4) % 1;
+      const shape = pulse < 0.62 ? Math.sin((Math.PI * pulse) / 0.62) ** 2 : 0;
+      // The whole chirp swells and falls a little, as a real one does.
+      return Math.sin(2 * Math.PI * hz * t) * shape * (0.7 + 0.3 * Math.sin((Math.PI * cycle) / 0.3)) * gain;
+    });
+  const air = loopify(lowpassAt(renderAt(LOOP + 1, () => rand()), 380), 1);
+  const bed = mix(cricket(4310, 9, 0, 0.5), cricket(4740, 8, 0.37, 0.28), cricket(3960, 12, 0.61, 0.2), normalise(air, 0.12));
+  write('night', normalise(bed, 0.5), LOOP_RATE);
+}
+
 // Stepping inside: air rushing past as the set grows around the wearer, rising and settling, with a low swell.
 {
   const rand = noise(53);

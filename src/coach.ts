@@ -22,6 +22,7 @@ import { Placement, Held, SetPiece, SetRole, ShotCamera, StageAnchor } from './s
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { BRIEFS } from './briefs.js';
 import { TAKE_MAX_SECONDS, TakeState } from './take.js';
+import { sayLineOnce } from './speech.js';
 
 const W = 1536;
 const H = 300;
@@ -39,6 +40,8 @@ const TEXT = '"Big Shoulders"';
 /** Seconds the welcome and the finished board stay up before the sheet steps aside. */
 const WELCOME_SECONDS = 7;
 const DONE_SECONDS = 12;
+/** Seconds the set may take to land by itself before the designer says how to land it. */
+const LAND_SAID_AFTER = 2.5;
 
 const Step = {
   Hidden: 0,
@@ -68,6 +71,9 @@ type Globals = {
   startOver: Signal<number>;
   setsBuilt: Signal<number>;
   talkOffered: Signal<boolean>;
+  micOff: Signal<boolean>;
+  ownBuild: Signal<boolean>;
+  coverageRunning: Signal<boolean>;
 };
 /** Seconds a passing note stays on the sheet: long enough to read a reason and act on it. */
 const NOTE_SECONDS = 6;
@@ -101,6 +107,13 @@ export class CoachSystem extends createSystem({
   private framed = false;
   /** A set has been asked for in words. */
   private said = false;
+  /** The set standing is one the designer built by itself to show how it goes: the wearer's own is still to come. */
+  private mine = false;
+  /** The step and the frame count last said aloud, so each step's line is said as it comes up and once. */
+  private voiced: StepId = Step.Hidden;
+  private voicedShots = -1;
+  /** Seconds the sheet has asked for the set to be landed: a room that knows its table lands it by itself first. */
+  private landAsked = 0;
   /** Up to two pieces in two hands: where each stood, and how it was turned and tipped, when it was picked up. */
   private watched: (Entity | null)[] = [null, null];
   private watchedFrom = [new Vector3(), new Vector3()];
@@ -118,6 +131,8 @@ export class CoachSystem extends createSystem({
   private drawnControllers = false;
   private scanOffered = false;
   private drawnScanOffered = false;
+  private drawnMine = false;
+  private drawnDeaf = false;
   /** A passing note ("BACK TO FRAME 3 | ...") and how long it has left. */
   private note = '';
   private noteLeft = 0;
@@ -195,9 +210,13 @@ export class CoachSystem extends createSystem({
         this.moved = false;
         this.framed = false;
         this.said = false;
+        this.mine = false;
       }),
+      // A set the designer built by itself, as the set landed, is not the wearer's sentence: the step stays theirs.
       g.setsBuilt.subscribe((n) => {
-        if (n > 0) this.said = true;
+        if (n === 0) return;
+        if (g.ownBuild.peek()) this.mine = true;
+        else this.said = true;
       }),
       () => this.texture.dispose(),
     );
@@ -225,6 +244,10 @@ export class CoachSystem extends createSystem({
     }
     if (this.timing && this.shots < BOARD_SLOTS) this.boardSeconds += delta;
     this.advance(delta);
+    const xr = this.input.xr;
+    this.controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
+    this.landAsked = this.step === Step.Land ? this.landAsked + delta : 0;
+    this.sayStep();
     if (this.noteLeft > 0) {
       this.noteLeft -= delta;
       if (this.noteLeft <= 0) this.note = '';
@@ -247,14 +270,14 @@ export class CoachSystem extends createSystem({
       return;
     }
     if (!this.fontsReady) return;
-    const xr = this.input.xr;
-    this.controllers = xr.isPrimary('controller', 'left') || xr.isPrimary('controller', 'right');
     if (
       this.step !== this.drawnStep ||
       this.shots !== this.drawnShots ||
       this.restored !== this.drawnRestored ||
       this.controllers !== this.drawnControllers ||
       this.scanOffered !== this.drawnScanOffered ||
+      this.mine !== this.drawnMine ||
+      g.micOff.peek() !== this.drawnDeaf ||
       this.note !== this.drawnNote ||
       g.briefIndex.peek() !== this.drawnBrief ||
       this.take !== this.drawnTake ||
@@ -265,6 +288,8 @@ export class CoachSystem extends createSystem({
       this.drawnRestored = this.restored;
       this.drawnControllers = this.controllers;
       this.drawnScanOffered = this.scanOffered;
+      this.drawnMine = this.mine;
+      this.drawnDeaf = g.micOff.peek();
       this.drawnNote = this.note;
       this.drawnBrief = g.briefIndex.peek();
       this.drawnTake = this.take;
@@ -287,6 +312,36 @@ export class CoachSystem extends createSystem({
     } else {
       this.step = Step.Land;
     }
+  }
+
+  /**
+   * The step's line, said aloud by the set designer as the step comes up: once each in a visit, for a newcomer
+   * using their hands (the recorded lines say pinch). Someone who has filled a board before hears only the welcome.
+   */
+  private sayStep(): void {
+    if (this.step === this.voiced && this.shots === this.voicedShots) return;
+    const g = this.globals as Globals;
+    // The designer is building a first set by itself: what to do next is said once it has spoken about that.
+    if (this.step === Step.Say && g.ownBuild.peek()) return;
+    // Where the headset knows the room, the set finds the table by itself in the first moments: the wearer is
+    // only told to land it once it is clear they will have to.
+    if (this.step === Step.Land && this.landAsked < LAND_SAID_AFTER) return;
+    // The set takes a moment to come back to its anchor: the welcome waits to see that it has.
+    if (this.step === Step.Welcome && !this.restored) return;
+    this.voiced = this.step;
+    this.voicedShots = this.shots;
+    if (this.controllers) return;
+    if (this.step === Step.Welcome) {
+      if (this.restored) sayLineOnce('back');
+      return;
+    }
+    if (this.seasoned && this.step !== Step.Done) return;
+    const deaf = g.micOff.peek();
+    if (this.step === Step.Land) sayLineOnce('land');
+    else if (this.step === Step.Say && !deaf) sayLineOnce(this.mine ? 'mine' : 'say');
+    else if (this.step === Step.Move && this.said && !deaf) sayLineOnce('block');
+    else if (this.step === Step.Fill && this.shots === 1 && !g.coverageRunning.peek()) sayLineOnce('frame');
+    else if (this.step === Step.Done) sayLineOnce('full');
   }
 
   /** Each step ends on the event it asked for; the order never goes backwards except to land the set again. */
@@ -380,26 +435,27 @@ export class CoachSystem extends createSystem({
       case Step.Land:
         return [
           '1 OF 4 · LAND THE SET',
-          this.controllers
-            ? 'Rest a controller on your table and pull the trigger.'
-            : this.scanOffered
-              ? 'Point at your table and pinch. Or pinch Find my table.'
-              : 'Point at your table and pinch.',
+          this.controllers ? 'Rest a controller on your table and pull the trigger.' : 'Point at a table or the floor and pinch.',
         ];
-      case Step.Say:
-        return [
-          '2 OF 4 · SAY THE SHOT',
-          this.controllers
-            ? 'Pull the trigger on Talk and say what happens in the shot, or on Try a shot.'
-            : 'Pinch Talk and say what happens: a dragon lands on a burning car. Or pinch Try a shot.',
-        ];
+      case Step.Say: {
+        // No microphone in here (it was never allowed on the page): Talk is Next shot.
+        if ((this.globals as Globals).micOff.peek()) {
+          return ['2 OF 4 · PICK A SHOT', 'Pinch Next shot and a set goes up. To say your own, allow the microphone on the page.'];
+        }
+        const press = this.controllers ? 'Pull the trigger on' : 'Pinch';
+        // The designer built the set standing by itself, to show how it goes.
+        if (this.mine) return ['2 OF 4 · SAY YOUR SHOT', `That one was mine. ${press} Talk and say yours.`];
+        return ['2 OF 4 · SAY THE SHOT', `${press} Talk and say the shot. Or ${this.controllers ? 'pull it on' : 'pinch'} Try a shot.`];
+      }
       case Step.Move:
         return this.said
           ? [
               '3 OF 4 · BLOCK IT',
-              this.controllers
-                ? 'Hold the trigger on any piece and move it, or press Talk and say what to change.'
-                : 'Pinch any piece and move it, or press Talk and say what to change.',
+              (this.globals as Globals).micOff.peek()
+                ? 'Pinch any piece and move it. Next shot builds another set.'
+                : this.controllers
+                  ? 'Hold the trigger on any piece and move it, or press Talk and say what to change.'
+                  : 'Pinch any piece and move it, or press Talk and say what to change.',
             ]
           : [
               '2 OF 4 · BLOCK IT',
@@ -447,6 +503,7 @@ export class CoachSystem extends createSystem({
     // The first frame is the moment to stand in it: the set grows around the wearer, in its own light.
     if (this.shots === 1) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Now stand in it: pinch Step inside twice and the set grows around you.'];
     if (this.shots === 2) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Pinch a frame on the board to go back to its setup.'];
+    if (this.said || this.mine) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Snap again, or pinch Shoot coverage and the designer shoots the rest.'];
     if (brief == null) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Every shot is printed. Shoot what you like.'];
     return [`NEXT: ${brief.title.toUpperCase()}`, brief.ask];
   }

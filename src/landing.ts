@@ -238,7 +238,7 @@ export class LandingGuide {
       ? controllers
         ? 'PULL THE TRIGGER TO LAND THE SET'
         : 'PINCH TO LAND THE SET'
-      : 'POINT AT YOUR TABLE';
+      : 'POINT AT A TABLE OR THE FLOOR';
     if (line === this.drawn || !this.fontsReady) return;
     this.drawn = line;
     const ctx = this.canvas.getContext('2d');

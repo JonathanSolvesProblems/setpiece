@@ -7,8 +7,9 @@
  * {"t":"end",...} closes it with how it went; {"t":"error","m":"..."} says why there is no plan.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { COVERAGE_ASK, COVERAGE_SCHEMA } from '../src/coverage-plan.js';
-import { PLAN_SCHEMA } from '../src/director-plan.js';
+import { COVERAGE_ASK, COVERAGE_SCHEMA, coverageShots, shotCall } from '../src/coverage-plan.js';
+import { PLAN_SCHEMA, plainLine } from '../src/director-plan.js';
+import { passFor } from './_voice.js';
 import { directorSystem } from '../src/director-prompt.js';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -41,7 +42,7 @@ const LOOK = `This picture is what the shot camera sees now, through its lens. L
  * many a minute. Neither is a wall: an Origin header can be written by anything that is not a browser. The cap
  * that holds is the spend limit on the key's own workspace.
  */
-const PER_VISITOR = 30;
+const PER_VISITOR = 120;
 const WINDOW_MS = 10 * 60 * 1000;
 const PER_MINUTE = 40;
 /** The site's own addresses. A development server on this machine or the home network is allowed only off production. */
@@ -49,6 +50,9 @@ const SITE = new Set(['https://setpiece.jonathansolvesproblems.com', 'https://se
 const DEVELOPMENT = [/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/, /^https:\/\/192\.168\.\d+\.\d+(:\d+)?$/];
 const allowed = (origin: string): boolean =>
   SITE.has(origin) || (process.env.VERCEL_ENV !== 'production' && DEVELOPMENT.some((pattern) => pattern.test(origin)));
+
+/** The reply's "says", once its closing quote has arrived. */
+const SAYS = /"says"\s*:\s*("(?:[^"\\]|\\.)*")/;
 
 const seen = new Map<string, number[]>();
 const everyone: number[] = [];
@@ -188,7 +192,10 @@ ${COVERAGE_ASK}`
   const started = Date.now();
   const encoder = new TextEncoder();
   // A request the app abandons (something new was said, or stop) stops the model too, so it is not billed to the end.
+  // On Vercel the page going away arrives as the request's own signal (vercel.json asks for it); elsewhere as the
+  // reply's stream being cancelled.
   let upstream: { abort(): void } | null = null;
+  request.signal?.addEventListener('abort', () => upstream?.abort());
   const body = new ReadableStream<Uint8Array>({
     cancel() {
       upstream?.abort();
@@ -215,11 +222,34 @@ ${COVERAGE_ASK}`
           output_config: { effort: EFFORT, format: { type: 'json_schema', schema: (coverage ? COVERAGE_SCHEMA : PLAN_SCHEMA) as unknown as Record<string, unknown> } },
         });
         upstream = stream;
+        // The reply so far, kept to sign what will be read aloud: a set's or a look's line as soon as it is whole
+        // (the voice starts while the pieces are still arriving), a coverage's shot calls once the plan is in.
+        let whole = '';
+        let signed = false;
         stream.on('text', (delta) => {
           if (first === 0) first = Date.now() - started;
           send({ t: 'd', s: delta });
+          whole += delta;
+          if (coverage || signed) return;
+          const says = SAYS.exec(whole);
+          if (says == null) return;
+          signed = true;
+          try {
+            const pass = passFor(plainLine(JSON.parse(says[1]), 160));
+            if (pass !== '') send({ t: 'v', pass });
+          } catch {
+            // Not a line that can be read: it is shown, not spoken.
+          }
         });
         const message = await stream.finalMessage();
+        if (coverage) {
+          try {
+            const passes = coverageShots(JSON.parse(whole)).map((shot, index) => passFor(shotCall(index, shot.title)));
+            if (passes.some((pass) => pass !== '')) send({ t: 'v', shots: passes });
+          } catch {
+            // The plan did not read: the app says so, and nothing is called.
+          }
+        }
         send({
           t: 'end',
           stop: message.stop_reason,

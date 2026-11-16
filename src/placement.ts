@@ -127,7 +127,7 @@ type Candidate = { x: number; top: number; z: number };
 export const StageStatus = {
   Floating: 'Floating. Not on your table yet.',
   Table: 'On your table.',
-  Touch: 'On your table, where you chose.',
+  Touch: 'Landed where you chose. Carry it by the striped edge to move it.',
   Manual: 'Moved by hand. Undo puts it back.',
   Kept: 'Moved by hand. Position saved.',
   Restored: 'Back where you left it.',

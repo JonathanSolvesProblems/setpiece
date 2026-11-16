@@ -4,6 +4,7 @@ import {
   createSystem,
   Entity,
   Object3D,
+  PlaybackMode,
   Quaternion,
   setWorldPosition,
   setWorldQuaternion,
@@ -14,13 +15,13 @@ import {
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { BRIEFS } from './briefs.js';
-import { assetByLabel, ASSETS, assetTitle, PAINTS, searchAssets, SHELF_SLOTS, SHELVES } from './catalog.js';
+import { assetByLabel, ASSETS, assetTitle, PAINTS, searchAssets, SHELF_SLOTS, SHELVES, STARTING_ASSETS } from './catalog.js';
 import type { Shelf } from './catalog.js';
 import { CAMERAS, LENSES, Rig, SENSORS } from './camera-formats.js';
 import { StageStatus } from './placement.js';
 import { wordsToHear } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
-import { SetPiece, StageAnchor } from './set-components.js';
+import { Held, SetPiece, StageAnchor } from './set-components.js';
 import { SCENES } from './scenes.js';
 import { noteSeconds } from './coach.js';
 import { hear } from './spoken.js';
@@ -30,7 +31,7 @@ import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
 import { micAnswer } from './mic.js';
-import { chooseSpoken, speak, SPOKEN, spokenChoice } from './speech.js';
+import { chooseSpoken, hush, micOpen, sayLine, sayLineOnce, SPOKEN, spokenChoice, talking } from './speech.js';
 
 /**
  * Where the panel sits relative to the stage, as the scene authors it: left of
@@ -149,6 +150,9 @@ type Globals = {
   sceneRequest: Signal<Spoken | null>;
   coachNote: Signal<string>;
   talkOffered: Signal<boolean>;
+  micOff: Signal<boolean>;
+  ownBuild: Signal<boolean>;
+  firstSetOn: Signal<boolean>;
   designing: Signal<boolean>;
   coachLine: Signal<string>;
   shotFrames: Signal<unknown[]>;
@@ -171,6 +175,13 @@ const RELISTEN_MS = 350;
 const PRESS_GAP_MS = 320;
 /** In a chain there is thinking between sentences: the listening waits this long for the next one. */
 const CHAIN_QUIET_MS = 20000;
+/** The longest keep-listening waits for the designer to finish building and talking before it gives up. */
+const CHAIN_WAIT_MS = 30000;
+/** How long after a newcomer lands the set the designer starts on a first set of its own: the landing is seen first. */
+const FIRST_SET_MS = 900;
+/** A hand still on a piece then is waited for: this many times, this long each. */
+const FIRST_SET_WAITS = 12;
+const FIRST_SET_WAIT_MS = 300;
 /** The tally's red: the record button wears it while a take is being recorded. */
 const TALLY_RED = '#e0352b';
 const CHALK = '#f6f7ef';
@@ -194,6 +205,7 @@ const SNAP_FLASH_RATE = 1.6;
 /** Wires the Setpiece control panel to the shared signals the viewfinder reads. */
 export class ControlsSystem extends createSystem({
   stages: { required: [SetPiece, StageAnchor] },
+  held: { required: [SetPiece, Held] },
 }) {
   private stage: Entity | null = null;
   private panelObject: Object3D | null = null;
@@ -358,10 +370,17 @@ export class ControlsSystem extends createSystem({
     // Two presses a moment apart are one slip of the hand, not two wishes: the second is let go.
     // (On the headset one pinch that crossed the panel painted a truck, pressed Record and added a camera.)
     let lastPress = -PRESS_GAP_MS;
+    // Every press that counts is heard: a soft tick, as a fingertip on the slate. (Snap has its clap and Talk its
+    // two notes as well.) Made now, so it has loaded by the first press.
+    const tickHolder = new Object3D();
+    tickHolder.name = 'PressTick';
+    const tick = this.world.createTransformEntity(tickHolder);
+    tick.addComponent(AudioSource, { src: './audio/tick.wav', volume: 0.4, positional: false, maxInstances: 2, playbackMode: PlaybackMode.Overlap });
     const meant = (): boolean => {
       const now = performance.now();
       if (now - lastPress < PRESS_GAP_MS) return false;
       lastPress = now;
+      if (this.world.visibilityState.peek() !== VisibilityState.NonImmersive) AudioUtils.play(tick);
       return true;
     };
     for (const mm of LENSES) {
@@ -472,9 +491,13 @@ export class ControlsSystem extends createSystem({
         if (count === 0) return;
         const note = g.noteSaid.peek();
         const [label = '', text = ''] = note.split(' | ');
+        // A set's line ends with what to try next. The designer's voice reads the description aloud, so when the
+        // block cannot hold both, the description is the part cut short and what to try next stays whole.
+        const tryAt = text.lastIndexOf(' Try: "');
+        const kept = tryAt > 0 ? `${fit(text.slice(0, tryAt), Math.max(HEARD_LEAST, SAYS_ROOM - widthOf(`${plain(label)}. ${plain(text.slice(tryAt))}`)))}${text.slice(tryAt)}` : text;
         // What was heard goes in front of what came of it, cut to the room what came of it leaves.
-        const room = Math.max(HEARD_LEAST, SAYS_ROOM - widthOf(`${plain(label)}. Heard: . ${plain(text)}`));
-        says(label, heardNow === '' ? text : `Heard: ${fit(heardNow, room)}. ${text}`, noteSeconds(note) * 1000);
+        const room = Math.max(HEARD_LEAST, SAYS_ROOM - widthOf(`${plain(label)}. Heard: . ${plain(kept)}`));
+        says(label, heardNow === '' ? kept : `Heard: ${fit(heardNow, room)}. ${kept}`, noteSeconds(note) * 1000);
       }),
     );
     // What cannot be taken back takes two presses. The first says, on the line above, what the second will cost.
@@ -568,7 +591,7 @@ export class ControlsSystem extends createSystem({
     const showTry = (): void => {
       const covering = g.coverageRunning.peek();
       const text = covering ? 'Stop coverage' : boardFull() ? 'Save the board' : setStands() ? 'Shoot coverage' : `Try a shot: ${tries[tryNext][0]}`;
-      panel.getElementById<UIKit.Text>('btn-try')?.setProperties({ text, display: covering || (!more && !g.lifeSize.peek()) ? 'flex' : 'none' });
+      panel.getElementById<UIKit.Text>('btn-try')?.setProperties({ text, display: covering || (!g.lifeSize.peek() && (!more || boardFull())) ? 'flex' : 'none' });
     };
     wire('btn-try', () => {
       if (g.coverageRunning.peek()) {
@@ -588,6 +611,57 @@ export class ControlsSystem extends createSystem({
       showTry();
       this.heard(sentence);
     });
+    // The first time a newcomer lands the set, the set designer builds a first set by itself: the first of the
+    // shots to try, asked of the real designer as if it had been said. The table comes alive before the panel has
+    // been found, and the wearer has heard and seen what a sentence does before they are asked for one. Only for
+    // someone who has not filled a board here before, with the starting set untouched and nothing of theirs on it.
+    let firstSetOffered = false;
+    let firstSetTimer: ReturnType<typeof setTimeout> | null = null;
+    const untouched = (): boolean => {
+      const on = g.trayOn.peek();
+      return (
+        g.setsBuilt.peek() === 0 &&
+        g.shotFrames.peek().length === 0 &&
+        g.takeState.peek() === 'idle' &&
+        !g.designing.peek() &&
+        on.length === STARTING_ASSETS.length &&
+        STARTING_ASSETS.every((label) => on.includes(label))
+      );
+    };
+    this.cleanupFuncs.push(
+      () => {
+        if (firstSetTimer != null) clearTimeout(firstSetTimer);
+      },
+      g.stageStatus.subscribe((status) => {
+        if (firstSetOffered || (status !== StageStatus.Table && status !== StageStatus.Touch)) return;
+        if (this.world.visibilityState.peek() === VisibilityState.NonImmersive || !g.firstSetOn.peek()) return;
+        // One chance in a visit, whatever comes of it.
+        firstSetOffered = true;
+        const director = this.world.getSystem(DirectorSystem);
+        if (director == null || !director.ready() || loadJson<{ done?: boolean }>(StoreKey.Coach)?.done === true || !untouched()) return;
+        // Marked now, so the call sheet waits for it instead of asking for a sentence in the moment between.
+        g.ownBuild.value = true;
+        let waits = 0;
+        const begin = (): void => {
+          firstSetTimer = null;
+          if (!untouched() || this.world.visibilityState.peek() === VisibilityState.NonImmersive) {
+            g.ownBuild.value = false;
+            return;
+          }
+          // The pinch that landed the set may have closed on a piece as well: a set cannot change under a hand, so
+          // the designer waits a few moments for it to open.
+          if (this.queries.held.entities.size > 0 && waits++ < FIRST_SET_WAITS) {
+            firstSetTimer = setTimeout(begin, FIRST_SET_WAIT_MS);
+            return;
+          }
+          const sentence = tries[tryNext][1];
+          tryNext = (tryNext + 1) % tries.length;
+          showTry();
+          void director.ask(sentence, [], true);
+        };
+        firstSetTimer = setTimeout(begin, FIRST_SET_MS);
+      }),
+    );
     // What the piece last touched can be given follows the wearer to every tab; the Assets tab shows it always.
     const showPieceBar = (): void => {
       panel.getElementById('held-block')?.setProperties({ display: (more && openTab === 'assets') || g.castLine.peek() !== '' ? 'flex' : 'none' });
@@ -680,7 +754,7 @@ export class ControlsSystem extends createSystem({
       const next = SPOKEN[(SPOKEN.indexOf(spokenChoice()) + 1) % SPOKEN.length];
       chooseSpoken(next);
       showSpoken();
-      if (next !== 'off') speak(next === 'her' ? 'I will read you what I build.' : 'I will read you what I build, in this voice.');
+      if (next !== 'off') sayLine('voice');
     });
     this.cleanupFuncs.push(
       g.squirmOn.subscribe((on) => {
@@ -723,6 +797,21 @@ export class ControlsSystem extends createSystem({
         thinking: 'One moment',
         error: 'Talk',
       };
+      // In a session the headset cannot ask for the microphone, so a wearer who never allowed it on the page has
+      // none in here. The button says what it does then: Next shot, the next of the shots to try.
+      let deaf = false;
+      const resting = (): string => (deaf ? 'Next shot' : 'Talk');
+      const hearing = (): void => {
+        const inSession = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+        void micAnswer().then((answer) => {
+          const now = inSession && (answer === 'prompt' || answer === 'denied');
+          if (now === deaf) return;
+          deaf = now;
+          g.micOff.value = deaf;
+          if (!busy && !g.designing.peek()) voiceButton.setProperties({ text: resting() });
+        });
+      };
+      this.cleanupFuncs.push(this.world.visibilityState.subscribe(() => hearing()));
       // Keep listening: after each sentence the microphone opens again by itself, so a whole setup
       // can be said after one pinch. A quiet spell ends it, and so does the button.
       const keepButton = panel.getElementById<UIKit.Text>('btn-keep-listening');
@@ -731,6 +820,8 @@ export class ControlsSystem extends createSystem({
       let chained = false;
       let halted = false;
       let again: ReturnType<typeof setTimeout> | null = null;
+      /** When the chain last began waiting to listen again. */
+      let chainWaitFrom = 0;
       const showKeep = (): void => {
         keepButton?.setProperties({ text: keep ? 'Keep listening: on' : 'Keep listening: off', borderColor: keep ? OPTIC_YELLOW : CHALK_HAZE });
       };
@@ -741,7 +832,7 @@ export class ControlsSystem extends createSystem({
       };
       this.cleanupFuncs.push(
         g.designing.subscribe((on) => {
-          if (!busy) voiceButton.setProperties({ text: on ? 'Designing' : 'Talk' });
+          if (!busy) voiceButton.setProperties({ text: on ? 'Designing' : resting() });
         }),
       );
       wire('btn-keep-listening', () => {
@@ -756,11 +847,18 @@ export class ControlsSystem extends createSystem({
         if (again != null) {
           clearTimeout(again);
           again = null;
-          chained = false;
-          tell('Listening stopped.', 4000);
-          return;
+          // In the short gap between two sentences the press ends the chain. Later, while the chain waits for the
+          // designer to finish building and talking, it means "my turn now": the designer is hushed below and the
+          // microphone opens at once.
+          if (performance.now() - chainWaitFrom < 3 * RELISTEN_MS) {
+            chained = false;
+            tell('Listening stopped.', 4000);
+            return;
+          }
         }
         saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), squirm: g.squirmOn.peek(), voice: true });
+        // The wearer's turn to speak: the designer stops talking, and is not heard as part of the sentence.
+        hush();
         // Two soft notes as the microphone opens and closes, so the wearer hears that it is listening.
         if (cueOn == null) {
           for (const [name, src] of [['ListenOn', './audio/listen-on.wav'], ['ListenOff', './audio/listen-off.wav']] as const) {
@@ -779,15 +877,26 @@ export class ControlsSystem extends createSystem({
             if (state !== 'listening' && heardOpen && cueOff != null) AudioUtils.play(cueOff);
             heardOpen = state === 'listening';
             busy = state === 'loading' || state === 'listening' || state === 'thinking';
+            // While the microphone is open the designer says nothing: it would be heard as part of the sentence.
+            micOpen(state === 'loading' || state === 'listening');
             voiceButton.setProperties({
-              text: state === 'idle' && g.designing.peek() ? 'Designing' : WORDS[state],
+              text: state === 'idle' && g.designing.peek() ? 'Designing' : state === 'idle' || state === 'error' ? resting() : WORDS[state],
               backgroundColor: state === 'listening' ? OPTIC_YELLOW : undefined,
               color: state === 'listening' ? CLOTH : CHALK,
             });
-            if (state === 'loading' && !chained) tell('Waking the listener.');
+            // What is said while the listener wakes is kept, so the wearer need not wait for it.
+            if (state === 'loading' && !chained) tell('Say the shot now. I am listening.');
             if (state === 'listening') {
               // A hint: what came of the last sentence keeps its place until it has been read.
-              tell(chained ? 'Still listening. Say the next thing, or stay quiet to stop.' : 'Say what happens in the shot, or a control: snap, eighty five, undo.', 0, true);
+              tell(
+                chained
+                  ? 'Still listening. Say the next thing, or stay quiet to stop.'
+                  : setStands()
+                    ? 'Say what to change: add rain, make the dragon bigger. Or say a new shot.'
+                    : 'Say the shot: a night chase, a man running from a car.',
+                0,
+                true,
+              );
             }
             if (state === 'error') {
               chained = false;
@@ -800,7 +909,7 @@ export class ControlsSystem extends createSystem({
             }
           },
           onProgress: (fraction) =>
-            tell(fraction < 1 ? `Fetching the listener, ${Math.round(fraction * 100)}%. This happens once.` : 'Waking the listener.'),
+            tell(fraction < 1 ? `Fetching the listener, ${Math.round(fraction * 100)}%. This happens once.` : 'Say the shot now. I am listening.'),
           onText: (text, final) => {
             if (text !== '') says('', `Heard: ${clip(text)}`);
             if (!final) return;
@@ -817,11 +926,23 @@ export class ControlsSystem extends createSystem({
               return;
             }
             chained = true;
-            again = setTimeout(() => {
+            // The microphone opens again once the designer has built and said its piece: opened sooner, the
+            // designer's own voice would be heard as the next sentence. A wait that long ends the chain.
+            chainWaitFrom = performance.now();
+            const relisten = (): void => {
               again = null;
-              if (!busy && this.world.visibilityState.peek() === VisibilityState.Visible) void voice?.start(CHAIN_QUIET_MS);
-              else chained = false;
-            }, RELISTEN_MS);
+              if (busy || this.world.visibilityState.peek() !== VisibilityState.Visible || performance.now() - chainWaitFrom > CHAIN_WAIT_MS) {
+                chained = false;
+                return;
+              }
+              // Settled: the set is up and its looks through the lens are done, each of which may speak.
+              if (this.world.getSystem(DirectorSystem)?.settled() === false || talking()) {
+                again = setTimeout(relisten, RELISTEN_MS);
+                return;
+              }
+              void voice?.start(CHAIN_QUIET_MS);
+            };
+            again = setTimeout(relisten, RELISTEN_MS);
           },
         });
         halted = busy;
@@ -834,11 +955,25 @@ export class ControlsSystem extends createSystem({
           const inSession = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
           void micAnswer().then((answer) => {
             if (inSession && (answer === 'prompt' || answer === 'denied')) {
+              // The press is not wasted: it asks for the next shot to try, as if it had been said, and the voice
+              // and the line under the set's reply say why. A hint, so the reply keeps its place first.
+              deaf = true;
+              g.micOff.value = true;
+              if (g.designing.peek()) {
+                tell('The set is still going up. Press again when it stands.', 3000);
+                return;
+              }
+              const sentence = tries[tryNext][1];
+              tryNext = (tryNext + 1) % tries.length;
+              showTry();
+              this.heard(sentence);
+              sayLineOnce('nomic');
               tell(
                 answer === 'denied'
-                  ? 'The microphone is not allowed for this page. Allow it in the browser, or pinch Try a shot.'
-                  : 'The headset cannot ask for the microphone in here. Leave, press Enter XR on the page and allow it, or pinch Try a shot.',
-                10000,
+                  ? 'No microphone for this page, so that was a shot to try. Allow it in the browser to say your own.'
+                  : 'No microphone in here, so that was a shot to try. To say your own: leave, press Enter XR and allow it.',
+                0,
+                true,
               );
               return;
             }

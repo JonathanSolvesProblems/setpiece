@@ -155,6 +155,8 @@ type Globals = {
   lensMm: Signal<number>;
   /** The set designer is building: what stands is not yet a set anybody made. */
   designing?: Signal<boolean>;
+  setsBuilt?: Signal<number>;
+  coverageRunning?: Signal<boolean>;
   snapRequested: Signal<number>;
   eyelineText: Signal<string[]>;
   shotList: Signal<string[]>;
@@ -1021,6 +1023,13 @@ export class ViewfinderSystem extends createSystem({
   /** The current brief, judged on this frame. A frame is kept either way; only a pass is stamped. Returns the sheet's line. */
   private judge(measured: Measure, shot: Shot): string {
     const g = this.globals as Globals;
+    // The briefs are for the eyeline set (they ask for the eyeline ball). A set the designer built is the wearer's
+    // own shot: its frame is kept without a verdict and said to be on the board, with its lens and height. While
+    // coverage is being shot, coverage's own line for each shot keeps its place instead.
+    if ((g.setsBuilt?.peek() ?? 0) > 0) {
+      if (g.coverageRunning?.peek() === true) return '';
+      return `FRAME ${shot.index} IS ON THE BOARD | ${shot.lensMm} mm, camera ${shot.cameraHeightM.toFixed(1)} m high.`;
+    }
     const index = g.briefIndex.peek();
     const brief = BRIEFS[index];
     if (brief == null) return '';

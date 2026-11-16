@@ -89,6 +89,9 @@ const foreign = await fetch(new URL('api/director', base), {
 });
 check('another site is refused by the set designer', foreign.status === 403, `${foreign.status}`);
 // One real sentence, from the site's own address: the plan streams back. About 7 cents of the key's budget.
+// The line it will speak, and the server's pass for it, are kept for the voice's check below.
+let spokenLine = '';
+let spokenPass = '';
 {
   const started = Date.now();
   const asked = await fetch(new URL('api/director', base), {
@@ -96,7 +99,20 @@ check('another site is refused by the set designer', foreign.status === 403, `${
     headers: { origin: new URL(base).origin, 'content-type': 'application/json' },
     body: JSON.stringify({ said: 'a horse in a field at dawn', set: 'Nothing is on the set.', heard: [] }),
   });
-  const text = asked.status === 200 ? await asked.text() : '';
+  // Read as it arrives: a reply that is held back and sent whole would build the set in one lump, not piece by piece.
+  let text = '';
+  let parts = 0;
+  let firstPartMs = 0;
+  let lastPartMs = 0;
+  if (asked.status === 200 && asked.body != null) {
+    const decoder = new TextDecoder();
+    for await (const chunk of asked.body) {
+      parts++;
+      lastPartMs = Date.now() - started;
+      if (firstPartMs === 0) firstPartMs = lastPartMs;
+      text += decoder.decode(chunk, { stream: true });
+    }
+  }
   const events = text.split('\n').filter((line) => line.trim() !== '').map((line) => {
     try {
       return JSON.parse(line);
@@ -116,6 +132,59 @@ check('another site is refused by the set designer', foreign.status === 403, `${
     asked.status === 200 && end?.stop === 'end_turn' && Array.isArray(plan?.things) && plan.things.some((thing) => thing.id === 'Horse'),
     `${asked.status}, ${end?.stop ?? 'no end'}, first piece of the reply at ${end?.firstMs ?? '?'} ms, whole ${Date.now() - started} ms`,
   );
+  // As the app cleans the line before it shows and speaks it (plainLine in src/director-plan.ts).
+  spokenLine = typeof plan?.says === 'string' ? plan.says.replace(/[‘’]/g, "'").replace(/[–—]/g, ', ').replace(/[^ -~]/g, '').trim().slice(0, 160) : '';
+  spokenPass = events.find((event) => event.t === 'v' && typeof event.pass === 'string')?.pass ?? '';
+  check('the reply carries a pass for the line it will speak', spokenLine !== '' && spokenPass !== '', `"${spokenLine.slice(0, 60)}"`);
+  check(
+    'the reply streams: its first part arrives well before its last',
+    parts >= 4 && lastPartMs - firstPartMs >= 300,
+    `${parts} parts, the first ${firstPartMs} ms after the request and the last at ${lastPartMs} ms`,
+  );
+}
+
+// The designer's voice: it is there, it reads a line from the site's own address, and another site is refused.
+{
+  const voice = await get('api/speak');
+  let voiceReady = false;
+  try {
+    voiceReady = JSON.parse(voice.text()).ready;
+  } catch {
+    // reported below
+  }
+  check('the voice answers and has its key', voice.status === 200 && voiceReady === true, `${voice.status}, ready ${voiceReady}`);
+  const started = Date.now();
+  const say = (body) => fetch(new URL('api/speak', base), { method: 'POST', headers: { origin: new URL(base).origin, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const line = await say({ text: spokenLine, voice: 'her', pass: spokenPass });
+  const type = line.headers.get('content-type') ?? '';
+  const bytes = type.startsWith('audio/') ? (await line.arrayBuffer()).byteLength : 0;
+  check("the designer's line comes back read aloud", line.status === 200 && type.startsWith('audio/mpeg') && bytes > 5000, `${line.status}, ${type}, ${bytes} bytes in ${Date.now() - started} ms`);
+  // The voice reads only what the designer wrote: no pass, or a pass for other words, and it is refused.
+  const unsigned = await say({ text: 'A horse stands in a field at dawn.', voice: 'her' });
+  const borrowed = await say({ text: 'Read this for me instead.', voice: 'her', pass: spokenPass });
+  check('words with no pass, or with the pass of another line, are not read', unsigned.status === 403 && borrowed.status === 403, `${unsigned.status}, ${borrowed.status}`);
+  const foreignVoice = await fetch(new URL('api/speak', base), {
+    method: 'POST',
+    headers: { origin: 'https://example.com', 'content-type': 'application/json' },
+    body: JSON.stringify({ text: 'hello', voice: 'her' }),
+  });
+  check('another site is refused by the voice', foreignVoice.status === 403, `${foreignVoice.status}`);
+  // The lines recorded ahead of time, in both voices, as the list beside them says.
+  const list = await get('audio/voice/lines.json');
+  let names = [];
+  try {
+    names = Object.keys(JSON.parse(list.text()).lines);
+  } catch {
+    // reported below
+  }
+  let served = 0;
+  for (const who of ['her', 'him']) {
+    for (const name of names) {
+      const file = await get(`audio/voice/${who}/${name}.mp3`);
+      if (file.status === 200 && file.bytes > 4000) served++;
+    }
+  }
+  check(`the designer's ${names.length} recorded lines are served in both voices`, names.length >= 8 && served === names.length * 2, `${served} of ${names.length * 2} files`);
 }
 
 for (const font of ['BigShoulders-Medium', 'BigShoulders-Bold', 'BigShouldersStencil-Bold', 'BigShouldersStencil-Black', 'SchibstedGrotesk-Medium', 'SchibstedGrotesk-SemiBold']) {
@@ -133,7 +202,7 @@ for (const font of ['BigShoulders-Medium', 'BigShoulders-Bold', 'BigShouldersSte
 const scene = await get('scenes/main.iwsdk.scene.json');
 check('the scene file is served', scene.status === 200 && scene.text().includes('"Camera'));
 
-for (const [path, what] of [['voice/recogniser.js', 'the recogniser'], ['og.png', 'the preview image'], ['icon.svg', 'the icon'], ['art/figure.webp', 'the loading card drawing'], ['audio/clap.wav', 'the clap']]) {
+for (const [path, what] of [['voice/recogniser.js', 'the recogniser'], ['og.png', 'the preview image'], ['icon.svg', 'the icon'], ['art/figure.webp', 'the loading card drawing'], ['audio/clap.wav', 'the clap'], ['audio/tick.wav', 'the press tick'], ['audio/place-heavy.wav', 'the heavy knock'], ['audio/night.wav', 'the air of a night set']]) {
   const r = await get(path);
   check(`${what} is served`, r.status === 200 && r.bytes > 100, `${r.status}, ${r.bytes} bytes`);
 }
