@@ -86,6 +86,14 @@ const ROOM = { halfX: 0.3, halfZ: 0.2, overhang: 0.01, bodyGap: 0.01, solidGap: 
 const BODY_HALF = 0.025;
 /** Higher than this off the ground, a piece is up on something or flying, and the set dresser leaves it be. */
 const RAISED = 0.01;
+/**
+ * How tall each burning effect is, on the slate. One standing on the ground inside a solid piece taller than this
+ * share of it is hidden, and is stood so that this share of it is sunk below the piece's top: fire on a truck burns
+ * from the truck's roof, not inside its box.
+ */
+const BURNS: Record<string, number> = { Fire: 0.18, Smoke: 0.3, Sparks: 0.12, Explosion: 0.2 };
+const BURN_HIDDEN = 0.45;
+const BURN_SUNK = 0.3;
 /** A piece the set dresser moves less than this (slate metres, 10 cm real) is slid, not dropped again. */
 const NUDGE = 0.01;
 /** A raised piece rests on a top no more than this above its own height (slate metres, 6 cm real). */
@@ -768,6 +776,7 @@ class PlanBuild {
     // roof slab, not on the chimney, and not on a taller truck parked beside the house); an effect on the ground
     // stands on the smallest footprint around it (the car, not the house front behind it).
     const under = new Map<Standing, Standing>();
+    const lifts: [Standing, number][] = [];
     const supports: { one: Standing; foot: Footing; top: number }[] = [];
     for (const one of standing) {
       if (one.base.shelf === 'Effects' || one.rest > RAISED) continue;
@@ -785,6 +794,7 @@ class PlanBuild {
       if (one.base.shelf !== 'Effects' && one.rest <= RAISED) continue;
       const raised = one.rest > RAISED;
       let best: Standing | null = null;
+      let bestTop = 0;
       let score = Infinity;
       for (const support of supports) {
         if (support.one === one || !holds(support.foot, one.object.position.x, one.object.position.z)) continue;
@@ -793,9 +803,13 @@ class PlanBuild {
         if (value < score) {
           score = value;
           best = support.one;
+          bestTop = support.top;
         }
       }
       if (best != null) under.set(one, best);
+      // Flames put on the ground inside the thing that burns are hidden by it: they go up to burn from its top.
+      const reach = BURNS[one.base.spareOf ?? one.base.label];
+      if (best != null && !raised && reach !== undefined && this.placed.has(one.label) && bestTop > reach * BURN_HIDDEN) lifts.push([one, bestTop - reach * BURN_SUNK]);
     }
     const moves: Moved[] = [];
     const apply = (feet: Footing[], owners: (Standing | null)[]): void => {
@@ -865,6 +879,11 @@ class PlanBuild {
     // A piece moved far enough to see drops onto its new mark; a nudge is only a nudge.
     for (const move of moves) {
       if (Math.hypot(move.dx, move.dz) >= NUDGE) drop(move.standing.entity, move.standing.object, move.standing.rest);
+    }
+    for (const [one, y] of lifts) {
+      one.rest = y;
+      this.restY.set(one.label, y);
+      drop(one.entity, one.object, y);
     }
     this.world.getSystem(ViewfinderSystem)?.refresh();
     return moves.length;

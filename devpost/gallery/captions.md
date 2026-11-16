@@ -53,5 +53,5 @@ Spoken on the headset: the first piece 1.6 s after the last word, the whole set 
 ## 09 leave
 
 ```
-Saved from the page: the board the designer shot, each frame with its numbers and its name, and the shot list as a CSV for the crew.
+Saved from the page: the board the designer shot, each frame with its lens and height, and the shot list as a CSV for the crew.
 ```

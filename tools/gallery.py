@@ -121,7 +121,7 @@ SLIDES = [
     dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json and quest-frame-time.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
          caption='{fps_samples} one-second samples, {fps_days} Nov: median {fps_median}, lowest {fps_min}. A heavier set on 11 Nov ran at {heavy_fps}, {heavy_then}.'),
     dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
-         caption='Saved from the page: the board the designer shot, each frame with its numbers and its name, and the shot list as a CSV for the crew.'),
+         caption='Saved from the page: the board the designer shot, each frame with its lens and height, and the shot list as a CSV for the crew.'),
     dict(slug='camera', badge=QUEST, headline='Format, rig, second camera', picture='captures/quest-camera-tab.jpg',
          caption='Four sensor formats, a tripod or a drone up to 11 m on the real set, and a second camera you can cut to while a take records.'),
 ]
@@ -594,24 +594,36 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
                 csv_path = out / 'saved-shot-list.csv'
                 await (await waiting.value).save_as(str(csv_path))
                 board = Image.open(board_path).convert('RGB')
-                rows = list(csv.reader(io.StringIO(csv_path.read_text(encoding='utf-8'))))[:4]
-                width, height = 2400, 1300
+                rows = list(csv.reader(io.StringIO(csv_path.read_text(encoding='utf-8'))))
+                # As wide as the slide's picture frame (1356 by 632), so nothing is left dark around it.
+                width, height = 2712, 1264
                 sheet = Image.new('RGB', (width, height), (42, 33, 28))
-                bw = 1500
+                bw = 1720
                 bh = int(board.height * bw / board.width)
-                sheet.paste(board.resize((bw, bh)), (0, (height - bh) // 2))
+                sheet.paste(board.resize((bw, bh)), (40, (height - bh) // 2))
                 draw = ImageDraw.Draw(sheet)
-                font = ImageFont.truetype(str(ROOT / 'public/ui/fonts/SchibstedGrotesk-Medium.ttf'), 30)
-                head = ImageFont.truetype(str(ROOT / 'public/ui/fonts/BigShoulders-Bold.ttf'), 40)
-                draw.text((1560, 60), 'SETPIECE-SHOT-LIST.CSV', font=head, fill=(199, 199, 183))
-                y = 140
+                font = ImageFont.truetype(str(ROOT / 'public/ui/fonts/SchibstedGrotesk-Medium.ttf'), 38)
+                head = ImageFont.truetype(str(ROOT / 'public/ui/fonts/BigShoulders-Bold.ttf'), 46)
+                left = bw + 110
+                draw.text((left, 150), 'SETPIECE-SHOT-LIST.CSV', font=head, fill=(214, 225, 60))
                 header, body = rows[0], rows[1:]
-                for record in body:
-                    for name, cell in list(zip(header, record))[:5]:
-                        draw.text((1560, y), name, font=font, fill=(199, 199, 183))
-                        draw.text((1990, y), cell, font=font, fill=(246, 247, 239))
-                        y += 40
-                    y += 30
+                at = {name: header.index(name) for name in ('Frame', 'Shot', 'Lens mm', 'Camera height m')}
+                columns = [('Frame', '#', 0), ('Shot', 'SHOT', 70), ('Lens mm', 'LENS', 520), ('Camera height m', 'HEIGHT', 680)]
+                y = 240
+                for name, title, x in columns:
+                    draw.text((left + x, y), title, font=head, fill=(199, 199, 183))
+                y += 70
+                draw.line((left, y - 8, width - 60, y - 8), fill=(90, 75, 61), width=3)
+                for record in body[:6]:
+                    for name, title, x in columns:
+                        cell = record[at[name]]
+                        if name == 'Lens mm':
+                            cell += ' mm'
+                        if name == 'Camera height m':
+                            cell = f'{float(cell):.1f} m'
+                        draw.text((left + x, y + 14), cell[:22], font=font, fill=(246, 247, 239))
+                    y += 88
+                    draw.line((left, y - 6, width - 60, y - 6), fill=(60, 50, 42), width=2)
                 sheet.save(png)
     elif recipe == 'standoff':
         await say('a mexican standoff after a car chase')
