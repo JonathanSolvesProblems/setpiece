@@ -134,6 +134,8 @@ export class DirectorSystem extends createSystem({
   /** Counts looks begun: a look still reading its picture when a newer one begins is dropped. */
   private lookGeneration = 0;
   private point = new Vector3();
+  /** The set standing is the one the designer built by itself as an example, not yet replaced by the wearer's own. */
+  private exampleStands = false;
   private fitSize = new Vector3();
   private fitMiddle = new Vector3();
   private lensAt = new Vector3();
@@ -232,10 +234,15 @@ export class DirectorSystem extends createSystem({
     this.looks = 0;
     // Whatever was being said about the last set stops: this is a new one.
     hush();
+    // The set standing is the example the designer built by itself: what is said now is the wearer's own first
+    // shot, and the designer is told so, so it starts a new scene instead of adding to its own.
+    const first = !own && this.exampleStands;
     // A set the designer builds by itself (the first, as a newcomer lands the set) is marked as its own until it is up.
     g.ownBuild.value = own;
     try {
-      return await this.request(said, { said, heard, set: this.describe() }, false, own);
+      const outcome = await this.request(said, { said, heard, set: this.describe(), first }, false, own);
+      if (outcome === 'built') this.exampleStands = own;
+      return outcome;
     } finally {
       if (own) g.ownBuild.value = false;
     }
@@ -875,7 +882,8 @@ class PlanBuild {
     // A greeting or a question changes nothing on the set: it is answered, and it is not counted as a set built.
     const changed = this.placed.size > 0 || this.removed.length > 0 || (this.camera != null && !this.camera.keep);
     if (changed) g.setsBuilt.value = g.setsBuilt.peek() + 1;
-    const title = (this.title || 'THE SET').toUpperCase();
+    // Which it was is said first: a new set, or a change to the one standing. (A reply that changed nothing is neither.)
+    const title = `${changed ? (this.fresh ? 'NEW SET: ' : 'CHANGED: ') : ''}${(this.title || 'THE SET').toUpperCase()}`;
     const lost = this.skipped > 0 ? ` ${this.skipped} of ${this.things} could not be built.` : '';
     const next = this.next !== '' ? ` Try: "${this.next}".` : '';
     g.coachNote.value = problem !== '' ? `${title} | ${problem}${lost}` : `${title} | ${this.says || 'The set is up.'}${lost}${next}`;

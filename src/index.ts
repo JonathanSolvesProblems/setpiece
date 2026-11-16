@@ -19,6 +19,7 @@ import { micAnswer } from './mic.js';
 import { startOver } from './start-over.js';
 import { keepOwnKey, ownKey } from './own-key.js';
 import { WalkthroughPointerSystem } from './pointer.js';
+import { SightlineSystem } from './sightline.js';
 import { EffectSoundSystem } from './effect-sound.js';
 import { CoverageSystem } from './coverage.js';
 import { SetFinderSystem } from './set-finder.js';
@@ -173,6 +174,7 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     .registerSystem(CoachSystem, { priority: 28 })
     .registerSystem(SetFinderSystem, { priority: 29 })
     .registerSystem(WalkthroughPointerSystem, { priority: 29 })
+    .registerSystem(SightlineSystem, { priority: 29 })
     .registerSystem(ControlsSystem, { priority: 30 });
 
   // The page's own controls: Enter XR, lenses, snap and reset, wired to the

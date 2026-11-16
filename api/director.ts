@@ -84,7 +84,7 @@ const subjectLine = (subject: unknown): string =>
 const refuse = (status: number, message: string): Response =>
   new Response(JSON.stringify({ t: 'error', m: message }) + '\n', { status, headers: { 'content-type': 'application/x-ndjson' } });
 
-type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown; coverage?: unknown; warm?: unknown };
+type Asked = { said?: unknown; heard?: unknown; set?: unknown; image?: unknown; report?: unknown; subject?: unknown; coverage?: unknown; first?: unknown; warm?: unknown };
 
 /**
  * A spoken sentence is waited on with the table empty, so the designer is asked to start writing at once instead of
@@ -110,6 +110,10 @@ function question(asked: Asked): string | null {
     '</set>',
     '',
     `The director said: "${said}"`,
+    // The headset says when the set standing is the designer's own example and this is the wearer's first sentence.
+    asked.first === true
+      ? 'The set standing now is an example you built by yourself to show how this works. This is the director\'s own first shot: build it as a new scene (fresh true), unless they plainly ask to change what stands there.'
+      : '',
     others.length > 0 ? `The recogniser's other guesses: ${others.map((guess) => `"${guess.slice(0, LONGEST_SAID)}"`).join('; ')}` : '',
   ]
     .filter((line, i, all) => line !== '' || (i > 0 && all[i - 1] !== ''))
