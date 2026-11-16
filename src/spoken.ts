@@ -62,8 +62,11 @@ export function hear(world: World, text: string, library = false): void {
   if (!library && director != null && director.available()) {
     const forDesigner: string[] = [];
     const later: Command[] = [];
-    for (const part of partsOf(text)) {
+    const parts = partsOf(text);
+    for (const part of parts) {
       const command = part.command;
+      // Leaving is only ever the whole of what was said: "two people argue and leave" builds a set and stays.
+      if (command?.do === 'leave' && parts.length > 1) continue;
       // Moving is the designer's; so is painting a piece it made, which it makes again in the new colour.
       const designers =
         command == null ||
@@ -88,7 +91,9 @@ export function hear(world: World, text: string, library = false): void {
     });
     return;
   }
-  for (const part of partsOf(text)) {
+  const parts = partsOf(text);
+  for (const part of parts) {
+    if (part.command?.do === 'leave' && parts.length > 1) continue;
     if (part.command == null) {
       g.sceneRequest.value = understand(part.text);
       continue;

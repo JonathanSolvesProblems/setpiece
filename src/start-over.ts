@@ -4,7 +4,7 @@
  * so the next person in the headset gets what a first visitor gets without leaving the session.
  */
 import type { Signal } from '@preact/signals-core';
-import { clearKey, StoreKey } from './store.js';
+import { clearKey, loadJson, saveJson, StoreKey } from './store.js';
 
 type Globals = {
   newBoardRequested: Signal<number>;
@@ -20,6 +20,8 @@ export function startOver(globals: unknown, landAgain: boolean): void {
   clearKey(StoreKey.Stage);
   clearKey(StoreKey.Coach);
   clearKey(StoreKey.Light);
+  // The small panel is a newcomer's: Talk, Try a shot and Skip the walkthrough are on it.
+  saveJson(StoreKey.Settings, { ...(loadJson<Record<string, unknown>>(StoreKey.Settings) ?? {}), more: false });
   g.setLight.value = 'studio';
   // No set of the designer's stands any more: the first one is built again as the set lands.
   g.setsBuilt.value = 0;

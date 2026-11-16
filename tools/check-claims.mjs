@@ -9,7 +9,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 // A clone on Windows may carry CRLF endings; the checks read one line ending.
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-const readme = read('README.md');
+// The README's short account and the long one it points to are read as one text.
+const readme = `${read('README.md')}\n${read('docs/what-it-does.md')}`;
 const count = (text, pattern) => (text.match(pattern) ?? []).length;
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen'];
 

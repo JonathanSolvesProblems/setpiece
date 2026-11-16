@@ -36,6 +36,7 @@ export class WalkthroughPointerSystem extends createSystem({ pieces: { required:
   private level = new Quaternion();
   private panel: UIKitMLAsset | null = null;
   private panelObject: Object3D | null = null;
+  private stage: Object3D | null = null;
   /** What is pointed at now: the target's name, its button or its piece, and how high the piece stands. */
   private target = '';
   private button: Element | null = null;
@@ -63,6 +64,11 @@ export class WalkthroughPointerSystem extends createSystem({ pieces: { required:
       this.world.visibilityState.peek() === VisibilityState.Visible && g.walkthrough.peek() && !g.lifeSize.peek() && g.takeState.peek() === 'idle' ? g.coachTarget.peek() : '';
     if (wanted !== this.target) this.aimAt(wanted);
     if (this.target === '') return;
+    this.stage ??= this.scene.getObjectByName('Stage') ?? null;
+    if (this.stage?.visible !== true) {
+      this.arrow.visible = false;
+      return;
+    }
     const bob = Math.abs(Math.sin(time * Math.PI * BOB_RATE)) * BOB;
     if (this.button != null) {
       const panel = this.panelObject;

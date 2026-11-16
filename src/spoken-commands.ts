@@ -127,7 +127,7 @@ const WHOLE_SIZES = new Set(['normal size', 'original size', 'regular size']);
 const INSIDE = new Set(['step inside', 'go inside', 'step in', 'stand in the shot', 'full size', 'life size', 'walk inside', 'go in']);
 const OUTSIDE = new Set(['step out', 'step outside', 'back out', 'go out', 'back to the table', 'go back to the table', 'leave the set', 'small again']);
 /** Out of the session and back to the page. ("Leave the set" is stepping out of a set at full size.) */
-const LEAVE = new Set(['exit', 'leave', 'quit', 'exit to browser', 'leave setpiece', 'exit setpiece', 'take me out', 'end session', 'end the session']);
+const LEAVE = new Set(['exit to browser', 'exit setpiece', 'leave setpiece', 'exit the session', 'leave the session', 'end the session', 'end session', 'take me out']);
 /** The designer's coverage of the set, shot by itself (src/coverage.ts): "cover it", "shoot coverage". */
 const COVER = new Set([
   'cover it', 'cover this', 'cover that', 'cover scene', 'cover set', 'cover shot', 'cover the scene', 'cover the set', 'cover the shot',

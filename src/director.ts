@@ -44,9 +44,11 @@ type Globals = {
 /** Real metres to the slate's, and back. */
 const SLATE = 0.1;
 const REAL = 10;
-/** The least of an actor a coverage shot holds: head to waist around the eyes, in real metres. */
-const CLOSE_UP_UP = 0.9;
-const CLOSE_UP_ACROSS = 0.7;
+/** The least of an actor a coverage shot holds: head and shoulders around the eyes, in real metres. */
+const CLOSE_UP_UP = 0.6;
+const CLOSE_UP_ACROSS = 0.5;
+/** A shot of an actor steps back at most this many times its own distance before a wider lens goes on instead. */
+const CLOSE_UP_BACK = 1.5;
 /** Where a camera may stand, in real metres from the stage's middle: as cleanCamera allows (src/director-plan.ts). */
 const CAMERA_STANDS = { x: 3.5, back: 2.4, front: 4 };
 const DEG = Math.PI / 180;
@@ -439,7 +441,7 @@ export class DirectorSystem extends createSystem({
     };
     const g = this.globals as unknown as Globals;
     const sensor = SENSORS[g.sensorIndex.peek()]?.heightMm ?? SENSORS[0].heightMm;
-    return fitShot(plan, subject, sensor, LENSES, CAMERA_STANDS);
+    return fitShot(plan, subject, sensor, LENSES, CAMERA_STANDS, person ? CLOSE_UP_BACK : Infinity);
   }
 
   /** Nothing of a set is still coming: no reply being read, no piece dropping, no camera or look waiting. */

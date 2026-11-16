@@ -70,6 +70,8 @@ export function fitShot(
   sensorHeightMm: number,
   lenses: readonly number[],
   stage: { x: number; back: number; front: number },
+  /** The most the camera steps back, as a multiple of how far it stood: a close-up stays near its actor. */
+  mostBack = Infinity,
 ): CameraPlan {
   // How far a lens must stand from the subject to hold it.
   const needed = (lens: number): number => Math.max((subject.up * lens) / (FILL * sensorHeightMm), (subject.across * lens) / (FILL * sensorHeightMm * ASPECT));
@@ -83,7 +85,7 @@ export function fitShot(
   let z = camera.z;
   if (flat > 1e-3 && need > Math.abs(dy)) {
     // Back along the line from the subject through the camera, no further than the stage lets a camera stand.
-    let reach = Math.sqrt(need * need - dy * dy) / flat;
+    let reach = Math.min(mostBack, Math.sqrt(need * need - dy * dy) / flat);
     if (dx > 0) reach = Math.min(reach, (stage.x - subject.x) / dx);
     if (dx < 0) reach = Math.min(reach, (-stage.x - subject.x) / dx);
     if (dz > 0) reach = Math.min(reach, (stage.front - subject.z) / dz);
@@ -95,7 +97,8 @@ export function fitShot(
   const far = Math.hypot(Math.hypot(x - subject.x, z - subject.z), dy);
   // The longest lens, no longer than the one asked for, that holds the subject from there; the widest if none does.
   let lens = Math.min(...lenses);
-  for (const mm of lenses) if (mm <= camera.lens && mm > lens && needed(mm) <= far) lens = mm;
+  // (A hair of room, so a camera stood back to exactly where its own lens holds the subject keeps that lens.)
+  for (const mm of lenses) if (mm <= camera.lens && mm > lens && needed(mm) <= far * 1.000001) lens = mm;
   return { ...camera, x, z, lens };
 }
 

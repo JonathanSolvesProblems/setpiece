@@ -120,6 +120,11 @@ SLIDES = [
          caption='Four sensor formats, a tripod or a drone up to 11 m on the real set, and a second camera you can cut to while a take records.'),
 ]
 
+# The gallery as it is submitted: eleven slides in the order of a first visit. A cold judge read on 15 Nov found
+# nineteen too many, with some repeating others; the rest stay above for anyone who wants to render them.
+SUBMITTED = ['say', 'table', 'voice', 'made', 'look', 'light', 'coverage', 'pinch', 'speed', 'fps', 'leave']
+SLIDES = [next(slide for slide in SLIDES if slide['slug'] == slug) for slug in SUBMITTED]
+
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{{font-family:SetStencil;src:url("{stencil}") format("truetype")}}
 @font-face{{font-family:SetShoulders;src:url("{shoulders}") format("truetype")}}

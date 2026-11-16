@@ -11,7 +11,7 @@ import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vecto
 import type { BufferGeometry, Material } from '@iwsdk/core';
 import { alignSpan, bevelBox } from './lib/hardsurface.js';
 import { mergeByMaterial } from './lib/vehicle.js';
-import { LAMP_GLOW, LAMP_POOL, poolGeometry } from './lib/practicals.js';
+import { haloGeometry, LAMP_GLOW, LAMP_POOL, poolGeometry } from './lib/practicals.js';
 
 /** Bare basswood, as a model maker's maquette comes before anyone paints it. */
 const primer = new MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.72 });
@@ -148,6 +148,12 @@ function lampPost(): Group {
   pool.position.set(0, 0.0015, 0.062);
   pool.renderOrder = 1;
   g.add(pool);
+  // And the glow round the lantern itself, with the pool's material: nothing by day, warm after dark.
+  const halo = new Mesh(haloGeometry(0.055), LAMP_POOL);
+  halo.name = 'LampHalo';
+  halo.position.set(0, 0.386, 0.062);
+  halo.renderOrder = 2;
+  g.add(halo);
   return g;
 }
 

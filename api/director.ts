@@ -131,7 +131,8 @@ export async function POST(request: Request): Promise<Response> {
   // A visitor's own key, from the page's field, answers their request in place of the site's. It is used for this
   // request and nothing else: not kept, not logged.
   const own = request.headers.get('x-setpiece-key')?.trim() ?? '';
-  const apiKey = /^sk-ant-[A-Za-z0-9_-]{20,240}$/.test(own) ? own : KEY();
+  const usingOwn = /^sk-ant-[A-Za-z0-9_-]{20,240}$/.test(own);
+  const apiKey = usingOwn ? own : KEY();
   if (!apiKey) return refuse(503, 'The set designer has no key on this server.');
   // Vercel writes the visitor's address itself; a header the caller sent is only used off Vercel.
   const visitor =
@@ -272,7 +273,12 @@ ${COVERAGE_ASK}`
         // limits): the app builds from its own library until the limit resets or is raised.
         const text = error instanceof Error ? error.message : '';
         const spent = status === 402 || (status === 400 && /usage limit|spend limit|credit balance/i.test(text));
-        const message = spent
+        // The visitor's own key, refused or out of credit: said as theirs, so the app does not take the designer
+        // itself to be off, and they know which box to empty.
+        const theirs = usingOwn && (spent || status === 401 || status === 403 || status === 404);
+        const message = theirs
+          ? 'Your own key was refused by Anthropic. Empty the key box on the page to use the site key.'
+          : spent
           ? 'The set designer is not taking requests right now.'
           : status === 429 || status === 529
             ? 'The set designer is busy. Try again in a moment.'

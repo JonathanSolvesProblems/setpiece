@@ -273,7 +273,7 @@ export class CoachSystem extends createSystem({
     this.advance(delta);
     // The walkthrough is done once a second frame is on the board, or they have stood in the set and come back.
     if (this.guiding) {
-      if (g.lifeSize.peek()) this.stoodIn = true;
+      if (g.lifeSize.peek() && this.shots >= 1) this.stoodIn = true;
       if (this.shots >= 2 || (this.stoodIn && !g.lifeSize.peek())) {
         this.endWalkthrough();
         sayLineOnce('done');

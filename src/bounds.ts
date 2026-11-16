@@ -11,7 +11,7 @@ export function localBounds(object: Object3D): Box3 {
   // that is not on, a pose that is not showing) is not part of its shape.
   const visit = (node: Object3D): void => {
     if (node !== object && !node.visible) return;
-    if (node instanceof Mesh && node.name !== 'EffectParticles' && node.name !== 'GrabVolume' && node.name !== 'HoverRing' && node.name !== 'LampPool') {
+    if (node instanceof Mesh && node.name !== 'EffectParticles' && node.name !== 'GrabVolume' && node.name !== 'HoverRing' && node.name !== 'LampPool' && node.name !== 'LampHalo') {
       const geometry = node.geometry;
       if (geometry.boundingBox == null) geometry.computeBoundingBox();
       if (geometry.boundingBox != null) {

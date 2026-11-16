@@ -74,5 +74,16 @@ const told = (shot, subject) => `${shot.lens} mm from ${far(shot, subject).toFix
   check('a camera in the back corner never leaves the stage', inside(shot) && shot.lens <= 85, told(shot, corner));
 }
 
+{
+  // As the app asks for an actor: head and shoulders, and a step back of at most half as far again.
+  const face = { x: 1.6, y: 1.6, z: 0.9, across: 0.5, up: 0.6 };
+  const asked = camera(1.6, 2.5, 1.6, 85);
+  const shot = fitShot(asked, face, SENSOR, LENSES, STAGE, 1.5);
+  const stepped = far(shot, face) / far(asked, face);
+  check('a close-up stays a close-up: it steps back half as far again at most, then takes a 50 mm, not the far edge of the stage', stepped <= 1.5 + 1e-6 && shot.lens === 50 && shot.z < STAGE.front, told(shot, face));
+  const held = fitShot(camera(1.6, 2.5 + 1.6, 1.6, 50), face, SENSOR, LENSES, STAGE, 1.5);
+  check('and one that already holds head and shoulders is left as planned', held.lens === 50 && Math.abs(held.z - 4.1) < 1e-6 || held.z === 4);
+}
+
 console.log(failed === 0 ? '\nAll coverage fits hold.' : `\n${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

@@ -624,7 +624,12 @@ export class ControlsSystem extends createSystem({
     });
     // The way out, on the small panel where a newcomer can find it (it was only under More, Stage): back to the
     // page, where the board and its Save buttons are.
-    wire('btn-leave', () => this.world.exitXR());
+    twice(
+      'btn-leave',
+      'Leave',
+      () => 'Leave ends the session and goes back to the page, where the board is. Press it again to go.',
+      () => this.world.exitXR(),
+    );
     this.cleanupFuncs.push(
       g.walkthrough.subscribe(() => showSkip()),
       g.lifeSize.subscribe(() => showSkip()),
@@ -638,6 +643,10 @@ export class ControlsSystem extends createSystem({
       () => {
         if (g.lifeSize.peek()) {
           says('', 'Step back out to the table first, then start the walkthrough again.', 5000);
+          return;
+        }
+        if (this.world.getSystem(DirectorSystem)?.settled() === false || g.coverageRunning.peek() || g.takeState.peek() !== 'idle') {
+          says('', 'The set is busy. Let it finish, then start the walkthrough again.', 5000);
           return;
         }
         // The small panel is where the walkthrough's buttons are.

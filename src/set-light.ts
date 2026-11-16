@@ -78,7 +78,7 @@ export const LOOKS: Record<LightName, Look> = {
   spotlight: { key: 0xfff4de, keyPower: 1.7, sky: 0x40404a, ground: 0x0a0a0c, fill: 0.07, top: '#020202', upper: '#040404', horizon: '#0a0908', floor: '#131110', env: { sky: [0.22, 0.21, 0.2], equator: [0.05, 0.05, 0.05], ground: [0.01, 0.01, 0.01], power: 0.45 }, keyAt: [0.05, 1.15, 0.12], practical: 0.3, art: null },
 };
 
-type Globals = { setLight: Signal<string>; lifeSize: Signal<boolean> };
+type Globals = { setLight: Signal<string>; lifeSize: Signal<boolean>; designing?: Signal<boolean> };
 
 /** The ground, its own colour under the wearer and the horizon's at its edge. */
 function paintGround(canvas: HTMLCanvasElement, look: Look): void {
@@ -146,7 +146,9 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     // A light's output grows with the square of the set's size and its reach with the size, every frame, so the
     // set growing around a wearer stepping inside is lit as it will be at full size all the way up.
     const life = g.lifeSize.peek();
-    if (this.worldDue > 0 && (life || --this.worldDue === 0)) this.paintWorld(look);
+    // The world's sky waits its frames out, then for the designer to finish: never in a frame a piece lands in.
+    if (this.worldDue > 1 && !life) this.worldDue--;
+    else if (this.worldDue > 0 && (life || g.designing?.peek() !== true)) this.paintWorld(look);
     const scale = life ? this.stage!.scale.x : 1;
     // The grain is drawn in each piece's own coordinates and grows with the set: at full size it is a third as deep.
     GRAIN_FADE.value = 1 / Math.sqrt(scale);
