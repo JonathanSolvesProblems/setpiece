@@ -22,7 +22,8 @@ import { Placement, Held, SetPiece, SetRole, ShotCamera, StageAnchor } from './s
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { BRIEFS } from './briefs.js';
 import { TAKE_MAX_SECONDS, TakeState } from './take.js';
-import { forgetSaid, hush, sayLineOnce } from './speech.js';
+import { forgetSaid, hush, hushLine, sayLineOnce } from './speech.js';
+import type { LineKey } from './spoken-lines.js';
 
 const W = 1536;
 const H = 300;
@@ -115,6 +116,8 @@ export class CoachSystem extends createSystem({
   /** The step and the frame count last said aloud, so each step's line is said as it comes up and once. */
   private voiced: StepId = Step.Hidden;
   private voicedShots = -1;
+  /** The line of the step now up, when it should stop as soon as the step is done. */
+  private voicedLine: LineKey | null = null;
   /** Seconds the sheet has asked for the set to be landed: a room that knows its table lands it by itself first. */
   private landAsked = 0;
   /**
@@ -372,6 +375,11 @@ export class CoachSystem extends createSystem({
   private sayStep(): void {
     if (this.step === this.voiced && this.shots === this.voicedShots) return;
     const g = this.globals as Globals;
+    // The step whose line was last said is behind the wearer now: its line is not said over what they do next.
+    if (this.step !== this.voiced && this.voicedLine != null) {
+      hushLine(this.voicedLine);
+      this.voicedLine = null;
+    }
     // The designer is building a first set by itself: what to do next is said once it has spoken about that.
     if (this.step === Step.Say && g.ownBuild.peek()) return;
     // Where the headset knows the room, the set finds the table by itself in the first moments: the wearer is
@@ -388,11 +396,16 @@ export class CoachSystem extends createSystem({
     }
     if (!this.guiding && this.step !== Step.Done) return;
     const deaf = g.micOff.peek();
-    if (this.step === Step.Land) sayLineOnce('land');
-    else if (this.step === Step.Say && !deaf) sayLineOnce(this.mine ? 'mine' : 'say');
-    else if (this.step === Step.Move && this.said && !deaf) sayLineOnce('block');
-    else if (this.step === Step.Fill && this.shots === 1 && !g.coverageRunning.peek()) sayLineOnce('frame');
-    else if (this.step === Step.Done) sayLineOnce('full');
+    let line: LineKey | null = null;
+    if (this.step === Step.Land) line = 'land';
+    else if (this.step === Step.Say && !deaf) line = this.mine ? 'mine' : 'say';
+    else if (this.step === Step.Move && this.said && !deaf) line = 'block';
+    else if (this.step === Step.Fill && this.shots === 1 && !g.coverageRunning.peek()) line = 'frame';
+    else if (this.step === Step.Done) line = 'full';
+    if (line == null) return;
+    sayLineOnce(line);
+    // Landing and saying the shot are over the moment they are done; the later lines are advice and are let finish.
+    this.voicedLine = line === 'land' || line === 'say' || line === 'mine' ? line : null;
   }
 
   /** Each step ends on the event it asked for; the order never goes backwards except to land the set again. */

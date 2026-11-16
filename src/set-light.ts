@@ -16,6 +16,7 @@ import {
   MeshBasicMaterial,
   Object3D,
   PointLight,
+  Quaternion,
   SphereGeometry,
   SRGBColorSpace,
   Vector3,
@@ -28,12 +29,16 @@ import { saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { GRAIN_FADE } from './wood-grain.js';
 import { LAMP_GLOW, LAMP_POOL, WINDOW_GLASS } from './scene-assets/lib/practicals.js';
+import { paintSky } from './sky-paint.js';
+import type { SkyArt } from './sky-paint.js';
 
 /** The set is 1:10, so a light's output grows by a hundred and its reach by ten at full size. */
 const LIFE_SCALE = 10;
 /** How much of the world around a set stepped inside covers the room: the rest of the room shows through. */
 const WORLD_COVER = 0.9;
 const WORLD_RADIUS = 60;
+/** Frames after a change of light before the world's sky is painted in it, unless the wearer steps inside first. */
+const WORLD_PAINT_AFTER = 150;
 const ORIGIN = new Vector3();
 
 interface Look {
@@ -57,32 +62,23 @@ interface Look {
   keyAt: Rgb;
   /** How far the set's own lights are up, 0 to 1: lit windows and a burning street lamp at night. */
   practical: number;
+  /** What is painted on the sky: a sun or moon, stars, clouds, a far skyline, haze. None on a stage. */
+  art: SkyArt | null;
 }
 type Rgb = [number, number, number];
 
 /** Studio is the look the set always had: a dark stage behind the lens, the authored key light. */
-const LOOKS: Record<LightName, Look> = {
-  studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25', env: { sky: [0.95, 0.9, 0.82], equator: [0.42, 0.4, 0.38], ground: [0.12, 0.11, 0.1], power: 1 }, keyAt: [-0.45, 0.72, 0.42], practical: 0 },
-  day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a', env: { sky: [0.78, 0.86, 1], equator: [0.55, 0.58, 0.6], ground: [0.2, 0.19, 0.17], power: 1 }, keyAt: [-0.3, 0.95, 0.3], practical: 0 },
-  'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f', env: { sky: [1, 0.72, 0.48], equator: [0.55, 0.4, 0.3], ground: [0.14, 0.1, 0.08], power: 1 }, keyAt: [-0.8, 0.22, 0.12], practical: 0.2 },
-  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x2e3a68, ground: 0x100e14, fill: 0.18, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217', env: { sky: [0.2, 0.26, 0.45], equator: [0.07, 0.08, 0.13], ground: [0.02, 0.02, 0.03], power: 0.6 }, keyAt: [0.3, 0.8, -1.1], practical: 1 },
-  overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66', env: { sky: [0.75, 0.78, 0.82], equator: [0.5, 0.52, 0.54], ground: [0.2, 0.2, 0.19], power: 1 }, keyAt: [-0.2, 1, 0.2], practical: 0.08 },
+export const LOOKS: Record<LightName, Look> = {
+  studio: { key: 0xffeed1, keyPower: 1, sky: 0xf6f7ef, ground: 0x64453e, fill: 0.45, top: '#140f0c', upper: '#1b1411', horizon: '#2a211c', floor: '#3a2d25', env: { sky: [0.95, 0.9, 0.82], equator: [0.42, 0.4, 0.38], ground: [0.12, 0.11, 0.1], power: 1 }, keyAt: [-0.45, 0.72, 0.42], practical: 0, art: null },
+  day: { key: 0xfff6e8, keyPower: 1.15, sky: 0xd8e8ff, ground: 0x6e6252, fill: 0.6, top: '#3a73bb', upper: '#8fb6dc', horizon: '#cfdfec', floor: '#86807a', env: { sky: [0.78, 0.86, 1], equator: [0.55, 0.58, 0.6], ground: [0.2, 0.19, 0.17], power: 1 }, keyAt: [-0.3, 0.95, 0.3], practical: 0, art: { stars: 0, orb: { disc: '#fffbe8', glow: 'rgba(255,246,214,0.85)', size: 0.016, reach: 0.2 }, clouds: { count: 20, lit: '255,255,255', shade: '176,196,222', alpha: 0.85 }, far: 'hills', farColour: '#7f97ad', windows: null, haze: '226,236,246', hazeAlpha: 0.45 } },
+  'golden hour': { key: 0xffb36b, keyPower: 1, sky: 0xffd2a3, ground: 0x5c3b2a, fill: 0.42, top: '#2f4a78', upper: '#c98a62', horizon: '#f2a65c', floor: '#68523f', env: { sky: [1, 0.72, 0.48], equator: [0.55, 0.4, 0.3], ground: [0.14, 0.1, 0.08], power: 1 }, keyAt: [-0.8, 0.22, 0.12], practical: 0.2, art: { stars: 0, orb: { disc: '#fff0c2', glow: 'rgba(255,170,84,0.9)', size: 0.022, reach: 0.34 }, clouds: { count: 13, lit: '255,190,132', shade: '132,84,100', alpha: 0.85 }, far: 'hills', farColour: '#4a3340', windows: null, haze: '255,176,104', hazeAlpha: 0.6 } },
+  night: { key: 0x9fb4ff, keyPower: 0.5, sky: 0x2e3a68, ground: 0x100e14, fill: 0.18, top: '#02040a', upper: '#0b1222', horizon: '#1b2440', floor: '#111217', env: { sky: [0.2, 0.26, 0.45], equator: [0.07, 0.08, 0.13], ground: [0.02, 0.02, 0.03], power: 0.6 }, keyAt: [0.3, 0.8, -1.1], practical: 1, art: { stars: 520, orb: { disc: '#f2f4ff', glow: 'rgba(150,170,255,0.55)', size: 0.014, reach: 0.16 }, clouds: { count: 7, lit: '64,78,122', shade: '18,24,48', alpha: 0.55 }, far: 'city', farColour: '#070a14', windows: '#ffc878', haze: '52,66,120', hazeAlpha: 0.45 } },
+  overcast: { key: 0xe2e7ee, keyPower: 0.85, sky: 0xc0c8d0, ground: 0x5e5e5a, fill: 0.6, top: '#737c87', upper: '#a3abb4', horizon: '#c5cbd1', floor: '#6a6a66', env: { sky: [0.75, 0.78, 0.82], equator: [0.5, 0.52, 0.54], ground: [0.2, 0.2, 0.19], power: 1 }, keyAt: [-0.2, 1, 0.2], practical: 0.08, art: { stars: 0, orb: null, clouds: { count: 44, lit: '196,202,210', shade: '120,128,138', alpha: 0.6 }, far: 'hills', farColour: '#7b838b', windows: null, haze: '200,206,212', hazeAlpha: 0.5 } },
+  // One pool of light on a dark stage: a product shot, an interrogation, a solo.
+  spotlight: { key: 0xfff4de, keyPower: 1.7, sky: 0x40404a, ground: 0x0a0a0c, fill: 0.07, top: '#020202', upper: '#040404', horizon: '#0a0908', floor: '#131110', env: { sky: [0.22, 0.21, 0.2], equator: [0.05, 0.05, 0.05], ground: [0.01, 0.01, 0.01], power: 0.45 }, keyAt: [0.05, 1.15, 0.12], practical: 0.3, art: null },
 };
 
 type Globals = { setLight: Signal<string>; lifeSize: Signal<boolean> };
-
-/** A sky, top to bottom, on a canvas a sphere's texture is drawn from. */
-function paintSky(canvas: HTMLCanvasElement, look: Look): void {
-  const g = canvas.getContext('2d');
-  if (g == null) return;
-  const gradient = g.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, look.top);
-  gradient.addColorStop(0.46, look.upper);
-  gradient.addColorStop(0.5, look.horizon);
-  gradient.addColorStop(1, look.floor);
-  g.fillStyle = gradient;
-  g.fillRect(0, 0, canvas.width, canvas.height);
-}
 
 /** The ground, its own colour under the wearer and the horizon's at its edge. */
 function paintGround(canvas: HTMLCanvasElement, look: Look): void {
@@ -110,6 +106,9 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
   private groundCanvas: HTMLCanvasElement | null = null;
   /** The light last painted on the fill, the backdrop and the world. */
   private applied = '';
+  /** Frames until the world's sky is painted in the light last applied; 0 when it is. */
+  private worldDue = 0;
+  private stageTurn = new Quaternion();
   /** The light last given to the environment every surface reflects. */
   private reflected = '';
   private head = new Vector3();
@@ -147,6 +146,7 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     // A light's output grows with the square of the set's size and its reach with the size, every frame, so the
     // set growing around a wearer stepping inside is lit as it will be at full size all the way up.
     const life = g.lifeSize.peek();
+    if (this.worldDue > 0 && (life || --this.worldDue === 0)) this.paintWorld(look);
     const scale = life ? this.stage!.scale.x : 1;
     // The grain is drawn in each piece's own coordinates and grows with the set: at full size it is a third as deep.
     GRAIN_FADE.value = 1 / Math.sqrt(scale);
@@ -196,21 +196,30 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     fill.color.setHex(look.sky);
     fill.groundColor.setHex(look.ground);
     fill.intensity = look.fill;
-    // The sky behind the shot: the backdrop's own canvas, painted again.
+    // The sky behind the shot: the backdrop's own canvas, painted again, with its sun where the key light stands.
     const map = (this.backdrop!.material as MeshBasicMaterial).map;
     if (map != null && map.image instanceof HTMLCanvasElement) {
-      paintSky(map.image, look);
+      paintSky(map.image, look, look.art, look.keyAt);
       map.needsUpdate = true;
     }
     this.ensureWorld();
-    if (this.skyCanvas != null && this.groundCanvas != null) {
-      paintSky(this.skyCanvas, look);
+    if (this.groundCanvas != null) {
       paintGround(this.groundCanvas, look);
-      (this.sky!.material as MeshBasicMaterial).map!.needsUpdate = true;
       (this.ground!.material as MeshBasicMaterial).map!.needsUpdate = true;
     }
+    // The world's own sky is four times the picture and seen only from inside the set: it is painted when the
+    // wearer steps in, or a moment after the light changes, not in the frame the set's first pieces land in.
+    this.worldDue = WORLD_PAINT_AFTER;
     // The monitor redraws with the new light.
     this.world.getSystem(ViewfinderSystem)?.refresh();
+  }
+
+  /** The sky around a wearer inside the set, painted in the set's light. */
+  private paintWorld(look: Look): void {
+    this.worldDue = 0;
+    if (this.skyCanvas == null || this.sky == null) return;
+    paintSky(this.skyCanvas, look, look.art, look.keyAt);
+    (this.sky.material as MeshBasicMaterial).map!.needsUpdate = true;
   }
 
   /** The environment every surface reflects, in the set's light; the environment system rebuilds it once. */
@@ -231,8 +240,8 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
   private ensureWorld(): void {
     if (this.sky != null) return;
     this.skyCanvas = document.createElement('canvas');
-    this.skyCanvas.width = 4;
-    this.skyCanvas.height = 256;
+    this.skyCanvas.width = 2048;
+    this.skyCanvas.height = 1024;
     const skyMap = new CanvasTexture(this.skyCanvas);
     skyMap.colorSpace = SRGBColorSpace;
     const sky = new Mesh(
@@ -288,6 +297,8 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     this.player.head.getWorldPosition(this.head);
     this.stage!.getWorldPosition(this.floor);
     sky.position.set(this.head.x, this.floor.y, this.head.z);
+    // Turned with the set, so its sun stands where the set's key light comes from.
+    sky.quaternion.copy(this.stage!.getWorldQuaternion(this.stageTurn));
     ground.position.set(this.head.x, this.floor.y - 0.003, this.head.z);
   }
 }

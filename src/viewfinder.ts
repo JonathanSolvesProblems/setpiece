@@ -1157,18 +1157,19 @@ export class ViewfinderSystem extends createSystem({
    * the lens pass only and never for the viewer.
    */
   private makeBackdrop(): Mesh {
+    // Big enough to hold the sky painted on it in each light (src/sky-paint.ts).
     const canvas = document.createElement('canvas');
-    canvas.width = 4;
-    canvas.height = 256;
+    canvas.width = 1024;
+    canvas.height = 512;
     const g = canvas.getContext('2d');
     if (g) {
-      const gradient = g.createLinearGradient(0, 0, 0, 256);
+      const gradient = g.createLinearGradient(0, 0, 0, 512);
       gradient.addColorStop(0, '#140f0c');
       gradient.addColorStop(0.46, '#1b1411');
       gradient.addColorStop(0.5, '#2a211c');
       gradient.addColorStop(1, '#3a2d25');
       g.fillStyle = gradient;
-      g.fillRect(0, 0, 4, 256);
+      g.fillRect(0, 0, 1024, 512);
     }
     const texture = new CanvasTexture(canvas);
     texture.colorSpace = SRGBColorSpace;

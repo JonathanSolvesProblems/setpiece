@@ -87,7 +87,7 @@ const number = { type: 'number' } as const;
  * The light a set is in, chosen by the designer from the sentence: studio is the look of an interior or a sound
  * stage, and the default. "" in a reply keeps the light as it is.
  */
-export const LIGHTS = ['studio', 'day', 'golden hour', 'night', 'overcast'] as const;
+export const LIGHTS = ['studio', 'day', 'golden hour', 'night', 'overcast', 'spotlight'] as const;
 export type LightName = (typeof LIGHTS)[number];
 export const isLight = (value: unknown): value is LightName => typeof value === 'string' && (LIGHTS as readonly string[]).includes(value);
 

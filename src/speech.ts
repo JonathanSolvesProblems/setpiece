@@ -27,6 +27,8 @@ const TAIL_MS = 450;
 let unavailable = false;
 let speaking = false;
 let playing: HTMLAudioElement | null = null;
+/** The recorded line being fetched or said now, if it is one. */
+let sayingLine: LineKey | null = null;
 /** The line on its way from the server, so a hush stops it there too. */
 let fetching: AbortController | null = null;
 /** Counts hushes: a line fetched before one is not played after it. */
@@ -99,6 +101,19 @@ function queue(item: Waiting): void {
   if (!speaking) void sayAll();
 }
 
+/**
+ * A step is done: its recorded line is not said after all. If it is waiting it is taken out of the queue, and if
+ * it is being said it stops there. (On the headset the set was landed three seconds in, just as the line telling
+ * the wearer to land it began.)
+ */
+export function hushLine(line: LineKey): void {
+  for (let i = waiting.length - 1; i >= 0; i--) {
+    const item = waiting[i];
+    if ('line' in item && item.line === line) waiting.splice(i, 1);
+  }
+  if (sayingLine === line) playing?.pause();
+}
+
 /** A newcomer starts again: every recorded line may be said once more. */
 export function forgetSaid(): void {
   saidOnce.clear();
@@ -121,6 +136,7 @@ async function sayAll(): Promise<void> {
       const turn = hushes;
       let url = '';
       let made = false;
+      sayingLine = 'line' in item ? item.line : null;
       if ('line' in item) {
         url = `./audio/voice/${voice}/${item.line}.mp3`;
       } else {
@@ -165,6 +181,7 @@ async function sayAll(): Promise<void> {
         // The browser would not play it (no gesture yet, or the file is missing): the panel has the words.
       } finally {
         playing = null;
+        sayingLine = null;
         endedAt = performance.now();
         if (made) URL.revokeObjectURL(url);
       }
