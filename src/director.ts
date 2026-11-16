@@ -46,6 +46,8 @@ const SLATE = 0.1;
 const REAL = 10;
 /** The least of an actor a coverage shot holds: head and shoulders around the eyes, in real metres. */
 const CLOSE_UP_UP = 0.6;
+/** How high a crouched actor's eyes are, as a share of their standing eye height (src/scene-assets/figures.scene-asset.ts). */
+const CROUCH_EYES = 0.75;
 const CLOSE_UP_ACROSS = 0.5;
 /** A shot of an actor steps back at most this many times its own distance before a wider lens goes on instead. */
 const CLOSE_UP_BACK = 1.5;
@@ -488,7 +490,9 @@ export class DirectorSystem extends createSystem({
     const box = localBounds(object);
     if (box.isEmpty()) return plan;
     const size = box.getSize(this.fitSize).multiplyScalar(object.scale.x * REAL);
-    const eyes = Number(entity.getValue(SetPiece, 'eyeHeight') ?? 0);
+    // A crouched actor's eyes are three quarters as high as when they stand.
+    const crouched = this.world.getSystem(TraySystem)?.dressOf(plan.look_at).cast?.[0] === POSES.indexOf('Crouch');
+    const eyes = Number(entity.getValue(SetPiece, 'eyeHeight') ?? 0) * (crouched ? CROUCH_EYES : 1);
     const person = entity.getValue(SetPiece, 'role') === SetRole.Actor && eyes > 0;
     const middle = person ? eyes : box.getCenter(this.fitMiddle).y;
     const subject = {

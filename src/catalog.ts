@@ -147,7 +147,7 @@ export const LOOKS = [
   { name: 'White shirt', top: 0xe6e4da, legs: 0x2a2c31, hair: true },
   { name: 'Hi-vis', top: 0xd6e13c, legs: 0x2f3a45, hair: true },
 ] as const;
-export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim'] as const;
+export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim', 'Crouch'] as const;
 /** An actor's build: a lay figure is made in a man's and a woman's proportions, as artists' figures are. */
 export const BUILDS = ['man', 'woman'] as const;
 

@@ -113,6 +113,8 @@ export type Stance = {
   running?: boolean;
   /** One arm straight out at the shoulder, with a wooden prop pistol in the hand. */
   aiming?: 'L' | 'R';
+  /** Down on bent knees with the back leaning forward and the hands by the knees: hiding behind cover. */
+  crouching?: boolean;
 };
 
 /**
@@ -147,24 +149,30 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
   const base = new Mesh(new CylinderGeometry(0.11 * h, 0.12 * h, 0.004, 20), slateShadow);
   base.name = 'Base';
   base.position.y = 0.002;
-  const hipY = 0.5 * h;
+  const low = stance.crouching === true;
+  // Crouched, the hips drop to knee height and the back leans in over the knees: everything above the hips keeps
+  // its length and tips forward with it.
+  const hipY = (low ? 0.3 : 0.5) * h;
+  const lean = low ? 0.42 : 0;
+  const up = (above: number): Vector3 => new Vector3(0, hipY + above * h * Math.cos(lean), above * h * Math.sin(lean) - (low ? 0.05 * h : 0));
   const post = new Mesh(new CylinderGeometry(0.0022, 0.0022, hipY, 8), steel);
   post.name = 'Post';
-  post.position.y = hipY / 2;
-  const pelvis = ball(new Vector3(0, hipY, 0), 0.1 * h, wood, 'Pelvis');
+  post.position.set(0, hipY / 2, low ? -0.05 * h : 0);
+  const pelvis = ball(up(0), 0.1 * h, wood, 'Pelvis');
   pelvis.scale.set(1.1 * build.hips, 0.8, 0.82 * (woman ? 1.08 : 1));
-  const torso = limb(new Vector3(0, hipY + 0.02 * h, 0), new Vector3(0, 0.78 * h, 0), 0.1 * h * build.waist, woodLight, 'Torso');
-  const chest = ball(new Vector3(0, 0.76 * h, 0), 0.12 * h, woodLight, 'Chest');
+  const torso = limb(up(0.02), up(0.28), 0.1 * h * build.waist, woodLight, 'Torso');
+  const chest = ball(up(0.26), 0.12 * h, woodLight, 'Chest');
   chest.scale.set(1.25 * build.shoulders, 0.7, woman ? 0.98 : 0.85);
-  const neck = ball(new Vector3(0, 0.86 * h, 0), 0.04 * h, joint, 'Neck');
-  const head = ball(new Vector3(0, 0.925 * h, 0), 0.075 * h * build.head, woodLight, 'Head');
+  const neck = ball(up(0.36), 0.04 * h, joint, 'Neck');
+  // The head stays up: someone hiding is still watching.
+  const head = ball(up(0.36).add(new Vector3(0, 0.065 * h, low ? 0.012 * h : 0)), 0.075 * h * build.head, woodLight, 'Head');
   head.scale.set(0.95, 1.1, 1);
   // The chest is carved into the torso: one piece of wood, one coat.
   g.add(base, post, pelvis, absorb(torso, chest), neck, head);
   for (const side of [-1, 1]) {
     const tag = side < 0 ? 'L' : 'R';
     const stepping = stance.step === tag;
-    const hip = new Vector3(side * 0.07 * h * build.hips, hipY - 0.02 * h, 0);
+    const hip = new Vector3(side * 0.07 * h * build.hips, hipY - 0.02 * h, low ? -0.05 * h : 0);
     let knee = new Vector3(side * 0.075 * h, stepping ? 0.28 * h : 0.27 * h, stepping ? 0.07 * h : 0.01 * h);
     let ankle = new Vector3(side * 0.075 * h, 0.05 * h, stepping ? 0.09 * h : 0);
     if (stance.running) {
@@ -173,8 +181,15 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       knee = new Vector3(side * 0.075 * h, fore ? 0.36 * h : 0.26 * h, fore ? 0.17 * h : -0.08 * h);
       ankle = new Vector3(side * 0.075 * h, fore ? 0.14 * h : 0.2 * h, fore ? 0.14 * h : -0.26 * h);
     }
+    if (low) {
+      // Thighs forward and level, shins dropping back under them to feet flat on the ground.
+      knee = new Vector3(side * 0.1 * h, 0.3 * h, 0.17 * h);
+      ankle = new Vector3(side * 0.085 * h, 0.05 * h, 0.06 * h);
+    }
     const foot = ball(
-      stance.running
+      low
+        ? new Vector3(side * 0.085 * h, 0.035 * h, 0.09 * h)
+        : stance.running
         ? ankle.clone().add(new Vector3(0, -0.015 * h, 0.03 * h))
         : new Vector3(side * 0.075 * h, 0.035 * h, (stepping ? 0.11 : 0.02) * h),
       0.04 * h,
@@ -187,10 +202,17 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       absorb(limb(hip, knee, 0.05 * h * build.limbs, wood, `Leg${tag}Upper`), limb(knee, ankle, 0.042 * h * build.limbs, wood, `Leg${tag}Lower`)),
       absorb(ball(knee, 0.047 * h, joint, `Knee${tag}`), foot),
     );
-    const shoulder = new Vector3(side * 0.16 * h, 0.8 * h, 0);
+    const shoulder = low ? up(0.3).setX(side * 0.16 * h) : new Vector3(side * 0.16 * h, 0.8 * h, 0);
     let elbow = new Vector3(side * 0.19 * h, 0.62 * h, -0.01 * h);
     let wrist = new Vector3(side * 0.16 * h, 0.45 * h, -0.05 * h);
-    if (stance.aiming === tag) {
+    if (low) {
+      // Arms forward, hands resting just above the knees.
+      elbow = new Vector3(side * 0.2 * h, 0.4 * h, 0.13 * h);
+      wrist = new Vector3(side * 0.12 * h, 0.36 * h, 0.24 * h);
+    }
+    if (low) {
+      // (set above)
+    } else if (stance.aiming === tag) {
       elbow = new Vector3(side * 0.12 * h, 0.8 * h, 0.17 * h);
       wrist = new Vector3(side * 0.05 * h, 0.81 * h, 0.33 * h);
     } else if (stance.pointing === tag) {
@@ -251,7 +273,9 @@ function castFigure(name: string, realHeightM: number, stances: Stance[]): Group
   const h = realHeightM * SCALE;
   stances.forEach((stance, i) => {
     const pose = layFigure(`Pose${i}`, realHeightM, stance);
-    const hair = ball(new Vector3(0, 0.945 * h, -0.008 * h), 0.08 * h, hairDark, 'Hair');
+    // Hair goes where the head is: a crouched figure's head is lower and further forward than a standing one's.
+    const moved = (figure: Group, height: number): Vector3 => (figure.getObjectByName('Head')?.position.clone() ?? new Vector3(0, 0.925 * height, 0)).sub(new Vector3(0, 0.925 * height, 0));
+    const hair = ball(new Vector3(0, 0.945 * h, -0.008 * h).add(moved(pose, h)), 0.08 * h, hairDark, 'Hair');
     hair.scale.set(1, 0.8, 1.02);
     hair.visible = false;
     pose.add(hair);
@@ -261,9 +285,9 @@ function castFigure(name: string, realHeightM: number, stances: Stance[]): Group
     // look, so she reads as a woman from across the table even in bare wood.
     const hw = h * 0.96;
     const her = layFigure(`Pose${i}W`, realHeightM * 0.96, stance, true);
-    const cap = ball(new Vector3(0, 0.95 * hw, -0.01 * hw), 0.077 * hw, hairDark, 'HairLong');
+    const cap = ball(new Vector3(0, 0.95 * hw, -0.01 * hw).add(moved(her, hw)), 0.077 * hw, hairDark, 'HairLong');
     cap.scale.set(1.04, 0.86, 1.06);
-    const fall = ball(new Vector3(0, 0.875 * hw, -0.04 * hw), 0.07 * hw, hairDark, 'HairLong');
+    const fall = ball(new Vector3(0, 0.875 * hw, -0.04 * hw).add(moved(her, hw)), 0.07 * hw, hairDark, 'HairLong');
     fall.scale.set(1.08, 1.25, 0.62);
     her.add(cap, fall);
     her.visible = false;
@@ -276,9 +300,10 @@ const neutral: Stance = {};
 const armsUp: Stance = { armsUp: true };
 const running: Stance = { running: true };
 const aiming: Stance = { aiming: 'R', step: 'L' };
+const crouching: Stance = { crouching: true };
 
-export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running, aiming]);
-export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running, aiming]);
-export const actorC = castFigure('ActorC', 1.78, [neutral, { step: 'L' }, armsUp, running, aiming]);
-export const actorD = castFigure('ActorD', 1.6, [neutral, { pointing: 'L' }, armsUp, running, aiming]);
+export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running, aiming, crouching]);
+export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running, aiming, crouching]);
+export const actorC = castFigure('ActorC', 1.78, [neutral, { step: 'L' }, armsUp, running, aiming, crouching]);
+export const actorD = castFigure('ActorD', 1.6, [neutral, { pointing: 'L' }, armsUp, running, aiming, crouching]);
 export const creature = eyelineStand(0.33);
