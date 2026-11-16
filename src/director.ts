@@ -25,6 +25,7 @@ import { Held, SetPiece, SetRole } from './set-components.js';
 import { TraySystem } from './tray.js';
 import type { Cast, Finish } from './tray.js';
 import { hush, speak } from './speech.js';
+import { designerHeaders } from './own-key.js';
 import { jpegOf, ViewfinderSystem } from './viewfinder.js';
 
 type Globals = {
@@ -166,7 +167,7 @@ export class DirectorSystem extends createSystem({
       // address, where the tests reload the page many times an hour.
       if (this.status === 'ready' && !this.warmed && location.hostname !== 'localhost') {
         this.warmed = true;
-        void fetch(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ warm: true }) }).catch(() => undefined);
+        void fetch(ENDPOINT, { method: 'POST', headers: designerHeaders(), body: JSON.stringify({ warm: true }) }).catch(() => undefined);
       }
     } catch {
       // Not known; the next request tries it.
@@ -283,7 +284,7 @@ export class DirectorSystem extends createSystem({
     try {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: designerHeaders(),
         body: JSON.stringify(body),
         signal: asking.signal,
       });

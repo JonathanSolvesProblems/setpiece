@@ -262,7 +262,10 @@
     <div id="btn-inside" class="word grow">Step inside</div>
     <div id="btn-more" class="word grow">More</div>
   </div>
-  <div id="btn-skip" class="word" style="width: 100%; display: none">Skip the walkthrough</div>
+  <div class="row3">
+    <div id="btn-skip" class="word grow" style="display: none">Skip the walkthrough</div>
+    <div id="btn-leave" class="word grow">Leave</div>
+  </div>
   <div id="tabs" class="tabs">
     <div id="tab-shoot" class="tab">Shoot</div>
     <div id="tab-camera" class="tab">Camera</div>

@@ -44,6 +44,7 @@ export type Command =
   | { do: 'inside'; on: boolean }
   | { do: 'go'; labels: string[] }
   | { do: 'cover' }
+  | { do: 'leave' }
   | { do: 'byHand' };
 
 /** Words that carry no instruction of their own. */
@@ -125,6 +126,8 @@ const WHOLE_SIZES = new Set(['normal size', 'original size', 'regular size']);
 /** Into the set at full size, and out again, as it is said. */
 const INSIDE = new Set(['step inside', 'go inside', 'step in', 'stand in the shot', 'full size', 'life size', 'walk inside', 'go in']);
 const OUTSIDE = new Set(['step out', 'step outside', 'back out', 'go out', 'back to the table', 'go back to the table', 'leave the set', 'small again']);
+/** Out of the session and back to the page. ("Leave the set" is stepping out of a set at full size.) */
+const LEAVE = new Set(['exit', 'leave', 'quit', 'exit to browser', 'leave setpiece', 'exit setpiece', 'take me out', 'end session', 'end the session']);
 /** The designer's coverage of the set, shot by itself (src/coverage.ts): "cover it", "shoot coverage". */
 const COVER = new Set([
   'cover it', 'cover this', 'cover that', 'cover scene', 'cover set', 'cover shot', 'cover the scene', 'cover the set', 'cover the shot',
@@ -175,6 +178,7 @@ export function commandIn(words: string[], named: Named[]): Command | null {
   if (pieces.length === 0) {
     if (UNDO.has(plain)) return { do: 'undo' };
     if (COVER.has(plain) || COVER.has(rest)) return { do: 'cover' };
+    if (LEAVE.has(plain)) return { do: 'leave' };
     if (INSIDE.has(plain) || INSIDE.has(rest)) return { do: 'inside', on: true };
     if (OUTSIDE.has(plain) || OUTSIDE.has(rest)) return { do: 'inside', on: false };
     // "Take me to the camera": stand at the lens, as Step inside does.
@@ -346,6 +350,7 @@ export function commandWords(): string[] {
   take(['snap', 'take', 'frame', 'picture', 'photo', 'shot', 'camera', 'cut', 'tripod', 'drone', 'hundred', 'size', 'undo']);
   take(['up', 'down', 'in', 'out', 'little', 'it', 'bring', 'move', 'raise', 'first', 'second', 'other', 'two', 'one']);
   take(['remove', 'delete', 'erase', 'lose', 'scrap', 'ditch', 'get rid of', 'take away', 'take out', 'off']);
+  take(LEAVE);
   take(Object.keys(LENS_NAMES));
   take(LENS_UNITS);
   take(Object.keys(STEPS));

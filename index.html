@@ -110,6 +110,14 @@
               <button class="shot-try" type="button">Two people arguing in a diner booth</button>
             </div>
             <p class="marks-note ask-note" id="page-ask-note" aria-live="polite">Say what happens in the shot. The set designer builds it piece by piece, and every piece can be moved.</p>
+            <details class="own-key">
+              <summary>Use your own Anthropic key</summary>
+              <form class="ask" id="own-key-form" autocomplete="off">
+                <input id="own-key" name="key" type="password" maxlength="260" placeholder="sk-ant-..." aria-describedby="own-key-note" />
+                <button class="block" type="submit">Keep</button>
+              </form>
+              <p class="marks-note" id="own-key-note">Not needed: the site's own key answers. Yours is kept in this browser only and sent with your requests to this site's server, which passes it to Anthropic and does not store it. Empty the box and press Keep to forget it.</p>
+            </details>
             <div class="field">
               <span class="label" id="lens-label">Lens</span>
               <div class="lenses" role="group" aria-labelledby="lens-label">

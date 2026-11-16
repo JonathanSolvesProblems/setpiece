@@ -17,6 +17,7 @@ import { SetLightSystem } from './set-light.js';
 import { prefetchListener } from './voice.js';
 import { micAnswer } from './mic.js';
 import { startOver } from './start-over.js';
+import { keepOwnKey, ownKey } from './own-key.js';
 import { WalkthroughPointerSystem } from './pointer.js';
 import { EffectSoundSystem } from './effect-sound.js';
 import { CoverageSystem } from './coverage.js';
@@ -314,6 +315,22 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     // Where the set stands on a table, and the headset's opening steps, mean nothing on a laptop.
     if (title === 'STAGE' || /^\d OF \d/.test(title)) return;
     askNote.textContent = title === '' ? words : `${title.charAt(0)}${title.slice(1).toLowerCase()}. ${words}`;
+  });
+  // A visitor's own key, for building past the site's limits: kept in this browser, sent with their requests.
+  const keyForm = document.getElementById('own-key-form') as HTMLFormElement | null;
+  const keyBox = document.getElementById('own-key') as HTMLInputElement | null;
+  const keyNote = document.getElementById('own-key-note');
+  const keyResting = keyNote?.textContent ?? '';
+  if (keyBox != null && ownKey() !== '') keyBox.placeholder = 'Your key is in use. Empty and Keep to forget it.';
+  keyForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (keyBox == null || keyNote == null) return;
+    const kept = keepOwnKey(keyBox.value);
+    keyNote.textContent = !kept ? 'That is not the shape of an Anthropic key (sk-ant-...). Nothing was kept.' : keyBox.value.trim() === '' ? `Forgotten. ${keyResting}` : 'Kept in this browser. Your requests to the set designer now use your key.';
+    if (kept) {
+      keyBox.placeholder = keyBox.value.trim() === '' ? 'sk-ant-...' : 'Your key is in use. Empty and Keep to forget it.';
+      keyBox.value = '';
+    }
   });
   // Shots to try, for a visitor who has not thought of one yet: the shot goes in the box and is built.
   const tries = [...document.querySelectorAll<HTMLButtonElement>('.shot-try')];

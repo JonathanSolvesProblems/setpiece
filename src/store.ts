@@ -19,6 +19,8 @@ export const StoreKey = {
   Made: 'setpiece.made.v1',
   /** The light the set is in (src/set-light.ts). */
   Light: 'setpiece.light.v1',
+  /** A visitor's own Anthropic key, if they gave one on the page (src/own-key.ts). */
+  OwnKey: 'setpiece.ownkey.v1',
 } as const;
 
 type Key = (typeof StoreKey)[keyof typeof StoreKey];

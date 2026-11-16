@@ -115,6 +115,9 @@ function obey(world: World, g: Globals, command: Command): string {
       return world.getSystem(LifeSizeSystem)?.goTo(command.labels[0]) ?? '';
     case 'cover':
       return world.getSystem(CoverageSystem)?.cover() ?? '';
+    case 'leave':
+      world.exitXR();
+      return '';
     case 'snap':
       if (g.lifeSize.peek()) return 'BACK TO THE TABLE FIRST | A frame is snapped from the table. Say it again there.';
       bump(g.snapRequested);

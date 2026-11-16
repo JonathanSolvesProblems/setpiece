@@ -622,6 +622,9 @@ export class ControlsSystem extends createSystem({
     wire('btn-skip', () => {
       g.walkthroughSkip.value = g.walkthroughSkip.peek() + 1;
     });
+    // The way out, on the small panel where a newcomer can find it (it was only under More, Stage): back to the
+    // page, where the board and its Save buttons are.
+    wire('btn-leave', () => this.world.exitXR());
     this.cleanupFuncs.push(
       g.walkthrough.subscribe(() => showSkip()),
       g.lifeSize.subscribe(() => showSkip()),

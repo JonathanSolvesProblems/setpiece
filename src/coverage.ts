@@ -7,6 +7,7 @@
  * ends, and keeps what it has shot.
  */
 import { sayLine, speak } from './speech.js';
+import { designerHeaders } from './own-key.js';
 import { createSystem, VisibilityState } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import type { CameraPlan } from './director-plan.js';
@@ -213,7 +214,7 @@ export class CoverageSystem extends createSystem({
     try {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: designerHeaders(),
         body: JSON.stringify({ said, heard: [], set: director.describe(), coverage: true }),
         signal: asking.signal,
       });

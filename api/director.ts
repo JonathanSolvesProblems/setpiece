@@ -128,7 +128,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!allowed(origin)) return refuse(403, 'This set designer only works inside Setpiece.');
   // JSON only: from another site's page, a browser has to ask first, and is told no.
   if (!(request.headers.get('content-type') ?? '').startsWith('application/json')) return refuse(415, 'The request could not be read.');
-  const apiKey = KEY();
+  // A visitor's own key, from the page's field, answers their request in place of the site's. It is used for this
+  // request and nothing else: not kept, not logged.
+  const own = request.headers.get('x-setpiece-key')?.trim() ?? '';
+  const apiKey = /^sk-ant-[A-Za-z0-9_-]{20,240}$/.test(own) ? own : KEY();
   if (!apiKey) return refuse(503, 'The set designer has no key on this server.');
   // Vercel writes the visitor's address itself; a header the caller sent is only used off Vercel.
   const visitor =
