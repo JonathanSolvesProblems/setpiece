@@ -91,8 +91,8 @@ SLIDES = [
     dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
          caption="The designer's own plan stood two actors inside a car parked side-on. Code stepped them out beside it before the camera was placed."),
     dict(slug='speed', badge='Result · devpost/results/designer-latency.json and quest-voice-designer.json', headline='{designer_first_s} s to the first piece', picture=('result', 'designer'),
-         caption='{designer_sentences} sets from a desktop: first piece a median {designer_first_s} s, whole set {designer_whole_s} s. Spoken on the headset: {quest_first_s} s and {quest_whole_s} s.'),
-    dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'voice'),
+         caption='{designer_sentences} sets from a desktop: first piece a median {designer_first_s} s, whole set {designer_whole_s} s. Spoken on the headset: first piece {quest_first_s} s.'),
+    dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'lines'),
          caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
     dict(slug='light', badge=LIVE_BADGE, headline='It lights the scene', picture=('live', 'light'),
          caption='The light comes from the sentence: a night chase is night, a duel at sunset golden hour. After dark the windows and the lamp are lit.'),
@@ -181,22 +181,18 @@ def result_body(kind: str) -> str:
         )
         return (f'<div class="result"><div class="big">{N["designer_first_s"]}<span class="unit">s to the first piece, median of {N["designer_sentences"]} sets</span></div>'
                 f'<p class="muted">From the request to the first piece of a fresh set, and to the whole set: the app\'s own server function, from a desktop on home broadband. '
-                f'On the headset, one sentence in my own words on {quest_designer["measured"]}: {N["quest_first_s"]} s from the end of the sentence to the first piece, {N["quest_whole_s"]} s to the whole set.</p>'
+                f'On the headset, {len(quest_designer["runs"])} sentences in my own words, the last on the live site: {N["quest_first_s"]} s from the end of the sentence to the first piece each time, {" and ".join(f"{run["wholeSetMs"] / 1000:.1f}" for run in quest_designer["runs"])} s to the whole set.</p>'
                 f'<table><tr><th>Said</th><th>First piece</th><th>Whole set</th></tr>{rows}</table></div>')
-    if kind == 'voice':
+    if kind == 'lines':
         when = {
             'land': 'The set has not landed yet',
             'mine': 'It has built the first set itself',
             'block': 'Your first set is up',
-            'frame': 'Your first frame is on the board',
-            'inside': 'You step inside',
-            'cover': 'You ask for coverage',
             'full': 'The board is full',
-            'back': 'You come back another day',
         }
         rows = ''.join(f"<tr><td class='muted'>{moment}</td><td>{spoken_lines[key]}</td></tr>" for key, moment in when.items() if key in spoken_lines)
         return (f'<div class="result rows5"><div class="big">{N["spoken_lines"]}<span class="unit">lines recorded, in two voices</span></div>'
-                f'<p class="muted">What it built and what it changed through the lens are read aloud as it writes them. These never change, so they ship as files and are said once each:</p>'
+                f'<p class="muted">What it built and what it changed through the lens are read aloud as it writes them. These never change, so they ship as files and are said once each. Four of them:</p>'
                 f'<table><tr><th>When</th><th>She says</th></tr>{rows}</table></div>')
     if kind == 'checks':
         lines = [l for l in checks.splitlines() if l.startswith('| ') and not l.startswith('| Check') and not l.startswith('|---')]

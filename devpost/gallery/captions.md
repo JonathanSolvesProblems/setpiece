@@ -53,7 +53,7 @@ Put your fingers on a piece and pinch, or close a fist around it. The pointing r
 ## 09 speed
 
 ```
-7 sets from a desktop: first piece a median 1.3 s, whole set 2.8 s. Spoken on the headset: 1.6 s and 3.3 s.
+7 sets from a desktop: first piece a median 1.3 s, whole set 2.8 s. Spoken on the headset: first piece 1.6 s.
 ```
 
 ## 10 fps
