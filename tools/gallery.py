@@ -509,20 +509,44 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         lens = '''() => { const v = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.copyMonitor === 'function');
           v.refresh(); const c = document.createElement('canvas'); v.copyMonitor(c); return c.toDataURL('image/png'); }'''
         if recipe == 'light':
-            # The shot camera's own picture of that set in three of its lights.
+            from PIL import ImageDraw, ImageFont
+            # A wide of that set, so the street, the house and the lamp are in it: the camera is put there by the
+            # app's own camera placing, at the front of the stage, looking at the car.
+            await page.evaluate('''() => {
+              const director = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.frameShot === 'function');
+              director.frameShot({ keep: false, x: 0.4, z: 3.9, height: 2.4, lens: 18, look_at: 'Car', look_x: 0, look_y: 1, look_z: 0 });
+            }''')
+            await page.wait_for_timeout(1500)
+            # The shot camera's own picture of it in four of its lights, two by two, each with its name.
+            names = ('day', 'golden hour', 'overcast', 'night')
             frames = []
-            for light in ('day', 'golden hour', 'night'):
+            for light in names:
                 await page.evaluate('(light) => { globalThis.setpiece.world.globals.setLight.value = light; }', light)
-                await page.wait_for_timeout(2500)
-                url = await page.evaluate(lens)
-                frames.append(Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).convert('RGB'))
-            h = min(i.height for i in frames)
-            frames = [i.resize((int(i.width * h / i.height), h)) for i in frames]
-            sheet = Image.new('RGB', (sum(i.width for i in frames) + 16 * (len(frames) - 1), h), (27, 20, 17))
-            x = 0
-            for i in frames:
-                sheet.paste(i, (x, 0))
-                x += i.width + 16
+                await page.wait_for_timeout(1500)
+                # The lens is only drawn again when something changes, and under software rendering a frame can take
+                # seconds: a fresh pass is asked for and waited on, so each picture is of its own light.
+                await page.evaluate('''() => { const v = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.copyMonitor === 'function');
+                  globalThis.__passes = v.lensPasses; v.refresh(); }''')
+                for _ in range(120):
+                    await page.wait_for_timeout(250)
+                    if await page.evaluate("[...globalThis.setpiece.world.getSystems()].find((s) => typeof s.copyMonitor === 'function').lensPasses >= globalThis.__passes + 2"):
+                        break
+                else:
+                    raise RuntimeError(f'the lens was not drawn again in the {light} light')
+                url = await page.evaluate('''() => { const v = [...globalThis.setpiece.world.getSystems()].find((s) => typeof s.copyMonitor === 'function');
+                  const c = document.createElement('canvas'); v.copyMonitor(c); return c.toDataURL('image/png'); }''')
+                frames.append(Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).convert('RGB').resize((1280, 720)))
+            if len({frame.tobytes()[:200000:997] for frame in frames}) < len(frames):
+                raise RuntimeError('two lights gave the same picture')
+            gap, band = 24, 64
+            sheet = Image.new('RGB', (1280 * 2 + gap, (720 + band) * 2 + gap), (42, 33, 28))
+            draw = ImageDraw.Draw(sheet)
+            label = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'BigShoulders-Bold.ttf'), 44)
+            for i, (name, frame) in enumerate(zip(names, frames)):
+                x = (i % 2) * (1280 + gap)
+                y = (i // 2) * (720 + band + gap)
+                sheet.paste(frame, (x, y))
+                draw.text((x + 6, y + 720 + 8), name.upper(), font=label, fill=(214, 225, 60))
             sheet.save(png)
         else:
             # The designer plans the coverage and the app shoots it onto the board; the board is then saved by the

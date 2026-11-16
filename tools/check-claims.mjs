@@ -73,7 +73,15 @@ expect(`README quotes the designer's first piece at a median of ${seconds(design
 expect(`README quotes the designer's whole set at a median of ${seconds(designer.wholeMs.median)} s`, readme.includes(`whole set ${seconds(designer.wholeMs.median)} s`) || readme.includes(`whole a median of ${seconds(designer.wholeMs.median)} s`));
 const everySample = [...fps, ...(frameTime.before?.frames_per_second ?? []), ...(frameTime.after?.frames_per_second ?? [])];
 const lowest = Math.min(...everySample);
-expect(`the tagline's frame rate is what all ${everySample.length} headset samples support: never under 60 (lowest ${lowest})`, tagline.includes('never under 60 fps') && lowest >= 60);
+// The tagline's time is the headset's: every sentence timed in a wearer's session put its first piece down inside it.
+const questDesigner = JSON.parse(read('devpost/results/quest-voice-designer.json'));
+const slowestFirst = Math.max(...questDesigner.runs.map((run) => run.firstPieceMs));
+expect(
+  `the tagline's "within two seconds" holds for all ${questDesigner.runs.length} sentences timed on the headset (slowest first piece ${slowestFirst} ms)`,
+  tagline.includes('within two seconds') && slowestFirst < 2000,
+);
+expect('the tagline no longer claims a frame-rate floor', !tagline.includes('never under 60'));
+expect(`every headset frame-rate sample the submission rests on is 60 or more (lowest ${lowest})`, lowest >= 60);
 expect('the submission makes no anchor or table-label claim it has not proven', !/anchors bring it back|finds a labelled table/.test(submission.split('Not yet proven')[0]));
 // The set designer's sets on the headset, as the submission quotes them, and the tagline's floor for every set the
 // designer may build in one reply.
@@ -88,8 +96,14 @@ expect(
 const mostThings = Number(/export const MOST_THINGS = (\d+)/.exec(read('src/director-plan.ts'))?.[1] ?? 'NaN');
 const withinLimit = [...realSets, designerFrames.first_run_hands_pointing.twenty_four_things].flatMap((set) => [set.frames_per_second.idle, set.frames_per_second.one_piece_moving]);
 expect(
-  `the tagline's "never under 60" holds for every headset reading of a set the designer may build in one reply (at most ${mostThings} things, 24 measured; lowest ${Math.min(...withinLimit)})`,
-  tagline.includes('never under 60 fps') && Math.min(...withinLimit) >= 60 && mostThings <= 24,
+  `every headset reading of a set the designer may build in one reply is 60 fps or more (at most ${mostThings} things, 24 measured; lowest ${Math.min(...withinLimit)})`,
+  Math.min(...withinLimit) >= 60 && mostThings <= 24,
+);
+// The description's two headset sentences, as the results file has them.
+const runs = questDesigner.runs;
+expect(
+  `the submission quotes the headset sentences: first piece ${(runs[0].firstPieceMs / 1000).toFixed(1)} s, whole set ${runs.map((run) => (run.wholeSetMs / 1000).toFixed(1)).join(' s and ')} s`,
+  submission.includes(`first piece down ${(runs[0].firstPieceMs / 1000).toFixed(1)} s`) && submission.includes(`whole set at ${runs.map((run) => (run.wholeSetMs / 1000).toFixed(1)).join(' s and ')} s`) && runs.every((run) => (run.firstPieceMs / 1000).toFixed(1) === (runs[0].firstPieceMs / 1000).toFixed(1)),
 );
 expect(`the submission says ${assets} pieces and ${lenses[0]} to ${lenses[lenses.length - 1]} mm`, submission.includes(`${assets} pieces`) && submission.includes(`${lenses[0]} to ${lenses[lenses.length - 1]} mm`));
 for (const file of readdirSync(new URL('../devpost/results/', import.meta.url))) {
