@@ -40,7 +40,7 @@ I wanted to be a VFX filmmaker before I switched to computer science. The short 
 - **Then it is yours.** Pick up any piece with your fingers, turn it with your wrist, size it with two hands, or say what to change.
 - **Frame it.** Six lenses from 18 to 135 mm, a monitor that shows what the lens sees, and Snap puts the frame on a storyboard with its lens and camera height measured from where the pieces stood.
 - **Cover it.** The designer plans a wide and closer shots and the app shoots them onto the board, each fitted to its subject by measure.
-- **Step inside.** The set grows to full size around you under a painted sky. Pinch the air and pull to move through it, and twist your wrist to turn it.
+- **Step inside.** The set grows to full size around you under a painted sky whose horizon fits the scene. Point at the floor and pinch to walk there; Turn left and Turn right are on the panel.
 - **Leave with it.** The board as an image, the shot list as a CSV and a take as a short video, saved from the page.
 - **Without the designer** the same sentence goes to a reader built into the app, which builds from the library's 51 assets. Nothing else depends on it.
 
@@ -62,7 +62,7 @@ For the frame rate: the monitor's second view of the set is drawn only on frames
 
 - **Seen on a Quest 3S, hands only.** Landing the set by pointing, in a room with no scan. Picking up, carrying and turning pieces, and snapping frames. Sets built from sentences spoken in my own words on the live site, with the replies read aloud, the first piece 1.6 s after the last word (`devpost/results/quest-voice-designer.json`). The newcomer walkthrough, from landing to the first frame (Nov 16). Stepping inside under the painted skies, at 86 to 89 frames a second on the live site (Nov 16).
 - **Frame rate on the headset.** With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving (Nov 14, replies replayed on the development server, `devpost/results/quest-frame-time-designer.json`). A set of 24 things ran at 63 to 64, so a reply holds 20 at most.
-- **In the emulator only.** Cover it, moving inside the set by pulling it, the take recorder, the drone, poses and looks, rolling vehicles, the spoken controls, and what changed after the Nov 16 session.
+- **In the emulator only.** Cover it, walking inside the set by pointing, the take recorder, the drone, poses and looks, rolling vehicles, the spoken controls, and what changed after the Nov 16 session.
 - **Not measured.** Anchors across a relaunch, the frame rate while a take plays, and any room but mine.
 
 The dated record behind each line is in [docs/where-this-stands.md](docs/where-this-stands.md).
