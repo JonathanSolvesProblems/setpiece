@@ -117,7 +117,7 @@ export class CoverageSystem extends createSystem({
     if (g.takeState.peek() !== 'idle') return 'A TAKE IS RUNNING | Stop the take, then say cover it.';
     if (this.queries.held.entities.size > 0) return 'PUT IT DOWN FIRST | Let go of the piece, then say cover it.';
     const life = g.lifeSize.peek();
-    if (!life && g.shotFrames.peek().length >= BOARD_SLOTS) return 'THE BOARD IS FULL | Pinch New board, then say cover it again.';
+    if (!life && g.shotFrames.peek().length >= BOARD_SLOTS) return 'THE BOARD IS FULL | Pinch + New under the storyboard for the next board, then say cover it again.';
     void this.run(director);
     return PLANNING_NOTE;
   }

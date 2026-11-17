@@ -42,7 +42,8 @@ I wanted to be a VFX filmmaker before I switched to computer science. The short 
 - **Cover it.** The designer plans a wide and closer shots and the app shoots them onto the board, each fitted to its subject by measure.
 - **It sits in its world.** On the table the scene's painted sky stands behind the set, with its sun or moon and the far city or hills. After dark the windows glow and headlamps light the road. One switch on the Stage tab turns the sky off.
 - **Step inside.** The set grows to full size around you under a painted sky whose horizon fits the scene. Point at the floor and pinch to walk there; Turn left and Turn right are on the panel.
-- **Leave with it.** The board as an image, the shot list as a CSV and a take as a short video, saved from the page. Up to four boards are kept, each with a tab under the storyboard: pinch a tab to change boards, and any frame on any of them brings its set back.
+- **Draw it.** Say "sketch", "anime style" or "noir look" and the monitor and the storyboard frames are drawn that way: a pencil storyboard, flat inked colour, or hard black and white. Name it in the shot ("an anime sword fight on a rooftop") and it happens by itself.
+- **Leave with it.** The board as an image, the shot list as a CSV and a take as a short video, saved from the page; a full board is also saved from inside the headset without leaving. Up to four boards are kept, each with a tab under the storyboard: pinch a tab and that board comes back with its set.
 - **Without the designer** the same sentence goes to a reader built into the app, which builds from the library's 51 assets. Nothing else depends on it.
 
 Every rule, limit and number behind those lines is in [docs/what-it-does.md](docs/what-it-does.md).

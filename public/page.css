@@ -579,3 +579,5 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
 .board-tabs { display: flex; flex-wrap: wrap; gap: calc(var(--unit) * 1.5); margin-bottom: calc(var(--unit) * 2.5); }
 .board-tabs[hidden] { display: none; }
 .board-tabs .lens { flex: 0 0 auto; min-width: 44px; padding: 0 calc(var(--unit) * 2.5); }
+.board-tabs.carry-on { align-items: center; margin: calc(var(--unit) * 2) 0 0; }
+.board-tabs .carry-label { font-size: 0.9rem; opacity: 0.8; margin-right: calc(var(--unit) * 1); }

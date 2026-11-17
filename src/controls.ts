@@ -27,6 +27,7 @@ import { noteSeconds } from './coach.js';
 import { hear } from './spoken.js';
 import { DirectorSystem } from './director.js';
 import { ViewfinderSystem } from './viewfinder.js';
+import { downloadBoard } from './exports.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
@@ -139,6 +140,7 @@ type Globals = {
   resetStageRequested: Signal<number>;
   newBoardRequested: Signal<number>;
   boardsNow: Signal<{ at: number; frames: number[] }>;
+  frameStyle: Signal<string>;
   coachTarget: Signal<string>;
   takeState: Signal<string>;
   takeLength: Signal<number>;
@@ -678,11 +680,19 @@ export class ControlsSystem extends createSystem({
     // Once a set stands it becomes Shoot coverage: the designer plans the shots and the app shoots them onto the board.
     // While it shoots, Stop coverage, whichever tab is open and at full size too.
     const setStands = (): boolean => g.setsBuilt.peek() > 0 && g.trayOn.peek().length > 0;
-    // In the headset with the board full, it is the way to the page, where the board and the take are saved.
+    // In the headset with the board full, it saves the board's picture, there and then; and once this board is
+    // saved, it is the way on to the next one.
     const boardFull = (): boolean => g.shotFrames.peek().length >= BOARD_SLOTS && this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+    let savedBoard = '';
+    const boardKey = (): string => {
+      const frames = g.shotFrames.peek() as { index: number }[];
+      return `${g.boardsNow.peek().at}:${frames.length}:${frames[frames.length - 1]?.index ?? 0}`;
+    };
     const showTry = (): void => {
       const covering = g.coverageRunning.peek();
-      const text = covering ? 'Stop coverage' : boardFull() ? 'Save the board' : setStands() ? 'Shoot coverage' : `Try a shot: ${tries[tryNext][0]}`;
+      // (With every tab taken there is no next board to go to: it stays Save the board.)
+      const room = g.boardsNow.peek().frames.length < 4;
+      const text = covering ? 'Stop coverage' : boardFull() ? (savedBoard === boardKey() && room ? 'Next board' : 'Save the board') : setStands() ? 'Shoot coverage' : `Try a shot: ${tries[tryNext][0]}`;
       panel.getElementById<UIKit.Text>('btn-try')?.setProperties({ text, display: covering || (!g.lifeSize.peek() && (!more || boardFull())) ? 'flex' : 'none' });
     };
     wire('btn-try', () => {
@@ -691,7 +701,20 @@ export class ControlsSystem extends createSystem({
         return;
       }
       if (boardFull()) {
-        this.world.exitXR();
+        const board = g.boardsNow.peek().at + 1;
+        if (savedBoard === boardKey() && g.boardsNow.peek().frames.length < 4) {
+          (g as unknown as { boardAsked: Signal<{ to: number; n: number }> }).boardAsked.value = { to: -1, n: (g as unknown as { boardAsked: Signal<{ to: number; n: number }> }).boardAsked.peek().n + 1 };
+          return;
+        }
+        // Saved where the wearer is: the session carries on. (It used to end the session to save from the page.)
+        const viewfinder = this.world.getSystem(ViewfinderSystem);
+        if (viewfinder != null) downloadBoard(viewfinder, `setpiece-board-${board}.png`);
+        savedBoard = boardKey();
+        g.coachNote.value =
+          g.boardsNow.peek().frames.length < 4
+            ? `BOARD ${board} SAVED | Its picture is in this headset's Downloads, and the board keeps its tab. Next board starts another.`
+            : `BOARD ${board} SAVED | Its picture is in this headset's Downloads. Four boards is the most: New board, under More, clears this one for the next.`;
+        showTry();
         return;
       }
       if (setStands()) {
@@ -908,6 +931,7 @@ export class ControlsSystem extends createSystem({
         showTry();
       }),
       g.coverageRunning.subscribe(() => showTry()),
+      g.boardsNow.subscribe(() => showTry()),
       g.shotFrames.subscribe(() => showTry()),
       this.world.visibilityState.subscribe(() => showTry()),
       g.setsBuilt.subscribe(() => showTry()),
@@ -919,6 +943,17 @@ export class ControlsSystem extends createSystem({
     wire('btn-squirm', () => {
       g.squirmOn.value = !g.squirmOn.peek();
     });
+    // How the frames are drawn: pressed, it steps on through photo, sketch, anime and noir.
+    const styleButton = panel.getElementById<UIKit.Text>('btn-drawn');
+    const STYLES = ['photo', 'sketch', 'anime', 'noir'];
+    wire('btn-drawn', () => {
+      g.frameStyle.value = STYLES[(Math.max(0, STYLES.indexOf(g.frameStyle.peek())) + 1) % STYLES.length];
+    });
+    this.cleanupFuncs.push(
+      g.frameStyle.subscribe((name) => {
+        styleButton?.setProperties({ text: `Drawn as: ${STYLES.includes(name) ? name : 'photo'}`, borderColor: name === 'photo' || !STYLES.includes(name) ? CHALK_HAZE : OPTIC_YELLOW });
+      }),
+    );
     const worldSwitch = panel.getElementById<UIKit.Text>('btn-world');
     wire('btn-world', () => {
       g.worldOn.value = !g.worldOn.peek();

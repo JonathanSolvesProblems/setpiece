@@ -17,9 +17,9 @@ function save(blob: Blob, name: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
-export function downloadBoard(viewfinder: ViewfinderSystem): void {
+export function downloadBoard(viewfinder: ViewfinderSystem, name = 'setpiece-board.png'): void {
   viewfinder.boardPicture().toBlob((blob) => {
-    if (blob) save(blob, 'setpiece-board.png');
+    if (blob) save(blob, name);
   }, 'image/png');
 }
 

@@ -43,6 +43,7 @@ import {
 import type { Signal } from '@preact/signals-core';
 import { assetByLabel } from './catalog.js';
 import { localBounds } from './bounds.js';
+import { FRAME_STYLES, isFrameStyle, STYLE_NOW, styleFrame, withFrameStyles } from './frame-style.js';
 import type { Dress } from './tray.js';
 import { BRIEFS } from './briefs.js';
 import type { Measure, PieceInFrame } from './briefs.js';
@@ -178,6 +179,7 @@ type Globals = {
   shotFrames: Signal<Shot[]>;
   newBoardRequested: Signal<number>;
   boardAsked: Signal<BoardAsk>;
+  frameStyle?: Signal<string>;
   boardsNow: Signal<BoardsNow>;
   takeState: Signal<string>;
   setupRecalled: Signal<number>;
@@ -303,6 +305,8 @@ export class ViewfinderSystem extends createSystem({
   private runs = new Float32Array(MAX_ACTORS);
   private frameCount = 0;
   private snapPending = false;
+  /** A frame's picture is being read back: the board is not changed under it. */
+  private snapping = false;
   /**
    * The key light's shadow is six passes and the monitor is a second view of
    * the whole set. Neither changes while the set is still, so both are drawn
@@ -799,6 +803,8 @@ export class ViewfinderSystem extends createSystem({
       g.coachNote.value = 'A TAKE IS RUNNING | Stop the take, then change boards.';
       return true;
     }
+    // A set being built, or a frame being taken, is finished first.
+    if (g.designing?.peek() === true || this.snapPending || this.snapping) return true;
     return false;
   }
 
@@ -823,7 +829,14 @@ export class ViewfinderSystem extends createSystem({
     this.drawBoard();
     this.publishBoard();
     const frames = this.shots.length === 1 ? '1 frame' : `${this.shots.length} frames`;
-    g.coachNote.value = `BOARD ${to + 1} | ${frames}. Pinch one to bring its set back. Your other boards are on the tabs under it.`;
+    // A board is a scene: its set comes back with it, as its last frame had it.
+    const lastShot = this.shots[this.shots.length - 1];
+    // What stood on the table is kept for Undo before the board's own set takes its place.
+    if (lastShot?.setup != null) this.rememberNow();
+    const back = lastShot != null && this.recall(lastShot);
+    g.coachNote.value = back
+      ? `BOARD ${to + 1} | ${frames}, and its set is back as frame ${lastShot.index} had it. Your other boards are on the tabs under the storyboard.`
+      : `BOARD ${to + 1} | ${frames}. Your other boards are on the tabs under the storyboard.`;
   }
 
   /**
@@ -1280,6 +1293,17 @@ export class ViewfinderSystem extends createSystem({
       new PlaneGeometry(0.32, 0.18),
       new MeshBasicMaterial({ map: this.target.texture, toneMapped: false }),
     );
+    // The monitor draws the lens's picture in the style chosen for the frames (src/frame-style.ts).
+    withFrameStyles(monitor.material as MeshBasicMaterial, [1 / RT_WIDTH, 1 / RT_HEIGHT]);
+    const style = (this.globals as Globals).frameStyle;
+    if (style != null) {
+      this.cleanupFuncs.push(
+        style.subscribe((name) => {
+          STYLE_NOW.value = isFrameStyle(name) ? FRAME_STYLES.indexOf(name) : 0;
+          saveJson(StoreKey.Settings, { ...(loadJson<Record<string, unknown>>(StoreKey.Settings) ?? {}), style: name });
+        }),
+      );
+    }
     monitor.name = 'Viewfinder';
     this.world.createTransformEntity(monitor, { parent: stage });
     monitor.position.set(...MONITOR_LOCAL);
@@ -1885,7 +1909,12 @@ export class ViewfinderSystem extends createSystem({
     const sensorIndex = g.sensorIndex.peek();
     const renderer = this.renderer as AsyncReader;
     if (renderer.readRenderTargetPixelsAsync) {
-      await renderer.readRenderTargetPixelsAsync(this.target, 0, 0, w, h, pixels);
+      this.snapping = true;
+      try {
+        await renderer.readRenderTargetPixelsAsync(this.target, 0, 0, w, h, pixels);
+      } finally {
+        this.snapping = false;
+      }
     } else {
       renderer.readRenderTargetPixels(this.target, 0, 0, w, h, pixels);
     }
@@ -1898,11 +1927,25 @@ export class ViewfinderSystem extends createSystem({
     for (let y = 0; y < h; y++) {
       image.data.set(pixels.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
     }
+    // The frame is drawn as the monitor showed it.
+    const styleName = g.frameStyle?.peek();
+    if (isFrameStyle(styleName)) styleFrame(image.data, w, h, styleName);
     ctx.putImageData(image, 0, 0);
 
     // Encoded here, in the snap's own frame (about 10 ms of it in the emulator): an encoder the browser may put off
     // to idle time, which a headset's frame loop may not leave, would hold back the snap's sound, flash and card.
     const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
+    // A full board is not written over: this frame starts the next board, while there is a tab for one.
+    let started = 0;
+    if (this.shots.length >= MAX_FRAMES && this.boards.length < MAX_BOARDS) {
+      this.boards[this.boardAt] = { taken: this.taken, shots: this.shots };
+      this.boards.push({ taken: 0, shots: [] });
+      this.boardAt = this.boards.length - 1;
+      this.shots = [];
+      this.thumbs = [];
+      this.taken = 0;
+      started = this.boardAt + 1;
+    }
     this.taken += 1;
     const shot: Shot = {
       index: this.taken,
@@ -1934,6 +1977,11 @@ export class ViewfinderSystem extends createSystem({
         const words = verdict.split(' | ')[1] ?? 'The oldest made room.';
         note = `FRAME ${shot.index} ON, FRAME ${gone.index} OFF THE BOARD | The card holds six. ${words}`;
       }
+    }
+    if (started > 0) {
+      const words = verdict.split(' | ')[1] ?? '';
+      note = `BOARD ${started}, FRAME 1 | Board ${started - 1} was full and keeps its tab. ${words}`.trim();
+      this.saveBoards();
     }
     if (note !== '') (this.globals as Globals).coachNote.value = note;
     this.drawBoard();

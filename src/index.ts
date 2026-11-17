@@ -68,6 +68,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.roomScanOffered = signal(false);
   globals.newBoardRequested = signal(0);
   // A board asked for by its tab (or -1 for a new one), and the boards there are (src/viewfinder.ts).
+  // How the monitor and the frames are drawn: photo, sketch, anime or noir (src/frame-style.ts).
+  globals.frameStyle = signal<string>(loadJson<{ style?: string }>(StoreKey.Settings)?.style ?? 'photo');
   globals.boardAsked = signal({ to: 0, n: 0 });
   globals.boardsNow = signal({ at: 0, frames: [0] });
   globals.coachLine = signal('');
@@ -389,13 +391,14 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   for (const button of [document.getElementById('page-reset'), fresh]) {
     button?.addEventListener('click', () => {
       startOver(globals, false);
-      if (hint) hint.textContent = 'A fresh set: the walkthrough runs again, and your boards keep their tabs.';
+      if (hint) hint.textContent = 'A new scene on a new board: the walkthrough runs again, and the boards you made keep their tabs.';
       // The one under Enter XR goes straight in, in the same press: starting fresh is not two buttons.
       if (button === fresh && enter != null && !enter.disabled && enter.dataset.mode !== 'copy') enter.click();
     });
   }
   // The boards there are, above the storyboard: a tab each, and one for a new board (four is the most).
   const boardTabs = document.getElementById('board-tabs');
+  const enterBoards = document.getElementById('enter-boards');
   const boardsNow = globals.boardsNow as Signal<{ at: number; frames: number[] }>;
   const boardAsked = globals.boardAsked as Signal<{ to: number; n: number }>;
   boardsNow.subscribe((now) => {
@@ -421,6 +424,28 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
       tabs.push(tab);
     }
     boardTabs.replaceChildren(...tabs);
+    // And under Enter XR, once there is a board to come back to: where the session carries on, and the others.
+    if (enterBoards != null) {
+      const some = now.frames.some((frames) => frames > 0);
+      enterBoards.hidden = !some;
+      const label = document.createElement('span');
+      label.className = 'carry-label';
+      label.textContent = 'Enter XR carries on with';
+      const picks: HTMLElement[] = [label];
+      now.frames.forEach((frames, i) => {
+        const pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'lens';
+        pick.textContent = `Board ${i + 1} (${frames})`;
+        pick.setAttribute('aria-pressed', String(i === now.at));
+        pick.title = `${frames} of 6 frames`;
+        pick.addEventListener('click', () => {
+          boardAsked.value = { to: i, n: boardAsked.peek().n + 1 };
+        });
+        picks.push(pick);
+      });
+      enterBoards.replaceChildren(...picks);
+    }
   });
   // A take on the page: drag a figure or the camera with the mouse while it records.
   const takeState = globals.takeState as Signal<string>;

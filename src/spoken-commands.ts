@@ -21,6 +21,8 @@
  * A piece named in the words: the labels it could mean (a group names several), the word it
  * starts at and how many words it is, and whether it was said for all of them ("the cars", "everyone").
  */
+import type { FrameStyle } from './frame-style.js';
+
 export type Named = { labels: string[]; at: number; length: number; all: boolean };
 
 export type SizeAsked = 'bigger' | 'smaller' | 'normal' | 'small' | 'big' | 'giant';
@@ -45,6 +47,7 @@ export type Command =
   | { do: 'go'; labels: string[] }
   | { do: 'cover' }
   | { do: 'leave' }
+  | { do: 'style'; style: FrameStyle }
   | { do: 'byHand' };
 
 /** Words that carry no instruction of their own. */
@@ -139,6 +142,14 @@ const GO_JOINS = new Set(['by', 'next', 'near', 'beside', 'behind', 'over', 'up'
 
 /** Taking the last change back, as it is said. "Bring it back" after a piece was struck is this too. */
 const UNDO = new Set(['undo', 'undo that', 'undo it', 'undo this', 'put it back', 'put that back', 'bring it back', 'bring that back', 'take that back']);
+/** A style for the frames, said by its name; and what else such a sentence may hold. */
+const STYLE_NAMES: Record<string, FrameStyle> = {
+  anime: 'anime', cartoon: 'anime', manga: 'anime', sketch: 'sketch', sketched: 'sketch', pencil: 'sketch', noir: 'noir',
+  photo: 'photo', photograph: 'photo', photographic: 'photo', realistic: 'photo',
+};
+const STYLE_TRIGGERS = new Set(['style', 'look', 'frames', 'mode', 'storyboard']);
+const STYLE_ALONE = new Set(['anime', 'cartoon', 'manga', 'sketch', 'pencil', 'noir']);
+const STYLE_CARRY = new Set(['it', 'this', 'that', 'make', 'draw', 'in', 'as', 'to', 'into', 'switch', 'go', 'back', 'like', 'set', 'show', 'use', 'change', 'frame', 'board', 'them', 'everything', 'all', 'monitor', 'drawing', 'drawn']);
 const POLITE = new Set(['please', 'now', 'okay', 'ok', 'just', 'um', 'uh', 'and', 'then', 'can', 'you', 'could']);
 const REMOVE_IT = /^(remove|delete|erase|lose|scrap|ditch|get rid of|take away|take out) (it|that|this)( one)?$|^take (it|that|this) (away|out|off)$/;
 const BY_HAND = new Set(['move', 'slide', 'push', 'pull', 'rotate', 'spin', 'turn', 'flip', 'drag', 'shift', 'nudge']);
@@ -179,6 +190,11 @@ export function commandIn(words: string[], named: Named[]): Command | null {
     if (UNDO.has(plain)) return { do: 'undo' };
     if (COVER.has(plain) || COVER.has(rest)) return { do: 'cover' };
     if (LEAVE.has(plain)) return { do: 'leave' };
+    // A style for the frames: its name with "style", "look" or "frames", or the name by itself. Nothing else in it.
+    const styles = core.filter((word) => word in STYLE_NAMES);
+    if (styles.length === 1 && core.every((word) => word in STYLE_NAMES || STYLE_TRIGGERS.has(word) || STYLE_CARRY.has(word))) {
+      if (core.some((word) => STYLE_TRIGGERS.has(word)) || (core.length === 1 && STYLE_ALONE.has(core[0]))) return { do: 'style', style: STYLE_NAMES[styles[0]] };
+    }
     if (INSIDE.has(plain) || INSIDE.has(rest)) return { do: 'inside', on: true };
     if (OUTSIDE.has(plain) || OUTSIDE.has(rest)) return { do: 'inside', on: false };
     // "Take me to the camera": stand at the lens, as Step inside does.
@@ -351,6 +367,8 @@ export function commandWords(): string[] {
   take(['up', 'down', 'in', 'out', 'little', 'it', 'bring', 'move', 'raise', 'first', 'second', 'other', 'two', 'one']);
   take(['remove', 'delete', 'erase', 'lose', 'scrap', 'ditch', 'get rid of', 'take away', 'take out', 'off']);
   take(LEAVE);
+  take(Object.keys(STYLE_NAMES));
+  take(STYLE_TRIGGERS);
   take(Object.keys(LENS_NAMES));
   take(LENS_UNITS);
   take(Object.keys(STEPS));

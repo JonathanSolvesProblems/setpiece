@@ -322,6 +322,10 @@
       <div class="label">RIG</div>
       <div id="btn-rig" class="word">Tripod</div>
     </div>
+    <div class="field">
+      <div class="label">FRAMES</div>
+      <div id="btn-drawn" class="word">Drawn as: photo</div>
+    </div>
     <div id="strike-row" class="field" style="display: none">
       <div class="line muted">Second camera</div>
       <div id="btn-strike-b" class="word">Strike cam B</div>

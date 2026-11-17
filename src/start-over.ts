@@ -24,6 +24,7 @@ export function startOver(globals: unknown, landAgain: boolean): void {
   // The small panel is a newcomer's: Talk, Try a shot and Skip the walkthrough are on it.
   saveJson(StoreKey.Settings, { ...(loadJson<Record<string, unknown>>(StoreKey.Settings) ?? {}), more: false });
   g.setLight.value = 'studio';
+  (g as unknown as { frameStyle: Signal<string> }).frameStyle.value = 'photo';
   (g as unknown as { setFar: Signal<string> }).setFar.value = '';
   // No set of the designer's stands any more: the first one is built again as the set lands.
   g.setsBuilt.value = 0;

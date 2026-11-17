@@ -8,6 +8,7 @@
  * signal the panel's button sets. What it cannot do: move a piece to a new
  * mark. Asked to, it says that moving is done by hand.
  */
+import { styleNamedIn } from './frame-style.js';
 import type { World } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { CAMERAS, LENSES, Rig } from './camera-formats.js';
@@ -81,6 +82,9 @@ export function hear(world: World, text: string, library = false): void {
     }
     g.lastSpoken.value = text;
     if (forDesigner.length === 0) return;
+    // A shot that names how it is drawn ("an anime sword fight") is drawn that way on the monitor and the board.
+    const named = styleNamedIn(forDesigner.join(' '));
+    if (named != null) (g as unknown as { frameStyle: Signal<string> }).frameStyle.value = named;
     void director.ask(forDesigner.join(', then ')).then((outcome) => {
       // A newer sentence took over: what was said after this one's set is not done to someone else's.
       if (outcome === 'superseded') return;
@@ -123,6 +127,11 @@ function obey(world: World, g: Globals, command: Command): string {
     case 'leave':
       world.exitXR();
       return '';
+    case 'style':
+      (g as unknown as { frameStyle: Signal<string> }).frameStyle.value = command.style;
+      return command.style === 'photo'
+        ? 'FRAMES AS THE LENS SEES THEM | The monitor and every new frame are plain again.'
+        : `FRAMES IN ${command.style.toUpperCase()} | The monitor and every new frame are drawn that way. Say photo style to go back.`;
     case 'snap':
       if (g.lifeSize.peek()) return 'BACK TO THE TABLE FIRST | A frame is snapped from the table. Say it again there.';
       bump(g.snapRequested);
