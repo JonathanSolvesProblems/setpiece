@@ -1,22 +1,22 @@
 # Live site checks
 
-Run on 2026-11-17 16:04 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: f448647-20261117T1603.
+Run on 2026-11-17 17:17 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: db7dfe5-20261117T1716.
 
 **54 of 54 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 217 ms |
+| the page answers over HTTPS | pass | 200, 231 ms |
 | it is Setpiece | pass |  |
 | search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
-| the app script is named in the page | pass | assets/index-BPFsE9PR.js |
+| the app script is named in the page | pass | assets/index-B0JWg0uD.js |
 | version.json is served | pass | 200 |
-| version.json names a build | pass | f448647-20261117T1603 |
-| the app script is served | pass | 200, 2.72 MB |
-| the app script is under 3 MB | pass | 2.72 MB |
+| version.json names a build | pass | db7dfe5-20261117T1716 |
+| the app script is served | pass | 200, 2.73 MB |
+| the app script is under 3 MB | pass | 2.73 MB |
 | the served script carries the same build as version.json | pass |  |
 | the voice words include the directing words | pass | 2 chunks |
 | the icon library is not in any chunk | pass |  |
@@ -35,11 +35,11 @@ Run on 2026-11-17 16:04 UTC against https://setpiece.jonathansolvesproblems.com/
 | the page has the Shot box and three shots to try | pass |  |
 | the set designer answers and has its key | pass | 200, ready true |
 | another site is refused by the set designer | pass | 403 |
-| a sentence comes back as a set with a horse in it | pass | 200, end_turn, first piece of the reply at 989 ms, whole 2301 ms |
+| a sentence comes back as a set with a horse in it | pass | 200, end_turn, first piece of the reply at 1512 ms, whole 2858 ms |
 | the reply carries a pass for the line it will speak | pass | "A horse stands in a fenced field at dawn, framed wide at eye" |
-| the reply streams: its first part arrives well before its last | pass | 61 parts, the first 1059 ms after the request and the last at 2300 ms |
+| the reply streams: its first part arrives well before its last | pass | 58 parts, the first 1580 ms after the request and the last at 2857 ms |
 | the voice answers and has its key | pass | 200, ready true |
-| the designer's line comes back read aloud | pass | 200, audio/mpeg, 45601 bytes in 370 ms |
+| the designer's line comes back read aloud | pass | 200, audio/mpeg, 42675 bytes in 344 ms |
 | words with no pass, or with the pass of another line, are not read | pass | 403, 403 |
 | another site is refused by the voice | pass | 403 |
 | the designer's 12 recorded lines are served in both voices | pass | 24 of 24 files |
