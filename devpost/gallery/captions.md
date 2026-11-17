@@ -11,7 +11,7 @@ One block per image, in gallery order. Paste the block, nothing else.
 ## 02 table
 
 ```
-A 1:10 film set lands on your real table. Two wooden stand-ins, a tennis ball for the creature, a 35 mm camera, your own hands.
+"Workers building an aircraft, a ladder up to its roof", said once. A 1:10 set on the real table, its own sky behind it, your hands on it.
 ```
 
 ## 03 made
@@ -32,25 +32,31 @@ Once the set is up it is shown its own camera's picture and how much of the fram
 The light comes from the sentence: a night chase is night, a duel at sunset golden hour. After dark the windows and the lamp are lit.
 ```
 
-## 06 coverage
+## 06 draw
+
+```
+One frame four ways: as the lens sees it, a pencil storyboard, anime (the set itself turns cartoon), and hard black and white.
+```
+
+## 07 coverage
 
 ```
 The designer plans a wide and then closer shots, the camera goes to each one, and the board fills by itself while you watch.
 ```
 
-## 07 pinch
+## 08 pinch
 
 ```
 Put your fingers on a piece and pinch, or close a fist around it. The pointing ray steps aside when a hand is near a piece.
 ```
 
-## 08 speed
+## 09 speed
 
 ```
 Spoken on the headset: the first piece 1.6 s after the last word, the whole set inside 4 s, at 87 to 89 frames a second.
 ```
 
-## 09 leave
+## 10 leave
 
 ```
 Saved from the page: the board the designer shot, each frame with its lens and height, and the shot list as a CSV for the crew.

@@ -81,6 +81,7 @@ N = {
     'checks_total': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(2),
 }
 QUEST = 'Quest 3S · headset capture · 6 Nov 2026'
+QUEST_17 = 'Quest 3S · headset capture · 17 Nov 2026'
 LIVE_BADGE = 'Live site · setpiece.jonathansolvesproblems.com' if 'GALLERY_BASE' not in os.environ else 'Development build · desktop browser'
 
 # One entry per slide, in the order a judge scrolls. `picture` is a file under devpost/, a live
@@ -88,8 +89,8 @@ LIVE_BADGE = 'Live site · setpiece.jonathansolvesproblems.com' if 'GALLERY_BASE
 SLIDES = [
     dict(slug='say', badge=LIVE_BADGE, headline='Say the shot', picture=('live', 'designer'),
          caption='"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.'),
-    dict(slug='table', badge=QUEST, headline='The shot, on your table', picture='captures/quest-set-on-table.jpg',
-         caption='A 1:10 film set lands on your real table. Two wooden stand-ins, a tennis ball for the creature, a 35 mm camera, your own hands.'),
+    dict(slug='table', badge=QUEST_17, headline='The shot, on your table', picture='captures/quest-aircraft-on-table.jpg',
+         caption='"Workers building an aircraft, a ladder up to its roof", said once. A 1:10 set on the real table, its own sky behind it, your hands on it.'),
     dict(slug='made', badge=LIVE_BADGE, headline='It makes what the library lacks', picture=('live', 'castle'),
          caption='Asked for a castle gate, it built the gate and two towers from simple wooden shapes, then two guards and a horse, low and wide.'),
     dict(slug='look', badge=LIVE_BADGE, headline='It checks its own frame', picture=('live', 'look'),
@@ -102,6 +103,8 @@ SLIDES = [
          caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
     dict(slug='light', badge=LIVE_BADGE, headline='It lights the scene', picture=('live', 'light'),
          caption='The light comes from the sentence: a night chase is night, a duel at sunset golden hour. After dark the windows and the lamp are lit.'),
+    dict(slug='draw', badge=LIVE_BADGE, headline='Draw it your way', picture=('live', 'draw'),
+         caption='One frame four ways: as the lens sees it, a pencil storyboard, anime (the set itself turns cartoon), and hard black and white.'),
     dict(slug='coverage', badge=LIVE_BADGE, headline='Say "cover it"', picture=('live', 'coverage'),
          caption='The designer plans a wide and then closer shots, the camera goes to each one, and the board fills by itself while you watch.'),
     dict(slug='pinch', badge=QUEST, headline='Reach in and pick it up', picture='captures/quest-hands-card.jpg',
@@ -128,7 +131,7 @@ SLIDES = [
 
 # The gallery as it is submitted: eleven slides in the order of a first visit. A cold judge read on 15 Nov found
 # nineteen too many, with some repeating others, and a second on 16 Nov asked for the numbers on one slide; the rest stay above for anyone who wants to render them.
-SUBMITTED = ['say', 'table', 'made', 'look', 'light', 'coverage', 'pinch', 'speed', 'leave']
+SUBMITTED = ['say', 'table', 'made', 'look', 'light', 'draw', 'coverage', 'pinch', 'speed', 'leave']
 SLIDES = [next(slide for slide in SLIDES if slide['slug'] == slug) for slug in SUBMITTED]
 
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -516,6 +519,48 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         draw.text((1360, y), 'AFTER THE SET DRESSER', font=label, fill=(214, 225, 60))
         draw.text((0, y + 64), 'Two actors standing inside the car', font=face, fill=(199, 199, 183))
         draw.text((1360, y + 64), 'Stepped out beside it, before the camera is placed', font=face, fill=(246, 247, 239))
+        sheet.save(png)
+    elif recipe == 'draw':
+        from PIL import Image, ImageDraw, ImageFont
+        # A duel from the real designer, then the same frame snapped in each of the four styles: what goes on the
+        # board is what the app itself draws (src/frame-style.ts, and in anime the set as a cartoon, src/toon.ts).
+        await page.fill('#page-ask-text', 'a sword fight between two knights by a tree and a house at golden hour, low and wide')
+        await click('#page-ask-go')
+        await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === true', timeout=20000)
+        idle = 0
+        for _ in range(400):
+            await page.wait_for_timeout(500)
+            busy = await page.evaluate('globalThis.setpiece.world.globals.designing.peek()')
+            idle = 0 if busy else idle + 1
+            if idle >= 16:
+                break
+        names = ('photo', 'sketch', 'anime', 'noir')
+        frames = []
+        for style in names:
+            await page.evaluate('(style) => { globalThis.setpiece.world.globals.frameStyle.value = style; }', style)
+            await page.wait_for_timeout(1500)
+            before = await page.evaluate('globalThis.setpiece.world.globals.shotFrames.peek().length')
+            await page.evaluate('globalThis.setpiece.world.globals.snapRequested.value += 1')
+            for _ in range(240):
+                await page.wait_for_timeout(250)
+                if await page.evaluate('globalThis.setpiece.world.globals.shotFrames.peek().length') > before:
+                    break
+            else:
+                raise RuntimeError(f'no frame was snapped in the {style} style')
+            url = await page.evaluate('globalThis.setpiece.world.globals.shotFrames.peek().at(-1).dataUrl')
+            frames.append(Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).convert('RGB').resize((1280, 720), Image.LANCZOS))
+        await page.evaluate("globalThis.setpiece.world.globals.frameStyle.value = 'photo'")
+        if len({frame.tobytes()[:200000:997] for frame in frames}) < len(frames):
+            raise RuntimeError('two styles gave the same picture')
+        gap, band = 24, 64
+        sheet = Image.new('RGB', (1280 * 2 + gap, (720 + band) * 2 + gap), (42, 33, 28))
+        draw = ImageDraw.Draw(sheet)
+        label = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'BigShoulders-Bold.ttf'), 44)
+        for i, (name, frame) in enumerate(zip(names, frames)):
+            x = (i % 2) * (1280 + gap)
+            y = (i // 2) * (720 + band + gap)
+            sheet.paste(frame, (x, y))
+            draw.text((x + 6, y + 720 + 8), name.upper(), font=label, fill=(214, 225, 60))
         sheet.save(png)
     elif recipe in ('light', 'coverage', 'exports'):
         from PIL import Image
