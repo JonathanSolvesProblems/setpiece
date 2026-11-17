@@ -100,6 +100,9 @@ export function hear(world: World, text: string, library = false): void {
     if (part.command?.do === 'leave' && parts.length > 1) continue;
     if (part.command == null) {
       g.sceneRequest.value = understand(part.text);
+      // Without the designer too, a shot that names how it is drawn is drawn that way.
+      const named = styleNamedIn(part.text);
+      if (named != null) (g as unknown as { frameStyle: Signal<string> }).frameStyle.value = named;
       continue;
     }
     const note = obey(world, g, part.command);
