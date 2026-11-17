@@ -178,6 +178,13 @@ export class DirectorSystem extends createSystem({
   /** The designer's instructions have been put in the cache for this visit (api/director.ts, warm). */
   private warmed = false;
 
+  /** A visitor has just given their own key (or taken it away): the designer is asked afresh, with it. */
+  again(): void {
+    this.status = 'unknown';
+    (this.globals as unknown as { designerSpent: Signal<boolean> }).designerSpent.value = false;
+    void this.check();
+  }
+
   private async check(): Promise<void> {
     this.checked = performance.now();
     try {
@@ -369,6 +376,7 @@ export class DirectorSystem extends createSystem({
         // No key, no sign-in, or the spend limit reached: the library builds from now on (the designer is checked
         // again now and then, in case the limit was raised).
         this.status = failed !== '' && /no key|cannot sign in|not taking requests/.test(failed) ? 'off' : this.status;
+        if (/used up its budget/.test(failed)) (g as unknown as { designerSpent: Signal<boolean> }).designerSpent.value = true;
         this.fallback(said, failed || 'The set designer sent nothing back.');
         return 'library';
       }
@@ -520,6 +528,7 @@ export class DirectorSystem extends createSystem({
   /** A refusal heard elsewhere (a coverage plan): no key, no sign-in or the spend limit switches the designer off too. */
   noteRefusal(message: string): void {
     if (/no key|cannot sign in|not taking requests/.test(message)) this.status = 'off';
+    if (/used up its budget/.test(message)) (this.globals as unknown as { designerSpent: Signal<boolean> }).designerSpent.value = true;
   }
 
   private frame(plan: CameraPlan, labels: Map<string, string>, glide = 0): boolean {
@@ -634,7 +643,11 @@ class PlanBuild {
       this.sayIt();
     }
     else if (key === 'next') this.next = plainLine(value, 60);
-    else if (key === 'fresh') this.begin(value === true && !this.looking);
+    else if (key === 'fresh') {
+      this.begin(value === true && !this.looking);
+      // A new scene has its own horizon: the last scene's does not stand behind it if this reply names none.
+      if (value === true && !this.looking && this.begun) (this.world.globals as unknown as { setFar: Signal<string> }).setFar.value = '';
+    }
     // The light the scene is in; "" keeps it. A look does not change it, and a plan that could not begin does not either.
     else if (key === 'light' && isLight(value) && !this.looking && this.begun) (this.world.globals as unknown as { setLight: Signal<string> }).setLight.value = value;
     // What stands on the horizon; "" keeps it, and a look does not change it.
@@ -888,7 +901,7 @@ class PlanBuild {
       owners.push(one);
     }
     if (feet.length > 0) apply(feet, owners);
-    if (moves.length === 0) return 0;
+    if (moves.length === 0 && lifts.length === 0) return 0;
     // What stood on a piece that moved goes with it: fire on a car, a dragon on a roof, a lamp on a table.
     for (const [one, base] of under) {
       const move = moves.find((moved) => moved.standing === base);

@@ -25,6 +25,11 @@ const MOST_WAITING = 3;
 const TAIL_MS = 450;
 
 let unavailable = false;
+/** Told once, when the server says its voice has no more to give this month. */
+let spent: (() => void) | null = null;
+export function onVoiceSpent(tell: () => void): void {
+  spent = tell;
+}
 let speaking = false;
 let playing: HTMLAudioElement | null = null;
 /** The recorded line being fetched or said now, if it is one. */
@@ -151,7 +156,10 @@ async function sayAll(): Promise<void> {
           });
           if (!response.ok) {
             const answer = (await response.json().catch(() => ({}))) as { off?: boolean };
-            if (answer.off === true) unavailable = true;
+            if (answer.off === true) {
+              unavailable = true;
+              spent?.();
+            }
             continue;
           }
           url = URL.createObjectURL(await response.blob());

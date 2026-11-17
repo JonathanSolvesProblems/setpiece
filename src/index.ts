@@ -134,6 +134,10 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.lifeSizeRequested = signal(0);
   // Back to camera, on the panel at full size: the wearer stands at the lens again (src/life-size.ts).
   globals.backToCamera = signal(0);
+  // The site's budget for the set designer is spent: the page opens the box for a visitor's own key.
+  globals.designerSpent = signal(false);
+  // Her voice's month is spent: said once, on the panel.
+  globals.voiceSpent = signal(false);
   // Turn left (the count goes up) and Turn right (down), on the panel at full size.
   globals.lifeTurn = signal(0);
   globals.removeSelected = signal(0);
@@ -338,7 +342,18 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     if (kept) {
       keyBox.placeholder = keyBox.value.trim() === '' ? 'sk-ant-...' : 'Your key is in use. Empty and Keep to forget it.';
       keyBox.value = '';
+      // The designer is asked again at once, with the key (or without it).
+      world.getSystem(DirectorSystem)?.again();
     }
+  });
+  // The site's budget for the designer spent: the box opens by itself and says why, with where a key is made.
+  const keyDetails = document.querySelector<HTMLDetailsElement>('details.own-key');
+  const keySummary = keyDetails?.querySelector('summary') ?? null;
+  const keySummaryResting = keySummary?.textContent ?? '';
+  (globals.designerSpent as Signal<boolean>).subscribe((spent) => {
+    if (keyDetails == null || keySummary == null) return;
+    keySummary.textContent = spent ? 'The set designer has used up this site\'s budget. Use your own Anthropic key to carry on' : keySummaryResting;
+    if (spent) keyDetails.open = true;
   });
   // Shots to try, for a visitor who has not thought of one yet: the shot goes in the box and is built.
   const tries = [...document.querySelectorAll<HTMLButtonElement>('.shot-try')];

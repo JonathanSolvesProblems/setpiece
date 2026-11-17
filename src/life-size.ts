@@ -262,7 +262,8 @@ export class LifeSizeSystem extends createSystem({
       // Turn left and Turn right, from the panel: the set turns an eighth of a circle about the wearer, at once.
       g.lifeTurn.subscribe((asked) => {
         const object = this.stage()?.object3D;
-        if (asked === this.turnSeen || object == null || !g.lifeSize.peek() || this.growT >= 0) {
+        // Not while the set is growing in or the wearer is on their way somewhere.
+        if (asked === this.turnSeen || object == null || !g.lifeSize.peek() || this.growT >= 0 || this.walkT >= 0) {
           this.turnSeen = asked;
           return;
         }

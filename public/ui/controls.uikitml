@@ -393,7 +393,7 @@
       </div>
     </div>
     <div id="btn-life" class="takebutton">Stand in the shot</div>
-    <div class="line muted">The set at full size around you, seen from the camera. It takes two presses.</div>
+    <div class="line muted">The set at full size around you, seen from the camera. One press goes in.</div>
     <div class="field">
       <div class="label short">ACTORS</div>
       <div id="btn-squirm" class="word">Life in the actors: on</div>

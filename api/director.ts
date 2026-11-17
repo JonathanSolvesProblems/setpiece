@@ -283,7 +283,7 @@ ${COVERAGE_ASK}`
         const message = theirs
           ? 'Your own key was refused by Anthropic. Empty the key box on the page to use the site key.'
           : spent
-          ? 'The set designer is not taking requests right now.'
+          ? 'The set designer is not taking requests right now: this site has used up its budget for it. Your own Anthropic key brings it back: add it on the page.'
           : status === 429 || status === 529
             ? 'The set designer is busy. Try again in a moment.'
             : status === 401 || status === 403

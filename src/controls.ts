@@ -33,7 +33,7 @@ import type { VoiceState } from './voice.js';
 import { micAnswer } from './mic.js';
 import { startOver } from './start-over.js';
 import { SightlineSystem } from './sightline.js';
-import { chooseSpoken, hush, micOpen, sayLine, sayLineOnce, SPOKEN, spokenChoice, talking } from './speech.js';
+import { chooseSpoken, hush, micOpen, onVoiceSpent, sayLine, sayLineOnce, SPOKEN, spokenChoice, talking } from './speech.js';
 
 /**
  * Where the panel sits relative to the stage, as the scene authors it: left of
@@ -441,6 +441,13 @@ export class ControlsSystem extends createSystem({
 
 
     // Tabs keep a panel this size on the table: one page shows, Snap frame is always there.
+    // Her voice's month spent: said once, where the wearer reads; the replies carry on in writing.
+    let voiceTold = false;
+    onVoiceSpent(() => {
+      if (voiceTold) return;
+      voiceTold = true;
+      g.coachNote.value = 'HER VOICE IS RESTING | The voice has used up its month. Her replies are written here instead.';
+    });
     const wire = (id: string, run: () => void): void => {
       const element = panel.getElementById(id);
       const press = (): void => {
