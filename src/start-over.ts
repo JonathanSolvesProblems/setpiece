@@ -20,9 +20,11 @@ export function startOver(globals: unknown, landAgain: boolean): void {
   clearKey(StoreKey.Stage);
   clearKey(StoreKey.Coach);
   clearKey(StoreKey.Light);
+  clearKey(StoreKey.Far);
   // The small panel is a newcomer's: Talk, Try a shot and Skip the walkthrough are on it.
   saveJson(StoreKey.Settings, { ...(loadJson<Record<string, unknown>>(StoreKey.Settings) ?? {}), more: false });
   g.setLight.value = 'studio';
+  (g as unknown as { setFar: Signal<string> }).setFar.value = '';
   // No set of the designer's stands any more: the first one is built again as the set lands.
   g.setsBuilt.value = 0;
   g.startOver.value = g.startOver.peek() + 1;

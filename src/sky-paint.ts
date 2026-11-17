@@ -18,7 +18,7 @@ export interface SkyArt {
   /** Clouds: how many, their lit and shaded colours as "r,g,b", how solid. */
   clouds: { count: number; lit: string; shade: string; alpha: number } | null;
   /** What stands on the horizon, its colour, and the colour of its lit windows if it has any. */
-  far: 'city' | 'hills' | null;
+  far: 'city' | 'hills' | 'mountains' | 'forest' | null;
   farColour: string;
   windows: string | null;
   /** Haze along the horizon: its colour as "r,g,b" and how thick. */
@@ -174,18 +174,48 @@ export function paintSky(canvas: HTMLCanvasElement, colours: SkyColours, art: Sk
       }
       x += wide;
     }
-  } else if (art.far === 'hills') {
-    for (const [height, alpha, a, b] of [
-      [0.03, 0.55, 3, 7],
-      [0.018, 1, 5, 11],
+  } else if (art.far === 'forest') {
+    // A treeline: a low dark band with the points of firs standing out of it, nearer ones taller.
+    for (const [height, alpha, step] of [
+      [0.016, 0.6, 0.004],
+      [0.024, 1, 0.006],
     ] as const) {
+      g.globalAlpha = alpha;
+      g.fillRect(0, horizon - height * H * 0.35, W, height * H * 0.35 + H * 0.004);
+      for (let x = 0; x < W; ) {
+        const wide = W * step * (0.6 + 0.8 * random());
+        const tall = height * H * (0.55 + 0.6 * random());
+        g.beginPath();
+        g.moveTo(x, horizon);
+        g.lineTo(x + wide / 2, horizon - tall);
+        g.lineTo(x + wide, horizon);
+        g.closePath();
+        g.fill();
+        x += wide * 0.7;
+      }
+    }
+    g.globalAlpha = 1;
+  } else if (art.far === 'hills' || art.far === 'mountains') {
+    // Mountains are hills three times as high, with peaks where hills are rounded.
+    const high = art.far === 'mountains';
+    for (const [height, alpha, a, b] of (high
+      ? [
+          [0.1, 0.5, 3, 7],
+          [0.06, 1, 5, 11],
+        ]
+      : [
+          [0.03, 0.55, 3, 7],
+          [0.018, 1, 5, 11],
+        ]) as [number, number, number, number][]) {
       const lift = random() * 10;
       g.globalAlpha = alpha;
       g.beginPath();
       g.moveTo(0, horizon + H * 0.004);
       for (let x = 0; x <= W; x += W / 256) {
         const turn = (x / W) * Math.PI * 2;
-        const rise = (Math.sin(turn * a + lift) * 0.5 + Math.sin(turn * b + lift * 2.3) * 0.3 + Math.sin(turn * (a + b) * 2 + lift) * 0.2) * 0.5 + 0.55;
+        const round = (Math.sin(turn * a + lift) * 0.5 + Math.sin(turn * b + lift * 2.3) * 0.3 + Math.sin(turn * (a + b) * 2 + lift) * 0.2) * 0.5 + 0.55;
+        // A peak is a fold: the same line, turned back on itself where it would dip.
+        const rise = high ? 0.25 + Math.abs(Math.sin(turn * a * 2 + lift) * 0.45 + Math.sin(turn * b * 2 + lift * 1.7) * 0.3) * 0.9 + round * 0.15 : round;
         g.lineTo(x, horizon - rise * height * H);
       }
       g.lineTo(W, horizon + H * 0.004);

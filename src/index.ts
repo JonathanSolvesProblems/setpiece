@@ -129,6 +129,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.lifeSize = signal(false);
   // The light the set is in, kept from the last visit (src/set-light.ts).
   globals.setLight = signal<string>(loadJson<string>(StoreKey.Light) ?? 'studio');
+  // What stands on the horizon behind the set, as the designer chose it for the scene; '' is the light's own.
+  globals.setFar = signal<string>(loadJson<string>(StoreKey.Far) ?? '');
   globals.lifeSizeRequested = signal(0);
   // Back to camera, on the panel at full size: the wearer stands at the lens again (src/life-size.ts).
   globals.backToCamera = signal(0);

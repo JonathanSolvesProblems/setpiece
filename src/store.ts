@@ -19,6 +19,8 @@ export const StoreKey = {
   Made: 'setpiece.made.v1',
   /** The light the set is in (src/set-light.ts). */
   Light: 'setpiece.light.v1',
+  /** What stands on the horizon behind the set (src/set-light.ts). */
+  Far: 'setpiece.far.v1',
   /** A visitor's own Anthropic key, if they gave one on the page (src/own-key.ts). */
   OwnKey: 'setpiece.ownkey.v1',
 } as const;

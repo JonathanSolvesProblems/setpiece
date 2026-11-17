@@ -102,6 +102,11 @@ export function fitMade(w: number, d: number, h: number, yawDeg = 0): number {
   return Math.round(most * 100) / 100;
 }
 
+/** What stands on the horizon behind a set: a far city, hills, mountains, a forest, or nothing but ground and sky. */
+export const FARS = ['city', 'hills', 'mountains', 'forest', 'open'] as const;
+export type FarName = (typeof FARS)[number];
+export const isFar = (value: unknown): value is FarName => typeof value === 'string' && (FARS as readonly string[]).includes(value);
+
 export const LIGHTS = ['studio', 'day', 'golden hour', 'night', 'overcast', 'spotlight'] as const;
 export type LightName = (typeof LIGHTS)[number];
 export const isLight = (value: unknown): value is LightName => typeof value === 'string' && (LIGHTS as readonly string[]).includes(value);
@@ -109,12 +114,13 @@ export const isLight = (value: unknown): value is LightName => typeof value === 
 export const PLAN_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['title', 'says', 'fresh', 'light', 'remove', 'things', 'camera', 'next'],
+  required: ['title', 'says', 'fresh', 'light', 'far', 'remove', 'things', 'camera', 'next'],
   properties: {
     title: string,
     says: string,
     fresh: { type: 'boolean' },
     light: { type: 'string', enum: ['', ...LIGHTS] },
+    far: { type: 'string', enum: ['', ...FARS] },
     remove: { type: 'array', items: string },
     things: {
       type: 'array',

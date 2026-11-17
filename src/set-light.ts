@@ -26,7 +26,7 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
-import { isLight } from './director-plan.js';
+import { isFar, isLight } from './director-plan.js';
 import type { LightName } from './director-plan.js';
 import { saveJson, StoreKey } from './store.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -146,6 +146,7 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
   private groundCanvas: HTMLCanvasElement | null = null;
   /** The light last painted on the fill, the backdrop and the world. */
   private applied = '';
+  private appliedFar = '';
   /** Frames until the world's sky is painted in the light last applied; 0 when it is. */
   private worldDue = 0;
   private stageTurn = new Quaternion();
@@ -159,6 +160,9 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     this.cleanupFuncs.push(
       g.setLight.subscribe((light) => {
         if (isLight(light)) saveJson(StoreKey.Light, light);
+      }),
+      (g as unknown as { setFar: Signal<string> }).setFar.subscribe((far) => {
+        if (isFar(far)) saveJson(StoreKey.Far, far);
       }),
       () => {
         (this.sky?.material as MeshBasicMaterial | undefined)?.map?.dispose();
@@ -178,8 +182,11 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     const g = this.globals as Globals;
     const light = this.current();
     const look = LOOKS[light];
-    if (light !== this.applied) {
+    // The light, or what stands on the horizon in it, changed: the set is lit and its skies painted again.
+    const far = (g as unknown as { setFar: Signal<string> }).setFar.peek();
+    if (light !== this.applied || far !== this.appliedFar) {
       this.applied = light;
+      this.appliedFar = far;
       this.paint(look);
     }
     if (light !== this.reflected) this.reflect(light, look);
@@ -241,7 +248,7 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     // The sky behind the shot: the backdrop's own canvas, painted again, with its sun where the key light stands.
     const map = (this.backdrop!.material as MeshBasicMaterial).map;
     if (map != null && map.image instanceof HTMLCanvasElement) {
-      paintSky(map.image, look, look.art, look.keyAt);
+      paintSky(map.image, look, this.artOf(look), look.keyAt);
       map.needsUpdate = true;
     }
     this.ensureWorld();
@@ -261,10 +268,17 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
   }
 
   /** The sky around a wearer inside the set, painted in the set's light. */
+  /** The light's sky with the scene's own horizon on it: a far city only lights its windows where the light has them lit. */
+  private artOf(look: Look): SkyArt | null {
+    const far = (this.globals as unknown as { setFar: Signal<string> }).setFar.peek();
+    if (look.art == null || !isFar(far)) return look.art;
+    return { ...look.art, far: far === 'open' ? null : far, windows: far === 'city' ? look.art.windows : null };
+  }
+
   private paintWorld(look: Look): void {
     this.worldDue = 0;
     if (this.skyCanvas == null || this.sky == null) return;
-    paintSky(this.skyCanvas, look, look.art, look.keyAt);
+    paintSky(this.skyCanvas, look, this.artOf(look), look.keyAt);
     (this.sky.material as MeshBasicMaterial).map!.needsUpdate = true;
   }
 

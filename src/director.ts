@@ -12,7 +12,7 @@ import { assetByLabel, assetTitle, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf
 import type { Asset } from './catalog.js';
 import { LENSES, SENSORS } from './camera-formats.js';
 import { fitShot } from './coverage-plan.js';
-import { cleanCamera, cleanThing, fitMade, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
+import { cleanCamera, cleanThing, fitMade, isFar, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
 import type { CameraPlan, Thing } from './director-plan.js';
 import { MadeSystem } from './made.js';
 import type { MadeDef } from './made.js';
@@ -637,6 +637,8 @@ class PlanBuild {
     else if (key === 'fresh') this.begin(value === true && !this.looking);
     // The light the scene is in; "" keeps it. A look does not change it, and a plan that could not begin does not either.
     else if (key === 'light' && isLight(value) && !this.looking && this.begun) (this.world.globals as unknown as { setLight: Signal<string> }).setLight.value = value;
+    // What stands on the horizon; "" keeps it, and a look does not change it.
+    else if (key === 'far' && isFar(value) && !this.looking && this.begun) (this.world.globals as unknown as { setFar: Signal<string> }).setFar.value = value;
     else if (key === 'remove' && Array.isArray(value) && !this.looking) {
       this.begin(this.fresh);
       const labels = value.filter((id): id is string => typeof id === 'string').map((id) => this.labels.get(id) ?? id);
