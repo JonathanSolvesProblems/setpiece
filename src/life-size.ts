@@ -57,7 +57,7 @@ const SIDES = ['left', 'right'] as const;
 type Side = (typeof SIDES)[number];
 const OPTIC_YELLOW = 0xd6e13c;
 /** What the panel says on stepping inside: the call sheet stays behind on the table. */
-const INSIDE_NOTE = 'INSIDE THE SET | Point at the floor and pinch: you walk to the yellow ring. Turn left and Turn right are on the panel. Back to the table leaves.';
+const INSIDE_NOTE = 'INSIDE THE SET | Point at the floor and pinch: you walk to the yellow ring. Turn left and Turn right are on the panel. Back to the table, or saying step out, leaves.';
 /**
  * Pulling the set: it moves this many times as far as the hand does (a comfortable seated pull of 30 cm is two
  * metres), the hand is smoothed at this rate first so tracking noise is not multiplied into a shaking world, and
@@ -172,6 +172,8 @@ export class LifeSizeSystem extends createSystem({
   private wristProbe = new Object3D();
   private wristTurned = 0;
   private turnSeen = 0;
+  /** The wearer has walked or turned since they were last stood at the lens. */
+  private wandered = false;
   private swing = new Quaternion();
   private grip: Mesh | null = null;
   private gripLine: Mesh | null = null;
@@ -270,6 +272,7 @@ export class LifeSizeSystem extends createSystem({
         // Turning left brings what was on the left in front: the set goes round to the right.
         const step = asked > this.turnSeen ? -SNAP_TURN : SNAP_TURN;
         this.turnSeen = asked;
+        this.wandered = true;
         this.walkT = -1;
         this.player.head.getWorldPosition(this.head);
         object.getWorldQuaternion(this.turn);
@@ -285,9 +288,14 @@ export class LifeSizeSystem extends createSystem({
       // Back to camera, from the panel: the wearer stands at the lens again, wherever they had walked to.
       g.backToCamera.subscribe((asked) => {
         if (asked === 0 || !g.lifeSize.peek()) return;
+        // Pressed without having gone anywhere, it would do nothing to see: it says so.
+        if (!this.wandered) {
+          g.coachNote.value = 'ALREADY AT THE CAMERA | This is where the shot is taken from. Point at the floor and pinch to walk somewhere.';
+          return;
+        }
         this.walkT = -1;
         this.cutToCamera();
-        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Point at the floor and pinch to walk.';
+        g.coachNote.value = 'AT THE CAMERA | You are back where the shot is taken from.';
       }),
     );
   }
@@ -424,7 +432,9 @@ export class LifeSizeSystem extends createSystem({
     this.aiming = null;
     for (let i = 0; i < SIDES.length; i++) {
       const side = SIDES[i];
-      if (controls?.panelWanted(side) === true) continue;
+      // A hand whose ray lands on the panel is pressing the panel. (Only on it: the panel floats beside the wearer
+      // in here, and a hand pointing at the floor past its edge is pointing at the floor.)
+      if (controls?.pointingAtPanel(side) === true) continue;
       const ray = this.player.raySpaces[side];
       ray.getWorldPosition(this.from);
       // A target ray points down its own -Z.
@@ -498,6 +508,7 @@ export class LifeSizeSystem extends createSystem({
     this.walkTo.copy(this.floor).add(this.offset);
     this.walkFor = Math.min(WALK_LONGEST, WALK_SECONDS + Math.max(0, this.offset.length() - 1) * WALK_SECONDS_A_METRE);
     this.walkT = 0;
+    this.wandered = true;
     if (this.steps != null) AudioUtils.play(this.steps);
   }
 
@@ -638,6 +649,7 @@ export class LifeSizeSystem extends createSystem({
     setWorldQuaternion(object, this.turn);
     setWorldPosition(object, this.head);
     this.world.getSystem(ViewfinderSystem)?.refresh();
+    this.wandered = true;
     return `BY THE ${assetTitle(label).toUpperCase()} | Look around. Say take me to another piece, or step out.`;
   }
 
@@ -697,6 +709,7 @@ export class LifeSizeSystem extends createSystem({
     // A piece moved by hand on the table since the last time inside is where it is now, not where it was.
     this.solidsStale = true;
     this.walkT = -1;
+    this.wandered = false;
     this.endPull();
     const g = this.globals as Globals;
     const stage = this.stage();

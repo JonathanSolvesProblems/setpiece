@@ -264,7 +264,7 @@
   </div>
   <div class="row3">
     <div id="btn-skip" class="word grow" style="display: none">Skip the walkthrough</div>
-    <div id="btn-leave" class="word grow">Leave</div>
+    <div id="btn-leave" class="word grow">Exit Setpiece</div>
   </div>
   <div id="tabs" class="tabs">
     <div id="tab-shoot" class="tab">Shoot</div>

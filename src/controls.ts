@@ -66,6 +66,14 @@ const WALK_AHEAD = 0.6;
 const WALK_LEFT = 0.32;
 const WALK_BELOW = 0.2;
 const WALK_FOLLOW = 3;
+/**
+ * Inside the set the panel stays where it is until it is this far off to the side of where the wearer faces
+ * (radians), this far from them or this near (metres), or this far above or below its place.
+ */
+const WALK_ASIDE_MOST = (62 * Math.PI) / 180;
+const WALK_FAR_MOST = 1.05;
+const WALK_NEAR_LEAST = 0.3;
+const WALK_HEIGHT_MOST = 0.35;
 const PANEL_YAW = (34 * Math.PI) / 180;
 const UP = new Vector3(0, 1, 0);
 
@@ -211,6 +219,8 @@ const PANEL_ORDER = 10;
  * long (seconds) after the last time one did, so a press that began on it ends on it.
  */
 const PANEL_GATE_MARGIN = 0.12;
+/** A ray this close outside the panel's edge still counts as on it, in metres. */
+const PANEL_ON_MARGIN = 0.04;
 const PANEL_GATE_HOLD = 0.4;
 const SIDES = ['left', 'right'] as const;
 type Gated = Object3D & { intersectChildren?: boolean };
@@ -250,6 +260,14 @@ export class ControlsSystem extends createSystem({
   private gateFrom = new Vector3();
   private gateWay = new Vector3();
   private gateTo = new Vector3();
+  private panelAt = new Vector3();
+  /** Inside the set, the panel is on its way to the wearer's side; otherwise it is holding still. */
+  private comingAlong = true;
+  private gateAcross = new Vector3();
+  private gateUp = new Vector3();
+  private gateOut = new Vector3();
+  private gateHit = new Vector3();
+  private onPanel: Record<'left' | 'right', boolean> = { left: false, right: false };
 
   /**
    * In the headset the panel travels with the set, so it is beside the slate
@@ -300,6 +318,11 @@ export class ControlsSystem extends createSystem({
     this.gatePanel(panel, time);
   }
 
+  /** This hand's ray lands on the panel itself, now: nothing near it, and nothing a moment ago. */
+  pointingAtPanel(side: 'left' | 'right'): boolean {
+    return this.onPanel[side];
+  }
+
   /** This hand points at the panel or reaches for it, or did a moment ago: its pinch now is for the panel. */
   panelWanted(side: 'left' | 'right'): boolean {
     return this.gateOpen && this.lastTime <= this.wantedUntil[side];
@@ -310,6 +333,11 @@ export class ControlsSystem extends createSystem({
     const size = this.panelRoot?.size?.value;
     const reach = (size == null ? 0.3 : Math.hypot(size[0], size[1]) * PANEL_UNIT * 0.5) + PANEL_GATE_MARGIN;
     panel.getWorldPosition(this.gateAt);
+    // The panel's own across, up and out, in the world.
+    panel.updateWorldMatrix(true, false);
+    this.gateAcross.setFromMatrixColumn(panel.matrixWorld, 0).normalize();
+    this.gateUp.setFromMatrixColumn(panel.matrixWorld, 1).normalize();
+    this.gateOut.setFromMatrixColumn(panel.matrixWorld, 2).normalize();
     let wanted = false;
     this.lastTime = time;
     for (let i = 0; i < SIDES.length; i++) {
@@ -324,6 +352,18 @@ export class ControlsSystem extends createSystem({
       // How far the middle of the panel is from the line the hand points along; behind the hand, from the hand itself.
       const off = along <= 0 ? this.gateTo.length() : Math.sqrt(Math.max(0, this.gateTo.lengthSq() - along * along));
       if (off <= reach) mine = true;
+      // Whether the ray lands on the panel itself, a finger's width to spare: where it crosses the panel's plane,
+      // measured along the panel's own across and up.
+      const facing = this.gateWay.dot(this.gateOut);
+      let onIt = false;
+      if (Math.abs(facing) > 1e-4 && size != null) {
+        const t = this.gateTo.dot(this.gateOut) / facing;
+        if (t > 0) {
+          this.gateHit.copy(this.gateWay).multiplyScalar(t).sub(this.gateTo);
+          onIt = Math.abs(this.gateHit.dot(this.gateAcross)) <= (size[0] * PANEL_UNIT) / 2 + PANEL_ON_MARGIN && Math.abs(this.gateHit.dot(this.gateUp)) <= (size[1] * PANEL_UNIT) / 2 + PANEL_ON_MARGIN;
+        }
+      }
+      this.onPanel[side] = onIt;
       this.player.indexTipSpaces[side].getWorldPosition(this.gateFrom);
       if (this.gateFrom.distanceTo(this.gateAt) <= reach + PANEL_GATE_MARGIN) mine = true;
       if (mine) {
@@ -360,9 +400,23 @@ export class ControlsSystem extends createSystem({
       this.head.y - WALK_BELOW,
       this.head.z + this.forward.z * WALK_AHEAD - this.forward.x * WALK_LEFT,
     );
-    panel.getWorldPosition(this.head).lerp(this.panelPosition, 1 - Math.exp(-WALK_FOLLOW * delta));
-    setWorldPosition(panel, this.head);
-    setWorldQuaternion(panel, this.panelQuaternion.setFromAxisAngle(UP, yaw + 0.35));
+    // It holds still, to be pinched: it comes along only once the wearer has turned or gone well away from it,
+    // and never while a hand is at it.
+    panel.getWorldPosition(this.panelAt);
+    const dx = this.panelAt.x - this.head.x;
+    const dz = this.panelAt.z - this.head.z;
+    const far = Math.hypot(dx, dz);
+    const aside = far < 1e-3 ? Math.PI : Math.acos(Math.max(-1, Math.min(1, (dx * this.forward.x + dz * this.forward.z) / far)));
+    const handAtIt = this.panelWanted('left') || this.panelWanted('right');
+    if (!this.comingAlong && !handAtIt && (aside > WALK_ASIDE_MOST || far > WALK_FAR_MOST || far < WALK_NEAR_LEAST || Math.abs(this.panelAt.y - (this.head.y - WALK_BELOW)) > WALK_HEIGHT_MOST)) this.comingAlong = true;
+    if (this.comingAlong) {
+      this.panelAt.lerp(this.panelPosition, 1 - Math.exp(-WALK_FOLLOW * delta));
+      setWorldPosition(panel, this.panelAt);
+      // Facing the wearer squarely, from wherever it has got to.
+      setWorldQuaternion(panel, this.panelQuaternion.setFromAxisAngle(UP, Math.atan2(this.head.x - this.panelAt.x, this.head.z - this.panelAt.z)));
+      if (this.panelAt.distanceTo(this.panelPosition) < 0.02) this.comingAlong = false;
+    }
+    void yaw;
     panel.visible = true;
   }
 
@@ -655,11 +709,18 @@ export class ControlsSystem extends createSystem({
     });
     // The way out, on the small panel where a newcomer can find it (it was only under More, Stage): back to the
     // page, where the board and its Save buttons are.
+    // It says what it leaves: inside the full-size set a wearer took "Leave" for the way back to the table, and
+    // was put out of the app (headset, 17 Nov). In there it is not on the panel at all: Back to the table is.
     twice(
       'btn-leave',
-      'Leave',
-      () => 'Leave ends the session and goes back to the page, where the board is. Press it again to go.',
+      'Exit Setpiece',
+      () => 'Exit Setpiece ends the session and goes back to the web page, where the board is saved. Press it again to exit.',
       () => this.world.exitXR(),
+    );
+    this.cleanupFuncs.push(
+      g.lifeSize.subscribe((on) => {
+        panel.getElementById('btn-leave')?.setProperties({ display: on ? 'none' : 'flex' });
+      }),
     );
     this.cleanupFuncs.push(
       g.walkthrough.subscribe(() => showSkip()),
@@ -747,18 +808,21 @@ export class ControlsSystem extends createSystem({
     );
     // What the piece last touched can be given follows the wearer to every tab; the Assets tab shows it always.
     const showPieceBar = (): void => {
-      panel.getElementById('held-block')?.setProperties({ display: (more && openTab === 'assets') || g.castLine.peek() !== '' ? 'flex' : 'none' });
+      panel.getElementById('held-block')?.setProperties({ display: !g.lifeSize.peek() && ((more && openTab === 'assets') || g.castLine.peek() !== '') ? 'flex' : 'none' });
     };
     const showTab = (tab: string): void => {
       openTab = tab;
+      // Inside the full-size set it is the small panel, whatever was open on the table: the tabs are for the table,
+      // and in there the More button is Turn right.
+      const open = more && !g.lifeSize.peek();
       showPieceBar();
-      panel.getElementById('tabs')?.setProperties({ display: more ? 'flex' : 'none' });
+      panel.getElementById('tabs')?.setProperties({ display: open ? 'flex' : 'none' });
       showTry();
       panel.getElementById('btn-skip')?.setProperties({ display: g.walkthrough.peek() && !more && !g.lifeSize.peek() ? 'flex' : 'none' });
       panel.getElementById<UIKit.Text>('btn-more')?.setProperties({ text: g.lifeSize.peek() ? 'Turn right' : more ? 'Less' : 'More', borderColor: more && !g.lifeSize.peek() ? OPTIC_YELLOW : CHALK_HAZE });
       panel.getElementById<UIKit.Text>('btn-undo')?.setProperties({ text: g.lifeSize.peek() ? 'Turn left' : 'Undo' });
       for (const name of TABS) {
-        panel.getElementById(`page-${name}`)?.setProperties({ display: more && name === tab ? 'flex' : 'none' });
+        panel.getElementById(`page-${name}`)?.setProperties({ display: open && name === tab ? 'flex' : 'none' });
         panel.getElementById(`tab-${name}`)?.setProperties({
           backgroundColor: name === tab ? OPTIC_YELLOW : undefined,
           color: name === tab ? CLOTH : CHALK,
@@ -832,6 +896,7 @@ export class ControlsSystem extends createSystem({
       g.lifeSize.subscribe((on) => {
         life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         inside?.setProperties({ text: on ? 'Back to camera' : 'Step inside', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        if (on) this.comingAlong = true;
         showTab(openTab);
         // A frame needs the slate under the actors, and the slate is back on the table.
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });

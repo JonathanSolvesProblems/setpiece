@@ -494,7 +494,7 @@ export class CoachSystem extends createSystem({
     }
     // Inside the full-size set the sheet says how to move, whichever step the walkthrough is on.
     if ((this.globals as Globals).lifeSize.peek() && this.step !== Step.Land) {
-      return ['INSIDE THE SET', 'Point at the floor and pinch to walk to the ring. Turn left and Turn right are on the panel. Back to the table leaves.'];
+      return ['INSIDE THE SET', 'Point at the floor and pinch to walk to the ring. Turn left and Turn right are on the panel. Back to the table, or saying step out, leaves.'];
     }
     switch (this.step) {
       case Step.Land:
