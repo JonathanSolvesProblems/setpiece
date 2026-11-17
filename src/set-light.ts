@@ -37,6 +37,7 @@ import { GRAIN_FADE } from './wood-grain.js';
 import { FIRE_LIGHT, LAMP_GLOW, LAMP_POOL, WINDOW_GLASS } from './scene-assets/lib/practicals.js';
 import { lens as HEADLAMPS, tail as TAIL_LAMPS } from './scene-assets/lib/vehicle.js';
 import { paintSky } from './sky-paint.js';
+import { TOON } from './toon.js';
 import type { SkyArt } from './sky-paint.js';
 
 /** The set is 1:10, so a light's output grows by a hundred and its reach by ten at full size. */
@@ -155,6 +156,9 @@ function awayOnly(material: MeshBasicMaterial): void {
 /** Frames the band and its ground are drawn at nothing when they are made, so their shaders are ready before a set is. */
 const CYC_WARM_FRAMES = 3;
 
+/** How much more fill and key light the set has while it is drawn as a cartoon. */
+const CARTOON_FILL = 2.2;
+const CARTOON_KEY = 1.3;
 /** Frames after a change of light before the world's sky is painted in it, unless the wearer steps inside first. */
 const WORLD_PAINT_AFTER = 150;
 const ORIGIN = new Vector3();
@@ -288,7 +292,11 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     // The grain is drawn in each piece's own coordinates and grows with the set: at full size it is a third as deep.
     GRAIN_FADE.value = 1 / Math.sqrt(scale);
     const key = this.key!;
-    key.intensity = this.keyIntensity * look.keyPower * scale * scale;
+    // A cartoon's shadows are colour, not black: with the set drawn as one (anime), the fill comes up and the key a
+    // little, before the light is cut into its flat steps (src/toon.ts).
+    const cartoon = TOON.value > 0.5;
+    this.fill!.intensity = look.fill * (cartoon ? CARTOON_FILL : 1);
+    key.intensity = this.keyIntensity * look.keyPower * (cartoon ? CARTOON_KEY : 1) * scale * scale;
     key.distance = this.keyDistance * scale;
     this.placeWorld(life);
     this.placeCyc(delta, look, life);
