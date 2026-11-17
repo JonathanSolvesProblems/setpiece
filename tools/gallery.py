@@ -93,23 +93,23 @@ SLIDES = [
     dict(slug='say', badge=LIVE_BADGE, headline='Say the shot', picture=('live', 'designer'),
          caption='"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.'),
     dict(slug='table', badge=QUEST_17, headline='The shot, on your table', picture='captures/quest-aircraft-on-table.jpg',
-         caption='"Workers building an aircraft, a ladder up to its roof", said once. A 1:10 set on the real table, its own sky behind it, your hands on it.'),
+         caption='"Workers building an aircraft", then "add a ladder with a worker on its roof". A 1:10 set on the real table, its sky behind, hands on it.'),
     dict(slug='made', badge=LIVE_BADGE, headline='It makes what the library lacks', picture=('live', 'castle'),
          caption='Asked for a castle gate, it built the gate and two towers from simple wooden shapes, then two guards and a horse, low and wide.'),
-    dict(slug='look', badge=LIVE_BADGE, headline='It checks its own frame', picture=('live', 'look'),
+    dict(slug='look', badge=LIVE_BADGE, headline='The designer checks its own frame', picture=('live', 'look'),
          caption="Once the set is up it is shown its own camera's picture and how much of the frame each piece takes. It moves the camera if the shot is off."),
     dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
          caption="The designer's own plan stood two actors inside a car parked side-on. Code stepped them out beside it before the camera was placed."),
     dict(slug='speed', badge='Measured on a Quest 3S · devpost/results', headline='{quest_first_s} s from your last word', picture=('result', 'designer'),
-         caption='On the headset: the first piece {quest_first_s} s after my last word, the set whole inside 4 s, six shots on the storyboard {coverage_s} s after Cover it.'),
+         caption='On the headset: the first piece {quest_first_s} s after my last word, sets whole in 3 to 7 s, six shots on the storyboard {coverage_s} s after Shoot coverage.'),
     dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'lines'),
          caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
-    dict(slug='light', badge=LIVE_BADGE, headline='It lights the scene', picture=('live', 'light'),
-         caption='The light comes from the sentence: a night chase is night, a duel at sunset golden hour. After dark the windows and the lamp are lit.'),
+    dict(slug='light', badge=QUEST_17, headline='Four sentences, four sets', picture='captures/quest-four-sets.jpg',
+         caption='In the headset, each from a sentence: a night chase, a road crew by day, a deck in snow with its fence on fire, an aircraft in the rain.'),
     dict(slug='draw', badge=LIVE_BADGE, headline='Draw it your way', picture=('live', 'draw'),
          caption='One frame four ways: as the lens sees it, a pencil storyboard, anime (the set itself turns cartoon), and hard black and white.'),
-    dict(slug='coverage', badge=QUEST_17, headline='Say "cover it"', picture='captures/quest-coverage-filling.jpg',
-         caption='Shot 4 of 6, in the headset: the designer planned the coverage, the camera goes to each shot and the board fills by itself. Six in {coverage_s} s.'),
+    dict(slug='coverage', badge=QUEST_17, headline='Shoot coverage', picture='captures/quest-coverage-filling.jpg',
+         caption='Shot 3 of 6, in the headset: the designer planned the shots, the camera goes to each one and the board fills by itself. Six in {coverage_s} s.'),
     dict(slug='pinch', badge=QUEST_17, headline='Reach in and pick it up', picture='captures/quest-dragon-in-hand.jpg',
          caption='A hand carries the dragon off the roof onto the truck. Pinch a piece or close a fist on it; let go in the air and a dragon stays there.'),
     dict(slug='board', badge=LIVE_BADGE, headline='Six setups, each with its numbers', picture=('live', 'board'),
@@ -126,7 +126,7 @@ SLIDES = [
          caption='After a reload in the headset the panel lists what came back: the set, the pieces and the board. Same spot after a relaunch: next to prove.'),
     dict(slug='fps', badge='Result · devpost/results/quest-frame-rate.json and quest-frame-time.json', headline='{fps_median} frames a second, median', picture=('result', 'fps'),
          caption='{fps_samples} one-second samples, {fps_days} Nov: median {fps_median}, lowest {fps_min}. A heavier set on 11 Nov ran at {heavy_fps}, {heavy_then}.'),
-    dict(slug='leave', badge=LIVE_BADGE, headline='You leave holding something', picture=('live', 'exports'),
+    dict(slug='leave', badge=LIVE_BADGE, headline='What you leave with', picture=('live', 'exports'),
          caption='Saved from the page: the board the designer shot, each frame with its lens and height, and the shot list as a CSV for the crew.'),
     dict(slug='camera', badge=QUEST, headline='Format, rig, second camera', picture='captures/quest-camera-tab.jpg',
          caption='Four sensor formats, a tripod or a drone up to 11 m on the real set, and a second camera you can cut to while a take records.'),
@@ -134,7 +134,7 @@ SLIDES = [
 
 # The gallery as it is submitted: eleven slides in the order of a first visit. A cold judge read on 15 Nov found
 # nineteen too many, with some repeating others, and a second on 16 Nov asked for the numbers on one slide; the rest stay above for anyone who wants to render them.
-SUBMITTED = ['say', 'table', 'made', 'look', 'light', 'draw', 'coverage', 'pinch', 'speed', 'leave']
+SUBMITTED = ['table', 'say', 'made', 'look', 'light', 'draw', 'coverage', 'pinch', 'speed', 'leave']
 SLIDES = [next(slide for slide in SLIDES if slide['slug'] == slug) for slug in SUBMITTED]
 
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -194,7 +194,7 @@ def result_body(kind: str) -> str:
         cell = lambda big, unit, words: (f'<div class="stat"><div class="big">{big}<span class="unit">{unit}</span></div><p>{words}</p></div>')
         return ('<div class="result stats">'
                 + cell(N['quest_first_s'], 's', f'from my last word to the first piece on the table. Spoken on a Quest 3S, {len(quest_designer["runs"])} sentences in my own words.')
-                + cell(f'{max(wholes):.1f}', 's', f'at most to the whole set standing ({" and ".join(f"{v:.1f}" for v in wholes)} s).')
+                + cell(f'{max(wholes):.1f}', 's', f'at most to the whole set standing for those two ({" and ".join(f"{v:.1f}" for v in wholes)} s). Bigger sets on 17 Nov: 4 to 7 s.')
                 + cell(str(COVERAGE_SECONDS), 's', f'from pressing Shoot coverage to six shots planned, shot and on the storyboard. On the headset, 17 Nov.')
                 + f'<p class="muted foot">From a desktop, {hurry["plans"]} sentences: first piece a median {hurry["firstPieceMs"]["median"] / 1000:.1f} s, slowest {hurry["firstPieceMs"]["slowest"] / 1000:.1f} s.</p></div>')
     if kind == 'lines':
@@ -399,10 +399,16 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             import textwrap, re
             # A piece is named once: "Truck (Truck)" is the truck, "A (Actor A)" is actor A.
             named = lambda text: re.sub(r'^([^(:]+) \(([^)]+)\):', lambda m: m.group(2) + ':', text)
+            # A piece's line, short: its share of the frame and where, and that it is hidden when it is.
+            def brief(line):
+                body = line[2:]
+                parts = body.split(';')[0].split(', ')
+                hidden = re.search(r'hidden behind [^;,.]+', body)
+                return named(', '.join(parts[:2]) if len(parts) > 1 else body) + (f' ({hidden.group(0)})' if hidden else '')
             # What it was told about its first frame: the first words of each piece's line, whole.
             y = 800
             for line in looks[0]['report'].split('\n')[:4]:
-                draw.text((0, y), named(line[2:].split(';')[0].split(', ')[0] + ', ' + line[2:].split(', ')[1] if ', ' in line else line[2:]), font=face, fill=(199, 199, 183))
+                draw.text((0, y), brief(line), font=face, fill=(199, 199, 183))
                 y += 46
             # Its own note says what it changed, in full; the lines under it are measured from the frame it left.
             words = note.split(' | ', 1)[-1].split('. ', 1)[-1] if 'THROUGH THE LENS' not in note else note.split(' | ', 1)[-1]
@@ -410,8 +416,8 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             for row in textwrap.wrap(words, 70)[:3]:
                 draw.text((1360, y), row, font=face, fill=(246, 247, 239))
                 y += 46
-            for line in measured.split('\n')[:2]:
-                draw.text((1360, y), named((line[2:].split(', ')[0] + ', ' + line[2:].split(', ')[1]) if ', ' in line else line[2:]), font=face, fill=(199, 199, 183))
+            for line in measured.split('\n')[:4]:
+                draw.text((1360, y), brief(line), font=face, fill=(199, 199, 183))
                 y += 46
             sheet.save(png)
     elif recipe == 'dresser':

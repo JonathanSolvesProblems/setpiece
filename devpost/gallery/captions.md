@@ -2,16 +2,16 @@
 
 One block per image, in gallery order. Paste the block, nothing else.
 
-## 01 say
+## 01 table
+
+```
+"Workers building an aircraft", then "add a ladder with a worker on its roof". A 1:10 set on the real table, its sky behind, hands on it.
+```
+
+## 02 say
 
 ```
 "A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.
-```
-
-## 02 table
-
-```
-"Workers building an aircraft, a ladder up to its roof", said once. A 1:10 set on the real table, its own sky behind it, your hands on it.
 ```
 
 ## 03 made
@@ -29,7 +29,7 @@ Once the set is up it is shown its own camera's picture and how much of the fram
 ## 05 light
 
 ```
-The light comes from the sentence: a night chase is night, a duel at sunset golden hour. After dark the windows and the lamp are lit.
+In the headset, each from a sentence: a night chase, a road crew by day, a deck in snow with its fence on fire, an aircraft in the rain.
 ```
 
 ## 06 draw
@@ -41,7 +41,7 @@ One frame four ways: as the lens sees it, a pencil storyboard, anime (the set it
 ## 07 coverage
 
 ```
-Shot 4 of 6, in the headset: the designer planned the coverage, the camera goes to each shot and the board fills by itself. Six in 25 s.
+Shot 3 of 6, in the headset: the designer planned the shots, the camera goes to each one and the board fills by itself. Six in 25 s.
 ```
 
 ## 08 pinch
@@ -53,7 +53,7 @@ A hand carries the dragon off the roof onto the truck. Pinch a piece or close a 
 ## 09 speed
 
 ```
-On the headset: the first piece 1.6 s after my last word, the set whole inside 4 s, six shots on the storyboard 25 s after Cover it.
+On the headset: the first piece 1.6 s after my last word, sets whole in 3 to 7 s, six shots on the storyboard 25 s after Shoot coverage.
 ```
 
 ## 10 leave
