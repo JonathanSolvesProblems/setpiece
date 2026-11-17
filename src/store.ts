@@ -9,6 +9,8 @@ export const StoreKey = {
   Stage: 'setpiece.stage.pose.v1',
   Pieces: 'setpiece.pieces.v1',
   Board: 'setpiece.board.v1',
+  /** The boards put away by New board, oldest first (src/viewfinder.ts). */
+  Boards: 'setpiece.boards.v1',
   Coach: 'setpiece.coach.v1',
   Take: 'setpiece.take.v1',
   Camera: 'setpiece.camera.v1',

@@ -138,6 +138,7 @@ type Globals = {
   stageStatus: Signal<string>;
   resetStageRequested: Signal<number>;
   newBoardRequested: Signal<number>;
+  boardsNow: Signal<{ at: number; frames: number[] }>;
   coachTarget: Signal<string>;
   takeState: Signal<string>;
   takeLength: Signal<number>;
@@ -615,8 +616,9 @@ export class ControlsSystem extends createSystem({
       'New board',
       () => {
         const frames = g.shotFrames.peek().length;
-        const lost = frames === 0 ? 'the set' : frames === 1 ? 'the frame and the set' : `${frames} frames and the set`;
-        return `New board clears ${lost}${g.takeLength.peek() > 0 ? ', and the take' : ''}. Press it again to go ahead.`;
+        const boards = g.boardsNow.peek().frames.length;
+        const kept = frames === 0 ? '' : boards >= 4 ? `Four boards is the most, so New board clears this one's ${frames === 1 ? 'frame' : `${frames} frames`}. ` : `This board keeps its tab on the card, ${frames === 1 ? 'its frame' : `all ${frames} frames`} with it. `;
+        return `${kept}New board clears the set${g.takeLength.peek() > 0 ? ' and the take' : ''}. Press it again to go ahead.`;
       },
       () => {
         g.newBoardRequested.value = g.newBoardRequested.value + 1;
@@ -1416,9 +1418,11 @@ export class ControlsSystem extends createSystem({
         eyeB?.setProperties({ text: lines[1] ?? '', color: tape(lines[1]) });
       }),
       // The card under the monitor is the shot list; the panel only keeps count.
-      g.shotList.subscribe((lines) => {
+      g.boardsNow.subscribe((now) => {
+        const frames = now.frames[now.at] ?? 0;
+        const which = now.frames.length > 1 ? `Board ${now.at + 1} of ${now.frames.length}: ` : '';
         boardCount?.setProperties({
-          text: lines.length === 0 ? 'No frames yet' : `${lines.length} of ${BOARD_SLOTS} frames, on the card`,
+          text: frames === 0 ? `${which}${which === '' ? 'No' : 'no'} frames yet` : `${which}${frames} of ${BOARD_SLOTS} frames, on the card`,
         });
       }),
     );

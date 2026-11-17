@@ -67,7 +67,13 @@ const HELPER_NAMES = new Set(['GrabVolume', 'HoverRing', 'StageHandle', 'HandleG
 const CAPTION_HEIGHT = 0.019;
 /** The storyboard card: three frames wide, two high, the width of the monitor. */
 const CARD_WIDTH = FRAME_WIDTH * FRAME_COLUMNS + FRAME_GAP * (FRAME_COLUMNS + 1);
-const CARD_HEIGHT = (FRAME_HEIGHT + CAPTION_HEIGHT) * 2 + FRAME_GAP * 3;
+/** The frames' part of the card, and under it the row of board tabs. */
+const FRAMES_HEIGHT = (FRAME_HEIGHT + CAPTION_HEIGHT) * 2 + FRAME_GAP * 3;
+const TABS_HEIGHT = 0.03;
+const CARD_HEIGHT = FRAMES_HEIGHT + TABS_HEIGHT;
+/** The most boards there are: four tabs, and a fifth place for the + that makes a new one. */
+const MAX_BOARDS = 4;
+const TAB_WIDTH = (CARD_WIDTH - FRAME_GAP * 2) / (MAX_BOARDS + 1);
 const CARD_PIXELS = 2048;
 /** Camera-report paper, toned down: a white card is the brightest thing in a dim room. */
 const PAPER = '#dcdccb';
@@ -152,6 +158,12 @@ export interface Setup {
 
 /** The board as it is kept between visits: the frames on the card and how many were ever taken. */
 type SavedBoard = { taken: number; shots: Shot[] };
+/** Every board but the one showing (which is kept under its own key, as it always was), and which one that is. */
+type SavedBoards = { at: number; boards: SavedBoard[] };
+/** A board to show, by its place in the row, or -1 for a new one; `n` goes up with each asking. */
+export type BoardAsk = { to: number; n: number };
+/** The boards there are: which is showing, and how many frames each holds. */
+export type BoardsNow = { at: number; frames: number[] };
 
 type Globals = {
   lensMm: Signal<number>;
@@ -165,6 +177,8 @@ type Globals = {
   shotList: Signal<string[]>;
   shotFrames: Signal<Shot[]>;
   newBoardRequested: Signal<number>;
+  boardAsked: Signal<BoardAsk>;
+  boardsNow: Signal<BoardsNow>;
   takeState: Signal<string>;
   setupRecalled: Signal<number>;
   coachNote: Signal<string>;
@@ -183,8 +197,17 @@ type Globals = {
   briefSkip: Signal<number>;
 };
 type SavedBriefs = { index: number; printed: string[] };
-/** While an effect runs, the monitor is redrawn on one frame in this many. */
+/**
+ * While an effect runs, the monitor is redrawn on one frame in this many: three while the headset has frames to
+ * spare, fewer redraws as frames run long. (Headset, 17 Nov: a 17-piece set with snow, fire, smoke and water ran
+ * near 60 with the monitor redrawn every third frame; the set comes first, the monitor's picture of the snow second.)
+ */
 const EFFECT_LENS_EVERY = 3;
+const EFFECT_LENS_SLOW = 6;
+const EFFECT_LENS_SLOWEST = 12;
+/** A frame this long (seconds, smoothed over about half a second) is running slow, and this long slower still. */
+const FRAME_SLOW = 0.0128;
+const FRAME_SLOWEST = 0.0148;
 /**
  * Undo goes back through the set as it stood at each quiet moment. The set is looked at this often
  * (seconds), a state has to hold from one look to the next to count, and this many are kept.
@@ -265,6 +288,10 @@ export class ViewfinderSystem extends createSystem({
   private overlayShown: boolean[] = [];
   /** The frames on the card, oldest first, six at most, and the picture drawn for each. */
   private shots: Shot[] = [];
+  /** Every board, in the order of their tabs; the one showing is at `boardAt` and its frames are `shots`. */
+  private boards: SavedBoard[] = [{ taken: 0, shots: [] }];
+  private boardAt = 0;
+  private boardAskSeen = 0;
   private thumbs: CanvasImageSource[] = [];
   /** How many frames this board has ever taken; a frame keeps its number when older ones drop off. */
   private taken = 0;
@@ -296,6 +323,8 @@ export class ViewfinderSystem extends createSystem({
   private historyClock = 0;
   private historyPending = '';
   private effectTick = 0;
+  /** How long a frame takes now, smoothed: the monitor's own redraws give way when it runs long. */
+  private frameSeconds = 0.011;
   /** The briefs met so far, by title. */
   private printed: string[] = [];
   /** The frame the set stands at now: the one last snapped or sent back to, until something moves. */
@@ -387,6 +416,13 @@ export class ViewfinderSystem extends createSystem({
           this.clearBoard();
         }
       }),
+      g.boardAsked.subscribe((ask) => {
+        if (ask.n > this.boardAskSeen) {
+          this.boardAskSeen = ask.n;
+          if (ask.to < 0) this.addBoard(true);
+          else this.showBoard(ask.to);
+        }
+      }),
       this.world.visibilityState.subscribe(() => {
         this.liveFrames = LIVE_AT_START;
       }),
@@ -404,6 +440,7 @@ export class ViewfinderSystem extends createSystem({
       .then(() => document.fonts.load('700 24px "Big Shoulders"'))
       .then(() => this.drawBoard());
     this.restoreBoard();
+    this.restoreBoards();
     const briefs = loadJson<SavedBriefs>(StoreKey.Briefs);
     if (briefs != null && Number.isInteger(briefs.index) && Array.isArray(briefs.printed)) {
       this.printed = briefs.printed.slice(0, BRIEFS.length);
@@ -426,7 +463,12 @@ export class ViewfinderSystem extends createSystem({
 
   /** The whole storyboard, for saving. */
   boardPicture(): HTMLCanvasElement {
-    return this.boardCanvas;
+    // The frames, without the row of tabs under them: those are for the hand, not for the page.
+    const picture = document.createElement('canvas');
+    picture.width = this.boardCanvas.width;
+    picture.height = Math.round((this.boardCanvas.width * FRAMES_HEIGHT) / CARD_WIDTH);
+    picture.getContext('2d')?.drawImage(this.boardCanvas, 0, 0);
+    return picture;
   }
 
   /** The monitor's picture as it stands, right way up, on a canvas. */
@@ -558,6 +600,30 @@ export class ViewfinderSystem extends createSystem({
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
     ctx.textBaseline = 'alphabetic';
+    // The boards, along the foot of the card: a tab each, the one showing in yellow, and a + for a new one.
+    const tabsTop = FRAMES_HEIGHT * px;
+    const tabW = TAB_WIDTH * px;
+    const tabH = TABS_HEIGHT * px - gap * 0.6;
+    ctx.fillStyle = INK;
+    ctx.fillRect(0, tabsTop - gap * 0.2, W, H - tabsTop + gap * 0.2);
+    ctx.textAlign = 'center';
+    for (let i = 0; i <= MAX_BOARDS; i++) {
+      const isNew = i === this.boards.length;
+      if (i > this.boards.length || (isNew && this.boards.length >= MAX_BOARDS)) break;
+      const x = gap + i * tabW;
+      const showing = i === this.boardAt;
+      ctx.fillStyle = showing ? '#d6e13c' : isNew ? INK : SLOT_EMPTY;
+      ctx.fillRect(x + 4, tabsTop + gap * 0.15, tabW - 8, tabH);
+      if (isNew) {
+        ctx.strokeStyle = CHALK_DUST;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x + 6, tabsTop + gap * 0.15 + 2, tabW - 12, tabH - 4);
+      }
+      ctx.fillStyle = showing ? INK : isNew ? CHALK : PAPER;
+      ctx.font = `700 ${Math.round(tabH * 0.56)}px "Big Shoulders"`;
+      ctx.fillText(isNew ? '+ NEW' : `BOARD ${i + 1}`, x + tabW / 2, tabsTop + gap * 0.15 + tabH * 0.7);
+    }
+    ctx.textAlign = 'left';
     for (let i = 0; i < MAX_FRAMES; i++) {
       const x = gap + (i % FRAME_COLUMNS) * (frameW + gap);
       const y = gap + Math.floor(i / FRAME_COLUMNS) * (frameH + caption + gap);
@@ -643,6 +709,7 @@ export class ViewfinderSystem extends createSystem({
         (s.distanceToCreatureM >= 0 ? `, ${s.distanceToCreatureM.toFixed(1)} m from creature` : ''),
     );
     g.shotFrames.value = this.shots.slice();
+    this.publishBoards();
   }
 
   /** The board from the last visit, if this browser kept one. */
@@ -652,13 +719,152 @@ export class ViewfinderSystem extends createSystem({
     this.shots = saved.shots.filter(validShot).slice(-MAX_FRAMES);
     if (this.shots.length === 0) return;
     this.taken = Math.max(saved.taken ?? 0, this.shots.length);
+    this.loadThumbs();
+    this.publishBoard();
+  }
+
+  /** The pictures of the frames now on the board, read from what each frame carries. */
+  private loadThumbs(): void {
     this.thumbs = this.shots.map((shot) => {
       const image = new Image();
       image.onload = () => this.drawBoard();
       image.src = shot.dataUrl;
       return image;
     });
+  }
+
+  /** The other boards from earlier visits, if this browser kept them, round the one showing. */
+  private restoreBoards(): void {
+    const saved = loadJson<SavedBoards>(StoreKey.Boards);
+    const showing: SavedBoard = { taken: this.taken, shots: this.shots };
+    this.boards = [];
+    if (saved != null && Array.isArray(saved.boards)) {
+      const at = Math.max(0, Math.min(saved.boards.length - 1, Math.round(saved.at ?? 0)));
+      saved.boards.forEach((board, i) => {
+        if (i === at) {
+          this.boardAt = this.boards.length;
+          this.boards.push(showing);
+          return;
+        }
+        if (board == null || !Array.isArray(board.shots)) return;
+        const shots = board.shots.filter(validShot).slice(-MAX_FRAMES);
+        if (shots.length > 0) this.boards.push({ taken: Math.max(board.taken ?? 0, shots.length), shots });
+      });
+    }
+    if (!this.boards.includes(showing)) {
+      this.boardAt = this.boards.length;
+      this.boards.push(showing);
+    }
+    while (this.boards.length > MAX_BOARDS) {
+      // More than there are tabs for (a file from elsewhere): the oldest that is not showing goes.
+      const drop = this.boardAt === 0 ? 1 : 0;
+      this.boards.splice(drop, 1);
+      if (drop < this.boardAt) this.boardAt--;
+    }
+    this.publishBoards();
+    this.drawBoard();
+  }
+
+  /** Says which boards there are, to the panel and the page. */
+  private publishBoards(): void {
+    this.boards[this.boardAt] = { taken: this.taken, shots: this.shots };
+    (this.globals as Globals).boardsNow.value = { at: this.boardAt, frames: this.boards.map((board) => board.shots.length) };
+  }
+
+  /**
+   * Kept for the next visit: the others here, the one showing under its own key as it always was. Storage that is
+   * full gives up the frames of the oldest board that is not showing, and says so, to hold the rest.
+   */
+  private saveBoards(): void {
+    this.publishBoards();
+    const others = (): SavedBoards => ({ at: this.boardAt, boards: this.boards.map((board, i) => (i === this.boardAt ? { taken: 0, shots: [] } : board)) });
+    while (!saveJson(StoreKey.Boards, others())) {
+      const oldest = this.boards.findIndex((board, i) => i !== this.boardAt && board.shots.length > 0);
+      if (oldest < 0) break;
+      this.boards.splice(oldest, 1);
+      if (oldest < this.boardAt) this.boardAt--;
+      (this.globals as Globals).coachNote.value = 'THIS BROWSER IS FULL | The oldest board had to go to keep the newest. Save boards from the page to keep them for good.';
+      this.publishBoards();
+    }
+  }
+
+  /** Changing boards waits for a shoot or a take to finish. */
+  private boardsBusy(): boolean {
+    const g = this.globals as Globals;
+    if (g.coverageRunning?.peek() === true) {
+      g.coachNote.value = 'COVERAGE IS SHOOTING | Let it finish, or stop it, then change boards.';
+      return true;
+    }
+    if (g.takeState.peek() !== 'idle') {
+      g.coachNote.value = 'A TAKE IS RUNNING | Stop the take, then change boards.';
+      return true;
+    }
+    return false;
+  }
+
+  /** The board at this tab comes up. The one that was showing stays in the row (an empty one closes behind you). */
+  private showBoard(index: number): void {
+    const g = this.globals as Globals;
+    if (index < 0 || index >= this.boards.length || index === this.boardAt || this.boardsBusy()) return;
+    let to = index;
+    if (this.shots.length === 0) {
+      this.boards.splice(this.boardAt, 1);
+      if (this.boardAt < to) to--;
+    } else {
+      this.boards[this.boardAt] = { taken: this.taken, shots: this.shots };
+    }
+    this.boardAt = to;
+    this.shots = this.boards[to].shots;
+    this.taken = Math.max(this.boards[to].taken ?? 0, this.shots.length);
+    this.recalledIndex = -1;
+    this.loadThumbs();
+    saveJson(StoreKey.Board, { taken: this.taken, shots: this.shots } satisfies SavedBoard);
+    this.saveBoards();
+    this.drawBoard();
     this.publishBoard();
+    const frames = this.shots.length === 1 ? '1 frame' : `${this.shots.length} frames`;
+    g.coachNote.value = `BOARD ${to + 1} | ${frames}. Pinch one to bring its set back. Your other boards are on the tabs under it.`;
+  }
+
+  /**
+   * A new board at the end of the row, showing. With every tab taken there is no room for one: the board showing is
+   * cleared instead when the panel's New board asked (it warned), and nothing happens when the card's + did.
+   */
+  private addBoard(fromTab: boolean): void {
+    const g = this.globals as Globals;
+    if (fromTab && this.boardsBusy()) return;
+    if (this.shots.length === 0) {
+      // The board showing is empty already: it is the new board.
+      if (fromTab) g.coachNote.value = `BOARD ${this.boardAt + 1} IS EMPTY | Snap frame fills it.`;
+      return;
+    }
+    if (this.boards.length >= MAX_BOARDS) {
+      if (fromTab) {
+        g.coachNote.value = `${MAX_BOARDS} BOARDS IS THE MOST | Save one from the page, then New board on the panel clears the one showing.`;
+        return;
+      }
+    } else {
+      this.boards[this.boardAt] = { taken: this.taken, shots: this.shots };
+      this.boards.push({ taken: 0, shots: [] });
+      this.boardAt = this.boards.length - 1;
+    }
+    this.shots = [];
+    this.thumbs = [];
+    this.taken = 0;
+    this.recalledIndex = -1;
+    clearKey(StoreKey.Board);
+    this.saveBoards();
+    this.drawBoard();
+    this.publishBoard();
+    if (fromTab) g.coachNote.value = `BOARD ${this.boardAt + 1} | A new board. The set is as it was: Snap frame fills this one.`;
+  }
+
+  /** The tab at this distance along the card's foot, in metres from its left edge. */
+  private tabAt(u: number): void {
+    const index = Math.floor((u - FRAME_GAP) / TAB_WIDTH);
+    if (index < 0 || index > MAX_BOARDS) return;
+    if (index < this.boards.length) this.showBoard(index);
+    else if (index === this.boards.length && this.boards.length < MAX_BOARDS) this.addBoard(true);
   }
 
   /** Which frame on the card is at this point, measured from the card's top left in metres. */
@@ -1059,14 +1265,9 @@ export class ViewfinderSystem extends createSystem({
     saveJson(StoreKey.Briefs, { index, printed: this.printed } satisfies SavedBriefs);
   }
 
+  /** New board, from the panel: a fresh board for a fresh set. The one that was showing keeps its tab. */
   private clearBoard(): void {
-    this.shots = [];
-    this.thumbs = [];
-    this.taken = 0;
-    this.recalledIndex = -1;
-    clearKey(StoreKey.Board);
-    this.drawBoard();
-    this.publishBoard();
+    this.addBoard(false);
   }
 
   /** The monitor is a child of the stage, so it travels wherever the stage is placed. */
@@ -1128,7 +1329,9 @@ export class ViewfinderSystem extends createSystem({
       event.stopPropagation?.();
       if (event.point == null) return;
       const local = card.worldToLocal(this.c.copy(event.point));
-      this.recallAt(local.x + CARD_WIDTH / 2, CARD_HEIGHT / 2 - local.y);
+      const down = CARD_HEIGHT / 2 - local.y;
+      if (down > FRAMES_HEIGHT) this.tabAt(local.x + CARD_WIDTH / 2);
+      else this.recallAt(local.x + CARD_WIDTH / 2, down);
     });
     this.overlays.push(card, this.player);
     // Chalk haze on the slate plate, cloned so the shared material stays clean.
@@ -1342,7 +1545,9 @@ export class ViewfinderSystem extends createSystem({
       }
     }
     // An effect moves on its own, so the monitor keeps up with it, at a rate the headset can spare.
-    this.effectTick = (this.effectTick + 1) % EFFECT_LENS_EVERY;
+    this.frameSeconds += (Math.min(delta, 0.05) - this.frameSeconds) * 0.04;
+    const every = this.frameSeconds > FRAME_SLOWEST ? EFFECT_LENS_SLOWEST : this.frameSeconds > FRAME_SLOW ? EFFECT_LENS_SLOW : EFFECT_LENS_EVERY;
+    this.effectTick = (this.effectTick + 1) % every;
     if (this.liveFrames === 0 && !this.snapPending && this.effectTick === 0 && (this.globals as Globals).effectsOn.peek() > 0) {
       if (this.monitor?.visible === true) {
         this.aimLens(cam);

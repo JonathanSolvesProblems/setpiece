@@ -574,3 +574,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 var(--pad); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* The boards there are, above the one showing: a tab each and one for a new board. */
+.board-tabs { display: flex; flex-wrap: wrap; gap: calc(var(--unit) * 1.5); margin-bottom: calc(var(--unit) * 2.5); }
+.board-tabs[hidden] { display: none; }
+.board-tabs .lens { flex: 0 0 auto; min-width: 44px; padding: 0 calc(var(--unit) * 2.5); }

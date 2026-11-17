@@ -67,6 +67,9 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.roomScanRequested = signal(0);
   globals.roomScanOffered = signal(false);
   globals.newBoardRequested = signal(0);
+  // A board asked for by its tab (or -1 for a new one), and the boards there are (src/viewfinder.ts).
+  globals.boardAsked = signal({ to: 0, n: 0 });
+  globals.boardsNow = signal({ at: 0, frames: [0] });
   globals.coachLine = signal('');
   // What the call sheet is asking for right now: 'actor', 'camera', 'snap' or nothing.
   globals.coachTarget = signal('');
@@ -386,10 +389,39 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   for (const button of [document.getElementById('page-reset'), fresh]) {
     button?.addEventListener('click', () => {
       startOver(globals, false);
-      if (hint) hint.textContent = 'Started over: the next Enter XR is a first visit, walkthrough and all.';
-      if (button === fresh && fresh != null) fresh.textContent = 'Started over. Now press Enter XR';
+      if (hint) hint.textContent = 'A fresh set: the walkthrough runs again, and your boards keep their tabs.';
+      // The one under Enter XR goes straight in, in the same press: starting fresh is not two buttons.
+      if (button === fresh && enter != null && !enter.disabled && enter.dataset.mode !== 'copy') enter.click();
     });
   }
+  // The boards there are, above the storyboard: a tab each, and one for a new board (four is the most).
+  const boardTabs = document.getElementById('board-tabs');
+  const boardsNow = globals.boardsNow as Signal<{ at: number; frames: number[] }>;
+  const boardAsked = globals.boardAsked as Signal<{ to: number; n: number }>;
+  boardsNow.subscribe((now) => {
+    if (boardTabs == null) return;
+    const count = now.frames.length;
+    // One empty board is no row of tabs: there is nothing to change to yet.
+    boardTabs.hidden = count === 1 && (now.frames[0] ?? 0) === 0;
+    const tabs: HTMLButtonElement[] = [];
+    for (let i = 0; i <= count && i < 5; i++) {
+      const isNew = i === count;
+      if (isNew && (count >= 4 || (now.frames[now.at] ?? 0) === 0)) break;
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'lens';
+      tab.textContent = isNew ? '+ New board' : `Board ${i + 1}`;
+      if (!isNew) {
+        tab.setAttribute('aria-pressed', String(i === now.at));
+        tab.title = `${now.frames[i]} of 6 frames`;
+      }
+      tab.addEventListener('click', () => {
+        boardAsked.value = { to: isNew ? -1 : i, n: boardAsked.peek().n + 1 };
+      });
+      tabs.push(tab);
+    }
+    boardTabs.replaceChildren(...tabs);
+  });
   // A take on the page: drag a figure or the camera with the mouse while it records.
   const takeState = globals.takeState as Signal<string>;
   const takeLength = globals.takeLength as Signal<number>;

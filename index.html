@@ -153,7 +153,7 @@
             <div class="actions">
               <button id="enter-xr" class="primary" type="button" disabled>Setting the stage</button>
               <button id="page-mic" class="block" type="button" hidden>Allow the microphone, to say the shot</button>
-              <button id="page-fresh" class="block" type="button" hidden>Start over as a first visit</button>
+              <button id="page-fresh" class="block" type="button" hidden>Enter XR on a fresh set</button>
               <p class="hint" id="xr-hint">Open this page in the Meta Quest Browser, point at any table and pinch: the set lands on it.</p>
             </div>
           </div>
@@ -161,7 +161,8 @@
             <p class="try">
               Try it here: type a shot, drag a figure, pick a lens, snap a frame.
             </p>
-            <ol class="board" id="board" aria-label="Storyboard, the last six frames">
+            <div class="board-tabs" id="board-tabs" role="group" aria-label="Your boards" hidden></div>
+            <ol class="board" id="board" aria-label="Storyboard, six frames to a board">
               <li><span class="n">1</span></li>
               <li><span class="n">2</span></li>
               <li><span class="n">3</span></li>
