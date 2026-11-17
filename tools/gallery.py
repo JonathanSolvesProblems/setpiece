@@ -340,7 +340,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         said = {
             'designer': 'a night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop',
             'castle': 'a medieval castle gate with two guards and a horse, low angle',
-            'look': 'a night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop',
+            'look': 'two people arguing beside a red car in front of a house, a tree to one side, in daylight',
         }[recipe]
         # What the designer was shown at its first look, kept from the request the page sends.
         await page.evaluate('''() => {
@@ -396,11 +396,13 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
             label = ImageFont.truetype(str(ROOT / 'public' / 'ui' / 'fonts' / 'BigShoulders-Bold.ttf'), 40)
             draw.text((0, 740), 'WHAT IT SAW FIRST', font=label, fill=(214, 225, 60))
             draw.text((1360, 740), 'AFTER IT LOOKED', font=label, fill=(214, 225, 60))
-            import textwrap
+            import textwrap, re
+            # A piece is named once: "Truck (Truck)" is the truck, "A (Actor A)" is actor A.
+            named = lambda text: re.sub(r'^([^(:]+) \(([^)]+)\):', lambda m: m.group(2) + ':', text)
             # What it was told about its first frame: the first words of each piece's line, whole.
             y = 800
             for line in looks[0]['report'].split('\n')[:4]:
-                draw.text((0, y), line[2:].split(';')[0].split(', ')[0] + ', ' + line[2:].split(', ')[1] if ', ' in line else line[2:], font=face, fill=(199, 199, 183))
+                draw.text((0, y), named(line[2:].split(';')[0].split(', ')[0] + ', ' + line[2:].split(', ')[1] if ', ' in line else line[2:]), font=face, fill=(199, 199, 183))
                 y += 46
             # Its own note says what it changed, in full; the lines under it are measured from the frame it left.
             words = note.split(' | ', 1)[-1].split('. ', 1)[-1] if 'THROUGH THE LENS' not in note else note.split(' | ', 1)[-1]
@@ -409,7 +411,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
                 draw.text((1360, y), row, font=face, fill=(246, 247, 239))
                 y += 46
             for line in measured.split('\n')[:2]:
-                draw.text((1360, y), (line[2:].split(', ')[0] + ', ' + line[2:].split(', ')[1]) if ', ' in line else line[2:], font=face, fill=(199, 199, 183))
+                draw.text((1360, y), named((line[2:].split(', ')[0] + ', ' + line[2:].split(', ')[1]) if ', ' in line else line[2:]), font=face, fill=(199, 199, 183))
                 y += 46
             sheet.save(png)
     elif recipe == 'dresser':
