@@ -7,6 +7,7 @@
  * the grain shows is each material's own.
  */
 import { MeshStandardMaterial } from '@iwsdk/core';
+import { addToon } from './toon.js';
 
 const KEY = 'setpiece-wood-grain';
 /** How deep the grain shows: bare wood in full, under a coat of enamel only faintly. */
@@ -42,9 +43,12 @@ export function withGrain(material: MeshStandardMaterial): void {
         float grainAt = vGrainAt.y + sin(vGrainAt.z * 31.0) * 0.0035 + sin(vGrainAt.x * 57.0 + vGrainAt.z * 13.0) * 0.002;
         grainAt += sin(grainAt * 23.0 + vGrainAt.x * 7.0) * 0.004;
         float grainBands = grainAt * 390.0;
-        float grainShown = grainDepth * grainFade * clamp(1.5 - fwidth(grainBands) * 0.75, 0.0, 1.0);
+        // (A cartoon is flat colour: the grain is put away while the set is drawn as one.)
+        float grainShown = grainDepth * grainFade * (1.0 - toonOn) * clamp(1.5 - fwidth(grainBands) * 0.75, 0.0, 1.0);
         diffuseColor.rgb *= 1.0 - grainShown + grainShown * sin(grainBands) * sin(grainAt * 83.0 + 1.7);`,
       );
+    // And the cartoon switch every piece carries (src/toon.ts).
+    addToon(shader);
   };
   material.customProgramCacheKey = () => KEY;
   material.needsUpdate = true;

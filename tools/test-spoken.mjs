@@ -22,7 +22,7 @@ async function load(path) {
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
 }
 
-const { commandIn, commandWords, partsIn } = await load('src/spoken-commands.ts');
+const { commandIn, commandWords, mendHeard, partsIn } = await load('src/spoken-commands.ts');
 const { namesIn, parseRequest, speechWords, wordsOf } = await load('src/scene-words.ts');
 const { SHELF_ASSETS } = await load('src/catalog.ts');
 
@@ -222,6 +222,20 @@ check('the scene reader steps over "bigger" and adds the dragon', request.items.
 
 // The recogniser is told the control words, and no letter said alone.
 const words = commandWords();
+for (const [heard, want] of [
+  ['an enemy sword fight at night', 'an anime sword fight at night'],
+  ['make and enemies sorry fight at night', 'make an anime sorry fight at night'],
+  ['enemy style', 'anime style'],
+  ['animated look', 'anime look'],
+  ['a dragon and enemies fight', 'a dragon and enemies fight'],
+  ['animate this scene', 'animate this scene'],
+  ['animate the chase', 'animate the chase'],
+  ['the enemy battle plan', 'the enemy battle plan'],
+  ['an enemy soldier attacks in the final battle', 'an enemy soldier attacks in the final battle'],
+  ['two enemies face each other across a river', 'two enemies face each other across a river'],
+  ['a night chase, a red car racing past a burning truck', 'a night chase, a red car racing past a burning truck'],
+]) check(`"${heard}" is read as "${want}"`, mendHeard(heard) === want, mendHeard(heard));
+check('"animate" alone is the anime style', isDeepStrictEqual(commandIn(wordsOf('animate'), []), { do: 'style', style: 'anime' }), JSON.stringify(commandIn(wordsOf('animate'), [])));
 check('the word list has the controls', ['snap', 'eighty', 'closer', 'tripod', 'bigger', 'record', 'camera b'].every((word) => words.includes(word)));
 check('no single letter is listened for', words.every((word) => word.length > 1));
 check('every listed entry is plain lower-case words', words.every((word) => /^[a-z]+( [a-z]+)*$/.test(word)));

@@ -44,6 +44,7 @@ import type { Signal } from '@preact/signals-core';
 import { assetByLabel } from './catalog.js';
 import { localBounds } from './bounds.js';
 import { FRAME_STYLES, isFrameStyle, STYLE_NOW, styleFrame, withFrameStyles } from './frame-style.js';
+import { TOON, withToon } from './toon.js';
 import type { Dress } from './tray.js';
 import { BRIEFS } from './briefs.js';
 import type { Measure, PieceInFrame } from './briefs.js';
@@ -1300,6 +1301,9 @@ export class ViewfinderSystem extends createSystem({
       this.cleanupFuncs.push(
         style.subscribe((name) => {
           STYLE_NOW.value = isFrameStyle(name) ? FRAME_STYLES.indexOf(name) : 0;
+          // In anime the set itself is drawn as a cartoon, on the table and through the lens.
+          TOON.value = name === 'anime' ? 1 : 0;
+          this.refresh();
           saveJson(StoreKey.Settings, { ...(loadJson<Record<string, unknown>>(StoreKey.Settings) ?? {}), style: name });
         }),
       );
@@ -1462,11 +1466,13 @@ export class ViewfinderSystem extends createSystem({
           felt.map = seamTexture;
           felt.color.set(0xffffff);
           object.material = felt;
+          withToon(felt);
         } else if (/^(Torso|Chest|Head|Leg|Arm|Hand)/.test(object.name) && !/lamp/i.test(object.name)) {
           // (A vehicle's Headlamps are not a figure's head: they keep the lamp material the set's light turns up.)
           const wood = material.clone();
           wood.map = grainTexture;
           object.material = wood;
+          withToon(wood);
         }
         object.castShadow = true;
         object.receiveShadow = true;

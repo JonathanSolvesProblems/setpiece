@@ -547,7 +547,7 @@ export class CoachSystem extends createSystem({
       case Step.Done: {
         const s = Math.round(this.doneSeconds);
         const took = s > 0 ? ` in ${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s` : '';
-        return ['BOARD FULL', `Six frames${took}. Pinch Save the board on the panel: the board and the take wait on the page.`];
+        return ['BOARD FULL', `Six frames${took}. Pinch Save the board: its picture is saved and you carry on. Your boards are on the tabs under the storyboard.`];
       }
       case Step.Welcome:
         // Only say the set is where it was left when it is.

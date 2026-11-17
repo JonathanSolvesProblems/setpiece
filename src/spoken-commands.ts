@@ -142,13 +142,29 @@ const GO_JOINS = new Set(['by', 'next', 'near', 'beside', 'behind', 'over', 'up'
 
 /** Taking the last change back, as it is said. "Bring it back" after a piece was struck is this too. */
 const UNDO = new Set(['undo', 'undo that', 'undo it', 'undo this', 'put it back', 'put that back', 'bring it back', 'bring that back', 'take that back']);
+/**
+ * The headset's recogniser has no word "anime": it writes "enemy", "enemies", "animate" or "any may" (headset,
+ * 17 Nov: "an enemy sword fight at night"). Where one of those stands just before what an anime is of (a fight, a
+ * scene, a style), it is put back, for the reader of controls and for the set designer alike.
+ */
+const ANIME_OF = '(?:fight|duel|battle|chase|scene|shot|film|movie|short|showdown|standoff|style|look|cartoon)';
+/** "an enemy sword fight": the article, the word, at most one more word, then what it is of. */
+const ANIME_AFTER_AN = new RegExp(`\\b(?:an|a)\\s+(?:enemy|enemies)(\\s+(?:[a-z]+\\s+)?${ANIME_OF})\\b`, 'gi');
+/** "and enemies sword fight", only as the sentence begins (after "make" or not): "a dragon and enemies fight" is left alone. */
+const ANIME_AT_START = new RegExp(`^((?:make\\s+)?)and\\s+(?:enemy|enemies)(\\s+(?:[a-z]+\\s+)?${ANIME_OF})\\b`, 'i');
+/** "enemy style", "animated look": the word straight before a word for how a picture is drawn. */
+const ANIME_STYLE = /\b(?:enemy|enemies|animate|animated|any may|anna may|annie may)(\s+(?:style|look|mode|frames?))\b/gi;
+export function mendHeard(text: string): string {
+  return text.replace(ANIME_STYLE, 'anime$1').replace(ANIME_AFTER_AN, 'an anime$1').replace(ANIME_AT_START, '$1an anime$2');
+}
+
 /** A style for the frames, said by its name; and what else such a sentence may hold. */
 const STYLE_NAMES: Record<string, FrameStyle> = {
-  anime: 'anime', cartoon: 'anime', manga: 'anime', sketch: 'sketch', sketched: 'sketch', pencil: 'sketch', noir: 'noir',
+  anime: 'anime', cartoon: 'anime', manga: 'anime', animate: 'anime', animated: 'anime', sketch: 'sketch', sketched: 'sketch', pencil: 'sketch', noir: 'noir',
   photo: 'photo', photograph: 'photo', photographic: 'photo', realistic: 'photo',
 };
 const STYLE_TRIGGERS = new Set(['style', 'look', 'frames', 'mode', 'storyboard']);
-const STYLE_ALONE = new Set(['anime', 'cartoon', 'manga', 'sketch', 'pencil', 'noir']);
+const STYLE_ALONE = new Set(['anime', 'cartoon', 'manga', 'animate', 'sketch', 'pencil', 'noir']);
 const STYLE_CARRY = new Set(['it', 'this', 'that', 'make', 'draw', 'in', 'as', 'to', 'into', 'switch', 'go', 'back', 'like', 'set', 'show', 'use', 'change', 'frame', 'board', 'them', 'everything', 'all', 'monitor', 'drawing', 'drawn']);
 const POLITE = new Set(['please', 'now', 'okay', 'ok', 'just', 'um', 'uh', 'and', 'then', 'can', 'you', 'could']);
 const REMOVE_IT = /^(remove|delete|erase|lose|scrap|ditch|get rid of|take away|take out) (it|that|this)( one)?$|^take (it|that|this) (away|out|off)$/;

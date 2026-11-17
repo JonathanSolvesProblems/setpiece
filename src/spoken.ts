@@ -20,6 +20,7 @@ import { PiecesSystem } from './pieces.js';
 import { partsOf, understand } from './scene-request.js';
 import type { Spoken } from './scene-request.js';
 import type { Command } from './spoken-commands.js';
+import { mendHeard } from './spoken-commands.js';
 import { TakeState } from './take.js';
 import { TraySystem } from './tray.js';
 import { ViewfinderSystem } from './viewfinder.js';
@@ -57,7 +58,8 @@ const TAKE_IS_RUNNING = 'A TAKE IS RUNNING | Say stop first, then say it again.'
  * everything else, a set, a change to it, a move, goes to the designer; controls said after it wait until
  * the designer's set is up. Without the designer, the library's reader builds what it can.
  */
-export function hear(world: World, text: string, library = false): void {
+export function hear(world: World, heard: string, library = false): void {
+  const text = mendHeard(heard);
   const g = world.globals as unknown as Globals;
   const director = world.getSystem(DirectorSystem);
   if (!library && director != null && director.available()) {

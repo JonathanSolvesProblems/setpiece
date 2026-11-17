@@ -3,7 +3,7 @@
  * storyboard (sketch), as flat colour with inked lines (anime), or in hard black and white (noir). A storyboard is
  * a drawing as often as a photograph, and the plan may be for an animation as easily as a film.
  *
- * It is a treatment of the lens's picture, never of the set: the pieces on the table are what they were. The
+ * It is a treatment of the lens's picture. (In anime the set is drawn as a cartoon as well: src/toon.ts.) The
  * monitor's own material draws it live (one small quad), and a snapped frame is put through the same sums once, on
  * the frame's own pixels, so the board shows what the monitor showed.
  */

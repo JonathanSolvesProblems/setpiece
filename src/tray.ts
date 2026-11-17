@@ -5,6 +5,7 @@
  * and the parts of a creature that move on their own are the only things here
  * that run by themselves, so this is also where their clock lives.
  */
+import { withToon } from './toon.js';
 import { createSystem, DepthOccludable, Entity, Mesh, MeshStandardMaterial, Object3D, OcclusionShadersMode, ShaderMaterial } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { CAMERAS, Rig, SENSORS } from './camera-formats.js';
@@ -264,6 +265,8 @@ export class TraySystem extends createSystem({
       if (!piece.hasComponent(ShotCamera)) this.freeze(piece);
       piece.object3D!.traverse((object) => {
         if (object instanceof Mesh && PAINTED.test(object.name)) withGrain(object.material as MeshStandardMaterial);
+        // Every other part of a piece can be drawn as a cartoon too (src/toon.ts).
+        else if (object instanceof Mesh && object.material instanceof MeshStandardMaterial) withToon(object.material);
         // A lamp's light on the ground is light, not something to point at.
         if (object.name === 'LampPool' || object.name === 'LampHalo') object.raycast = () => {};
         if (object.name !== 'EffectParticles') return;
