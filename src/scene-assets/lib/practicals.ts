@@ -44,30 +44,47 @@ export function poolGeometry(radius: number): RingGeometry {
 }
 
 /**
- * The glow round a burning lamp: three shells one inside the other, each adding a little warm light, so it is
- * brightest at the bulb and gone at its edge from wherever it is seen. One mesh, coloured in its vertices, drawn
- * with the pool's own material, so it comes up with the pool as the light falls and costs no shader of its own.
+ * The glow round a burning lamp: three soft discs through its middle, one across each axis, each brightest at the
+ * centre and gone at its rim, drawn from both sides. Seen from anywhere at least one faces the eye, so it reads as
+ * a round glow that thins away with no edge. (Shells one inside another showed their rims as rings in a close
+ * shot.) One mesh, coloured in its vertices, drawn with the pool's own material, so it comes up with the pool as
+ * the light falls and costs no shader of its own.
  */
-export function haloGeometry(radius: number, around = 14, up = 10): BufferGeometry {
-  const shells = [
-    [1, 0.07],
-    [0.6, 0.16],
-    [0.3, 0.42],
-  ] as const;
+export function haloGeometry(radius: number, around = 16, rings = 3): BufferGeometry {
   const positions: number[] = [];
   const colours: number[] = [];
   const index: number[] = [];
-  for (const [share, light] of shells) {
-    const shell = new SphereGeometry(radius * share, around, up);
-    const at = shell.getAttribute('position');
+  const STRENGTH = 0.42;
+  for (let axis = 0; axis < 3; axis++) {
     const first = positions.length / 3;
-    for (let i = 0; i < at.count; i++) {
-      positions.push(at.getX(i), at.getY(i), at.getZ(i));
-      colours.push(light, light * 0.74, light * 0.42);
+    const put = (u: number, v: number, k: number): void => {
+      if (axis === 0) positions.push(0, u, v);
+      else if (axis === 1) positions.push(u, 0, v);
+      else positions.push(u, v, 0);
+      colours.push(STRENGTH * k, STRENGTH * k * 0.74, STRENGTH * k * 0.42);
+    };
+    put(0, 0, 1);
+    for (let r = 1; r <= rings; r++) {
+      const out = r / rings;
+      for (let i = 0; i < around; i++) {
+        const turn = (i / around) * Math.PI * 2;
+        put(Math.cos(turn) * radius * out, Math.sin(turn) * radius * out, (1 - out) * (1 - out));
+      }
     }
-    const faces = shell.getIndex();
-    if (faces != null) for (let i = 0; i < faces.count; i++) index.push(first + faces.getX(i));
-    shell.dispose();
+    // Each face twice, once wound each way: the material draws one side only.
+    const face = (a: number, b: number, c: number): void => {
+      index.push(first + a, first + b, first + c, first + a, first + c, first + b);
+    };
+    for (let i = 0; i < around; i++) face(0, 1 + i, 1 + ((i + 1) % around));
+    for (let r = 1; r < rings; r++) {
+      for (let i = 0; i < around; i++) {
+        const inner = 1 + (r - 1) * around;
+        const outer = 1 + r * around;
+        const next = (i + 1) % around;
+        face(inner + i, outer + i, outer + next);
+        face(inner + i, outer + next, inner + next);
+      }
+    }
   }
   const halo = new BufferGeometry();
   halo.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
@@ -153,7 +170,7 @@ export function beamGeometry(width: number, spread: number, reach: number, colou
 }
 
 const HEADLAMP_LIGHT = [0.6, 0.54, 0.42] as const;
-const HEADLAMP_GLOW = haloGeometry(0.03, 10, 6);
+const HEADLAMP_GLOW = haloGeometry(0.03, 12, 3);
 
 /**
  * A vehicle's headlamps burning: a glow at each (they are `half` to either side of the middle, `y` up, at `z`) and
@@ -180,7 +197,7 @@ export function headlights(vehicle: Group, half: number, y: number, z: number): 
  */
 export const FIRE_LIGHT = LAMP_POOL.clone();
 FIRE_LIGHT.opacity = 0.6;
-const FIRE_GLOW = haloGeometry(0.1, 10, 6);
+const FIRE_GLOW = haloGeometry(0.12, 20, 4);
 const FIRE_POOL = poolGeometry(0.11);
 
 /** The glow round a fire's flames and its light on whatever it stands on. Not part of its shape. */

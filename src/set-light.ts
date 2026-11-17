@@ -330,8 +330,8 @@ export class SetLightSystem extends createSystem({ environment: { required: [IBL
     WINDOW_GLASS.emissiveIntensity = 1.5 * look.practical;
     LAMP_GLOW.emissiveIntensity = 0.6 + 1.8 * look.practical;
     LAMP_POOL.opacity = 0.75 * look.practical;
-    HEADLAMPS.emissiveIntensity = 2.2 * look.practical;
-    TAIL_LAMPS.emissiveIntensity = 1.6 * look.practical;
+    HEADLAMPS.emissiveIntensity = 1.25 * look.practical;
+    TAIL_LAMPS.emissiveIntensity = 0.9 * look.practical;
     const fill = this.fill!;
     fill.color.setHex(look.sky);
     fill.groundColor.setHex(look.ground);
