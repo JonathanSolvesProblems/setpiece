@@ -34,6 +34,8 @@ check(
 check('the loading card is in the page', /id="loader"/.test(html) && /id="loader-step"/.test(html));
 check('the page controls start locked until the set is ready', /class="strip"[^>]*\binert\b/.test(html) && /id="enter-xr"[^>]*disabled/.test(html));
 check('the page signs itself', /jonathansolvesproblems\.com/.test(html));
+// The boards a visitor made are on the page: a row of tabs by the storyboard, and under Enter XR the one the session carries on with.
+check('the page has the board tabs and the carry-on row', /id="board-tabs"/.test(html) && /id="enter-boards"/.test(html));
 const script = /src="\.?\/?(assets\/index-[\w-]+\.js)"/.exec(html)?.[1];
 check('the app script is named in the page', script != null, script ?? 'none');
 // Vite splits shared code into chunks the page preloads; a claim about the code is checked against all of them.
@@ -64,7 +66,7 @@ if (script) {
 const panel = await get('ui/controls.uikitml');
 check('the headset panel is served', panel.status === 200);
 const panelText = panel.text();
-for (const id of ['btn-snap', 'btn-record', 'btn-voice', 'btn-life', 'tab-assets', 'btn-find-table', 'btn-more', 'btn-shelf-more', 'btn-undo', 'btn-inside']) {
+for (const id of ['btn-snap', 'btn-record', 'btn-voice', 'btn-life', 'tab-assets', 'btn-find-table', 'btn-more', 'btn-shelf-more', 'btn-undo', 'btn-inside', 'btn-drawn', 'btn-world']) {
   check(`the panel has ${id}`, panelText.includes(`id="${id}"`));
 }
 // A second element with the same id is never found, so its button does nothing.

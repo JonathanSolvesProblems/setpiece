@@ -1,17 +1,18 @@
 # Live site checks
 
-Run on 2026-11-17 18:30 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: fa23fea-20261117T1829.
+Run on 2026-11-17 20:11 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: fa23fea-20261117T1829.
 
-**54 of 54 passed.**
+**57 of 57 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 271 ms |
+| the page answers over HTTPS | pass | 200, 166 ms |
 | it is Setpiece | pass |  |
 | search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
+| the page has the board tabs and the carry-on row | pass |  |
 | the app script is named in the page | pass | assets/index-C-td3dlW.js |
 | version.json is served | pass | 200 |
 | version.json names a build | pass | fa23fea-20261117T1829 |
@@ -31,15 +32,17 @@ Run on 2026-11-17 18:30 UTC against https://setpiece.jonathansolvesproblems.com/
 | the panel has btn-shelf-more | pass |  |
 | the panel has btn-undo | pass |  |
 | the panel has btn-inside | pass |  |
+| the panel has btn-drawn | pass |  |
+| the panel has btn-world | pass |  |
 | every panel element id is used once | pass |  |
 | the page has the Shot box and three shots to try | pass |  |
 | the set designer answers and has its key | pass | 200, ready true |
 | another site is refused by the set designer | pass | 403 |
-| a sentence comes back as a set with a horse in it | pass | 200, end_turn, first piece of the reply at 2089 ms, whole 3392 ms |
-| the reply carries a pass for the line it will speak | pass | "A horse stands in an open field by a tree and fence, framed " |
-| the reply streams: its first part arrives well before its last | pass | 61 parts, the first 2165 ms after the request and the last at 3392 ms |
+| a sentence comes back as a set with a horse in it | pass | 200, end_turn, first piece of the reply at 917 ms, whole 2199 ms |
+| the reply carries a pass for the line it will speak | pass | "A horse stands in an open field by a fence and tree, framed " |
+| the reply streams: its first part arrives well before its last | pass | 54 parts, the first 981 ms after the request and the last at 2199 ms |
 | the voice answers and has its key | pass | 200, ready true |
-| the designer's line comes back read aloud | pass | 200, audio/mpeg, 46855 bytes in 352 ms |
+| the designer's line comes back read aloud | pass | 200, audio/mpeg, 46855 bytes in 325 ms |
 | words with no pass, or with the pass of another line, are not read | pass | 403, 403 |
 | another site is refused by the voice | pass | 403 |
 | the designer's 12 recorded lines are served in both voices | pass | 24 of 24 files |

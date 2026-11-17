@@ -27,7 +27,7 @@ The set designer and its voice are two server functions (`api/director.ts`, `api
 
 `npm run dev` opens a managed browser with the Immersive Web SDK emulator. `npm run typecheck` checks types. `npm run build` writes `dist/` for any static host. `node tools/make-audio.mjs` regenerates the fifteen sounds, and `node tools/make-voice-lines.mjs` records the set designer's fixed lines again (it needs an ElevenLabs key, and only records a line whose words changed).
 
-To check it yourself: `node tools/check-live.mjs` asserts 54 things about the live site and writes what it found to `devpost/checks/last-run.md`. `npm run check:claims` fails when this README or the submission text disagrees with the code or the measurements. Every number in this file traces to `devpost/sources.md`.
+To check it yourself: `node tools/check-live.mjs` asserts 57 things about the live site and writes what it found to `devpost/checks/last-run.md`. `npm run check:claims` fails when this README or the submission text disagrees with the code or the measurements. Every number in this file traces to `devpost/sources.md`.
 
 ## Why
 
