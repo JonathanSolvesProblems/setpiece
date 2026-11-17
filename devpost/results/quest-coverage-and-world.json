@@ -1,0 +1,47 @@
+{
+ "what": "Readings taken over the cable from a Meta Quest 3S while its wearer used Setpiece on the live site (setpiece.jonathansolvesproblems.com) on 17 November 2026, in two sessions. Every set was built by the set designer from sentences the wearer spoke in his own words; nothing was replayed. Times are from the session's log (one line each time its state changed, to the second). Frame rates are frames counted over four or five seconds of the session's own animation loop, or the log's own one-minute averages where it says so.",
+ "measured": "2026-11-17",
+ "device": "Meta Quest 3S, Quest Browser, both hands tracked",
+ "caveat": "The headset's own screen recorder was running throughout both sessions, to film them. On 16 November it was measured to cost about ten frames a second. No frame rate here was taken with it off, so none of these is quoted in the submission as the app's frame rate.",
+ "sessions": [
+  {
+   "build": "f448647",
+   "started": "11:40",
+   "shoot_coverage": [
+    { "pressed": "11:43:24", "first_shot_named": "11:43:29", "done": "11:43:45", "planned": 6, "shot": 5, "seconds_from_press_to_done": 21, "why_fewer": "one frame was already on the six-frame board" }
+   ],
+   "designer": [
+    { "said": "a road crew guiding cars past the part still under construction", "heard_to_set_standing_seconds": 4 },
+    { "said": "five workers building a deck under a clear roof, fenced on the sides and front", "heard_to_set_standing_seconds": 7, "pieces": 11, "made_by_the_designer": 5 },
+    { "said": "add another worker", "heard_to_changed_seconds": 2 },
+    { "said": "make it start snowing", "heard_to_changed_seconds": 1 },
+    { "said": "part of the fence catches fire and a firefighter hoses it down", "heard_to_changed_seconds": 3 }
+   ],
+   "frames_per_second_with_the_recorder_running": [
+    { "where": "the deck set on the table in day light (7 pieces), the scene's sky standing behind the set", "value": 72.2, "over_seconds": 4, "worst_frame_ms": 21 },
+    { "where": "the same set a few seconds later with that sky switched off", "value": 74.8, "over_seconds": 4, "worst_frame_ms": 20 },
+    { "where": "17 pieces with snow, fire, smoke and water all running, the wearer stepping inside during the count", "value": 61.1, "over_seconds": 5, "worst_frame_ms": 43 },
+    { "where": "the log's one-minute averages across that 17-piece set", "values": [56.4, 59.6, 52.2] },
+    { "where": "the log's one-minute averages on the lighter sets before it", "values": [67.7, 65.8] }
+   ],
+   "what_the_sky_costs": "2.6 frames a second on that set (72.2 with it, 74.8 without)"
+  },
+  {
+   "build": "db7dfe5",
+   "started": "12:21",
+   "change_since": "While an effect runs, the monitor is redrawn less often when frames run long (src/viewfinder.ts, EFFECT_LENS_SLOW).",
+   "shoot_coverage": [
+    { "pressed": "12:24:29", "first_shot_named": "12:24:34", "done": "12:24:54", "planned": 6, "shot": 6, "seconds_from_press_to_done": 25 }
+   ],
+   "designer": [
+    { "said": "workers building an aircraft while civilians watch from a distance", "heard_to_set_standing_seconds": 5 },
+    { "said": "add a ladder over the aircraft with a worker on its roof", "heard_to_changed_seconds": 6 },
+    { "said": "it is raining now, add a big umbrella that covers the aircraft", "heard_to_changed_seconds": 2 }
+   ],
+   "frames_per_second_with_the_recorder_running": [
+    { "where": "the log's one-minute averages: the night chase, the aircraft set, the aircraft set in rain under the umbrella", "values": [63.5, 65.1, 68.5] }
+   ],
+   "boards": "After leaving and coming back, the tab for Board 1 brought its six coverage frames up again."
+  }
+ ]
+}

@@ -39,7 +39,11 @@ Open the link in the Quest Browser, sit at a table, press Enter XR. Point at the
 
 ## Then it's yours
 
-Pick up any piece with your fingers, or say what to change: "make the dragon bigger", "add rain". Pick a lens from 18 to 135 mm and snap, and the frame goes on a storyboard with its lens and height. Say "cover it" and it plans a wide and closer shots, then shoots them onto the board while you watch. Step inside and the set grows to full size around you. You leave with the board as an image, a shot list and a short animatic. The set, its light and the board are kept, so the next day you sit down to the same shot.
+Pick up any piece with your fingers, or say what to change: "make the dragon bigger", "add rain". Pick a lens from 18 to 135 mm and snap, and the frame goes on a storyboard with its lens and height. Say "cover it" and it plans a wide and closer shots, then shoots them onto the board while you watch. Step inside and the set grows to full size around you.
+
+It isn't only for film. Say "an anime sword fight on a rooftop" and the set on your table turns cartoon, flat colour with inked edges. Say "sketch" and the board is drawn in pencil, the way a storyboard usually is. A game level, a product photo and a stop-motion shot are planned the same way.
+
+You leave with the board as an image, a shot list and a short animatic. Up to four boards are kept, each with its set, so the next day you sit down to the same scenes.
 
 ## How it's built
 
@@ -47,11 +51,11 @@ Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes yo
 
 ## Measured
 
-On a Quest 3S I spoke two sentences in my own words. Both times the first piece was on the table 1.6 s after I stopped speaking, and the whole set stood at 3.3 s and 3.7 s. With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site, my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR, and standing inside a full-size set the designer had just built, it held 86 to 89 frames a second.
+On a Quest 3S I spoke two sentences in my own words. Both times the first piece was on the table 1.6 s after I stopped speaking, and the whole set stood at 3.3 s and 3.7 s. With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site, my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR, and standing inside a full-size set the designer had just built, it held 86 to 89 frames a second. Cover it planned six shots and had all six on the board 25 seconds after I pressed it.
 
 ## Not yet proven
 
-Cover it and walking the full-size set by pointing have run on the live page and in the emulator, not yet on the headset. Every headset session so far has been in my own room.
+Walking the full-size set by pointing, the anime and sketch looks, and saving a board without leaving the session have run on the live page and in the emulator, not yet on the headset. Every headset session so far has been in my own room.
 
 ## What's next
 
