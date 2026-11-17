@@ -28,6 +28,8 @@ def font_uri(name: str) -> str:
 W, H = 1500, 1000
 
 fps = json.loads((ROOT / 'devpost/results/quest-frame-rate.json').read_text(encoding='utf-8'))
+# Shoot coverage on the headset: the run in which all six planned shots went on the board.
+COVERAGE_SECONDS = next(run['seconds_from_press_to_done'] for session in json.loads((ROOT / 'devpost/results/quest-coverage-and-world.json').read_text(encoding='utf-8'))['sessions'] for run in session['shoot_coverage'] if run['shot'] == run['planned'])
 voice = json.loads((ROOT / 'devpost/results/voice-recognition.json').read_text(encoding='utf-8'))
 quest_voice = json.loads((ROOT / 'devpost/results/quest-voice.json').read_text(encoding='utf-8'))
 frame_time = json.loads((ROOT / 'devpost/results/quest-frame-time.json').read_text(encoding='utf-8'))
@@ -75,6 +77,7 @@ N = {
     'quest_whole_s': f"{quest_designer['runs'][0]['wholeSetMs'] / 1000:.1f}",
     'spoken_lines': len(spoken_lines),
     # The designer's sets on the headset, as the submission quotes them (tools/check-claims.mjs reads the same three).
+    'coverage_s': COVERAGE_SECONDS,
     'sets_standing': (lambda v: f'{min(v)} to {max(v)}')([round(s['frames_per_second']['idle']) for s in designer_sets]),
     'sets_moving': (lambda v: f'{min(v)} to {max(v)}')([round(s['frames_per_second']['one_piece_moving']) for s in designer_sets]),
     'checks_passed': re.search(r'\*\*(\d+) of (\d+) passed', checks).group(1),
@@ -97,18 +100,18 @@ SLIDES = [
          caption="Once the set is up it is shown its own camera's picture and how much of the frame each piece takes. It moves the camera if the shot is off."),
     dict(slug='dresser', badge='Replayed plan · devpost/results/designer-eval.json', headline='Nobody stands inside a car', picture=('live', 'dresser'),
          caption="The designer's own plan stood two actors inside a car parked side-on. Code stepped them out beside it before the camera was placed."),
-    dict(slug='speed', badge='Measured on a Quest 3S · devpost/results/quest-voice-designer.json', headline='{quest_first_s} s from your last word', picture=('result', 'designer'),
-         caption='Spoken on the headset: the first piece {quest_first_s} s after the last word, the whole set inside 4 s, at {sets_standing} frames a second.'),
+    dict(slug='speed', badge='Measured on a Quest 3S · devpost/results', headline='{quest_first_s} s from your last word', picture=('result', 'designer'),
+         caption='On the headset: the first piece {quest_first_s} s after my last word, the set whole inside 4 s, six shots on the storyboard {coverage_s} s after Cover it.'),
     dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'lines'),
          caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
     dict(slug='light', badge=LIVE_BADGE, headline='It lights the scene', picture=('live', 'light'),
          caption='The light comes from the sentence: a night chase is night, a duel at sunset golden hour. After dark the windows and the lamp are lit.'),
     dict(slug='draw', badge=LIVE_BADGE, headline='Draw it your way', picture=('live', 'draw'),
          caption='One frame four ways: as the lens sees it, a pencil storyboard, anime (the set itself turns cartoon), and hard black and white.'),
-    dict(slug='coverage', badge=LIVE_BADGE, headline='Say "cover it"', picture=('live', 'coverage'),
-         caption='The designer plans a wide and then closer shots, the camera goes to each one, and the board fills by itself while you watch.'),
-    dict(slug='pinch', badge=QUEST, headline='Reach in and pick it up', picture='captures/quest-hands-card.jpg',
-         caption='Put your fingers on a piece and pinch, or close a fist around it. The pointing ray steps aside when a hand is near a piece.'),
+    dict(slug='coverage', badge=QUEST_17, headline='Say "cover it"', picture='captures/quest-coverage-filling.jpg',
+         caption='Shot 4 of 6, in the headset: the designer planned the coverage, the camera goes to each shot and the board fills by itself. Six in {coverage_s} s.'),
+    dict(slug='pinch', badge=QUEST_17, headline='Reach in and pick it up', picture='captures/quest-dragon-in-hand.jpg',
+         caption='A hand carries the dragon off the roof onto the truck. Pinch a piece or close a fist on it; let go in the air and a dragon stays there.'),
     dict(slug='board', badge=LIVE_BADGE, headline='Six setups, each with its numbers', picture=('live', 'board'),
          caption='Each frame on the board is stamped with its lens, camera height, distance and every actor’s eyeline, measured where the pieces stood.'),
     dict(slug='lenses', badge=LIVE_BADGE, headline='Six lenses, 18 to 135 mm', picture=('live', 'lenses'),
@@ -192,7 +195,7 @@ def result_body(kind: str) -> str:
         return ('<div class="result stats">'
                 + cell(N['quest_first_s'], 's', f'from my last word to the first piece on the table. Spoken on a Quest 3S, {len(quest_designer["runs"])} sentences in my own words.')
                 + cell(f'{max(wholes):.1f}', 's', f'at most to the whole set standing ({" and ".join(f"{v:.1f}" for v in wholes)} s).')
-                + cell(N['sets_standing'].split(' to ')[0], 'fps', f'or more with its sets standing and both hands tracked ({N["sets_standing"]}); {N["sets_moving"]} with a piece moving.')
+                + cell(str(COVERAGE_SECONDS), 's', f'from pressing Shoot coverage to six shots planned, shot and on the storyboard. On the headset, 17 Nov.')
                 + f'<p class="muted foot">From a desktop, {hurry["plans"]} sentences: first piece a median {hurry["firstPieceMs"]["median"] / 1000:.1f} s, slowest {hurry["firstPieceMs"]["slowest"] / 1000:.1f} s.</p></div>')
     if kind == 'lines':
         when = {
@@ -524,7 +527,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
         from PIL import Image, ImageDraw, ImageFont
         # A duel from the real designer, then the same frame snapped in each of the four styles: what goes on the
         # board is what the app itself draws (src/frame-style.ts, and in anime the set as a cartoon, src/toon.ts).
-        await page.fill('#page-ask-text', 'a sword fight between two knights by a tree and a house at golden hour, low and wide')
+        await page.fill('#page-ask-text', 'a knight facing a red dragon in front of a castle gate, a tree and a horse beside them, in daylight, low and wide')
         await click('#page-ask-go')
         await page.wait_for_function('globalThis.setpiece.world.globals.designing.peek() === true', timeout=20000)
         idle = 0

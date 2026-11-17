@@ -41,19 +41,19 @@ One frame four ways: as the lens sees it, a pencil storyboard, anime (the set it
 ## 07 coverage
 
 ```
-The designer plans a wide and then closer shots, the camera goes to each one, and the board fills by itself while you watch.
+Shot 4 of 6, in the headset: the designer planned the coverage, the camera goes to each shot and the board fills by itself. Six in 25 s.
 ```
 
 ## 08 pinch
 
 ```
-Put your fingers on a piece and pinch, or close a fist around it. The pointing ray steps aside when a hand is near a piece.
+A hand carries the dragon off the roof onto the truck. Pinch a piece or close a fist on it; let go in the air and a dragon stays there.
 ```
 
 ## 09 speed
 
 ```
-Spoken on the headset: the first piece 1.6 s after the last word, the whole set inside 4 s, at 87 to 89 frames a second.
+On the headset: the first piece 1.6 s after my last word, the set whole inside 4 s, six shots on the storyboard 25 s after Cover it.
 ```
 
 ## 10 leave

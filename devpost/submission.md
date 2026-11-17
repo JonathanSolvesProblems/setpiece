@@ -29,37 +29,35 @@ New Experience
 ## Description
 
 ```
-About ten years ago I made short VFX films for YouTube: lightning in a field, a creature floating next to me in the woods. Every effect went in on a computer weeks after the shoot. On the day I was reaching for something that wasn't there and framing the shot around empty air. I switched to computer science after that.
+About ten years ago I made short VFX films for YouTube: lightning in a field, a creature floating next to me in the woods. Every effect went in on a computer weeks after the shoot. On the day I was framing the shot around empty air, with nothing for the actor to look at.
 
-Setpiece is a miniature film set on your real table, for a director planning a shot. You say the shot out loud, an AI set designer builds it at one-tenth scale, you move the actors and the camera with your hands, and you leave with a storyboard and a shot list. It's the table I needed back then.
+Setpiece is a miniature film set on your real table, for a director planning a shot before the shoot day. You say the shot out loud, an AI set designer builds it at one-tenth scale, you move the actors and the camera with your hands, and you leave with a storyboard and a shot list. On the headset, six shots were planned, shot and on the storyboard 25 seconds after I asked for them.
 
 ## The first minute
 
-Open the link in the Quest Browser, sit at a table, press Enter XR. Point at the table and pinch, and a film set lands on it. The set designer builds a first set by itself and says out loud what it built. Then a small arrow points at Talk. Say "a night chase, a red car racing past a burning truck, two actors running at camera, a dragon on a rooftop". The pieces drop onto your table one at a time as it writes them, with the actors posed, the light set for night and the camera placed. What the library doesn't have, a castle gate or a market stall, it builds from simple wooden shapes. Then it looks through its own camera and reframes if the shot is off.
+Open the link in the Quest Browser, sit at a table and press Enter XR. Point at the table and pinch, and a film set lands on it. The set designer builds a first set by itself and says out loud what it built, then a small arrow points at Talk. Say "a night chase, a red car racing past a burning truck, a dragon on a rooftop". The pieces drop onto your table one at a time, posed, lit for night, with the camera placed. What the library doesn't have, like a castle gate, it builds from simple wooden shapes. Then it looks through its own camera and moves it if the shot is off.
 
-## Then it's yours
+## Then you direct
 
-Pick up any piece with your fingers, or say what to change: "make the dragon bigger", "add rain". Pick a lens from 18 to 135 mm and snap, and the frame goes on a storyboard with its lens and height. Say "cover it" and it plans a wide and closer shots, then shoots them onto the board while you watch. Step inside and the set grows to full size around you.
+Pick up any piece with your fingers, or say what to change: "add rain". A tennis ball on a stand marks where the creature's eyes will be, and each frame records how far every actor looks up at it. Pick a lens from 18 to 135 mm and snap, and the frame goes on a storyboard with its lens and camera height. Say "cover it" and the designer plans a wide shot and closer ones, then shoots them onto the board while you watch. Step inside and the set grows to full size around you. Say "an anime sword fight" and the set turns cartoon; say "sketch" and the board is drawn in pencil.
 
-It isn't only for film. Say "an anime sword fight on a rooftop" and the set on your table turns cartoon, flat colour with inked edges. Say "sketch" and the board is drawn in pencil, the way a storyboard usually is. A game level, a product photo and a stop-motion shot are planned the same way.
-
-You leave with the board as an image, a shot list and a short animatic. Up to four boards are kept, each with its set, so the next day you sit down to the same scenes.
+You leave with the board as an image, the shot list as a spreadsheet and a short video of the moves you recorded. Up to four boards are kept, each with its set, so the next day you sit down to the same scenes.
 
 ## How it's built
 
-Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes your table the stage: the set sits at arm's reach where you pointed, and you lean round it the way you would lean round a model. Hit testing lands it with no room scan, a spatial anchor holds it there, and hands do everything. Speech becomes text on the headset; the designer gets the words, the list of pieces and the camera's picture, never your voice. The designer is Claude behind a server function, answering one piece a line, so each piece lands as soon as its line is written. Code then checks its work: an actor it stood inside a car is moved out before the camera is placed. ElevenLabs reads its replies aloud. Take the designer away and there is still a tool: a reader built into the app builds from the library's 51 pieces, and everything by hand works.
+Immersive Web SDK in the Quest Browser. Passthrough makes your table the stage: the set lands where you pointed, found by the headset's own surface detection with no room scan, and hands do everything. Speech becomes text on the headset. The designer is Claude behind a small server, answering one piece a line, so each piece lands as soon as its line is written. Code then checks its work: an actor it stood inside a car is moved out before the camera is placed. If the designer can't be reached, the app still builds from its own library of 51 pieces.
 
 ## Measured
 
-On a Quest 3S I spoke two sentences in my own words. Both times the first piece was on the table 1.6 s after I stopped speaking, and the whole set stood at 3.3 s and 3.7 s. With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site, my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR, and standing inside a full-size set the designer had just built, it held 86 to 89 frames a second. Cover it planned six shots and had all six on the board 25 seconds after I pressed it.
+On a Quest 3S I spoke two sentences in my own words. Both times the first piece was on the table 1.6 s after I stopped speaking, and the whole set stood at 3.3 s and 3.7 s. With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site, my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR. Cover it planned six shots and had all six on the board 25 seconds after I pressed it.
 
-## Not yet proven
+## Checked on the desktop page, not yet on the headset
 
-Walking the full-size set by pointing, the anime and sketch looks, and saving a board without leaving the session have run on the live page and in the emulator, not yet on the headset. Every headset session so far has been in my own room.
+Walking the full-size set by pointing, the anime and sketch looks, and saving a board without leaving the session. Tested in one room, mine; the set lands by live surface detection, so it doesn't rely on a stored room layout, but other rooms are untested. The heaviest set I built (17 pieces, four effects) ran at 52 to 60 frames a second with the headset's recorder running, which costs about ten; I haven't measured it again with the recorder off.
 
 ## What's next
 
-Two people around the same set: a director and a DP each with a headset, moving the same pieces and arguing over the same frame. Taking the board out to the tools a crew already uses, so a frame here opens as a camera in a 3D package. More of what the designer now has to build from shapes: interiors, crowds, animals. And rooms that aren't mine.
+Two people around the same set, a director and a camera operator each with a headset, arguing over the same frame.
 ```
 
 ## Hand interactions, and what excites me about VR
@@ -67,7 +65,7 @@ Two people around the same set: a director and a DP each with a headset, moving 
 ```
 Everything is done with hands. Reach out and pinch a piece, or close your fist on it, and it comes with you. Point and pinch for anything further away. A pinch held on the striped edge moves the whole set. Twisting your wrist turns what you're holding, and tilts the camera. I measured my own hand to set where a fist starts, because the first version only worked if you pointed in a straight line and pinched, and my hand kept trying to just grab the thing. Held actors squirm a little in your fingers, and you can turn that off.
 
-A newcomer is walked through once: the designer says each step out loud and a small arrow points at the button or the piece, and it can be skipped. Nobody has to be taught what to do with a tiny wooden actor, and building a set has no menu: it's one spoken sentence. At full size, you point at the floor and pinch to walk there, and turn with two buttons on the panel, without standing up.
+A newcomer is walked through once: the designer says each step out loud and a small arrow points at the button or the piece, and it can be skipped. Building a set has no menu: it's one spoken sentence. At full size, you point at the floor and pinch to walk there, and turn with two buttons on the panel, without standing up.
 ```
 
 ## Target launch date
