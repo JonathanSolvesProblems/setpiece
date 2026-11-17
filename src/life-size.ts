@@ -50,14 +50,14 @@ const WALK_STEP = 0.025;
 /** How fast the ring follows the look, as a share of what is left each second. */
 const RING_FOLLOWS = 14;
 const NEAREST = 0.4;
-const FARTHEST = 25;
+const FARTHEST = 14;
 /** A spot nearer the wearer's feet than this is not somewhere to walk to. */
 const AHEAD = 0.8;
 const SIDES = ['left', 'right'] as const;
 type Side = (typeof SIDES)[number];
 const OPTIC_YELLOW = 0xd6e13c;
 /** What the panel says on stepping inside: the call sheet stays behind on the table. */
-const INSIDE_NOTE = 'INSIDE THE SET | Pinch the air and pull: the set moves with your hand. Twist your wrist to turn it. Back to the table leaves.';
+const INSIDE_NOTE = 'INSIDE THE SET | Point at the floor and pinch: you walk to the yellow ring. Turn left and Turn right are on the panel. Back to the table leaves.';
 /**
  * Pulling the set: it moves this many times as far as the hand does (a comfortable seated pull of 30 cm is two
  * metres), the hand is smoothed at this rate first so tracking noise is not multiplied into a shaking world, and
@@ -71,8 +71,20 @@ const STANDING_EYES = 1.6;
 const PULL_GAIN = 7;
 const PULL_SMOOTH = 16;
 const PULL_TURN_GAIN = 2.2;
-/** The ring on the floor where the wearer looks, and a pinch to walk to it: retired for the pull, kept for a test. */
-const RING_WALK = false;
+/**
+ * A hand that pulls rolls a little at the wrist without meaning to: the set turns only for what the wrist has
+ * turned past this, in radians, since the pinch began (two pulls on the headset turned the set 278 degrees
+ * before there was one).
+ */
+const PULL_TURN_SLACK = 0.3;
+/** Pulling the set by a pinch in the air: off. It turned and shook the world around a seated wearer (headset, 17 Nov). */
+const PULL_MOVES = false;
+/** A hand points at the floor when its ray falls at least this steeply. */
+const POINTS_DOWN = -0.06;
+/** A hand aims only at a spot within this of where the wearer is looking, as a cosine (28 degrees). */
+const AIM_WITHIN = 0.883;
+/** A turn from the panel, in radians: an eighth of a circle, at once (a snap turn is the comfortable kind). */
+const SNAP_TURN = Math.PI / 4;
 /**
  * A walk is a short glide, not a jump: the wearer sees the set pass and knows where they have got to. It takes
  * this long for the first metre and this much more for each metre after, and never longer than the last.
@@ -90,6 +102,7 @@ type Globals = {
   lifeSizeRequested: Signal<number>;
   coachNote: Signal<string>;
   backToCamera: Signal<number>;
+  lifeTurn: Signal<number>;
   trayOn: Signal<string[]>;
   layoutChanged: Signal<number>;
   setsBuilt: Signal<number>;
@@ -144,12 +157,22 @@ export class LifeSizeSystem extends createSystem({
   /** The ring on the floor where a pinch would stand the wearer, and which hand is pointing there. */
   private mark: Mesh | null = null;
   private spot = new Vector3();
+  private rayWay = new Vector3();
+  private toSpot = new Vector3();
+  private handAt = new Vector3();
+  /** The hand whose ray the ring is under, if one is pointing. */
+  private aiming: Side | null = null;
   /** The hand pulling the set, where it is (smoothed) and was, the wrist's turn, and the marks that show the pinch took. */
   private pulling: Side | null = null;
   private handNow = new Vector3();
   private handSmooth = new Vector3();
   private handLast = new Vector3();
   private wrist = new HandTurn();
+  /** The wrist is read on this, not on the set: what it has turned the set by so far this pinch, and a scratch turn. */
+  private wristProbe = new Object3D();
+  private wristTurned = 0;
+  private turnSeen = 0;
+  private swing = new Quaternion();
   private grip: Mesh | null = null;
   private gripLine: Mesh | null = null;
   /** The ring was showing last frame: it glides to where the look moves, and appears at once where it was not. */
@@ -236,12 +259,34 @@ export class LifeSizeSystem extends createSystem({
       g.trayOn.subscribe(changed),
       g.layoutChanged.subscribe(changed),
       g.setsBuilt.subscribe(changed),
+      // Turn left and Turn right, from the panel: the set turns an eighth of a circle about the wearer, at once.
+      g.lifeTurn.subscribe((asked) => {
+        const object = this.stage()?.object3D;
+        if (asked === this.turnSeen || object == null || !g.lifeSize.peek() || this.growT >= 0) {
+          this.turnSeen = asked;
+          return;
+        }
+        // Turning left brings what was on the left in front: the set goes round to the right.
+        const step = asked > this.turnSeen ? -SNAP_TURN : SNAP_TURN;
+        this.turnSeen = asked;
+        this.walkT = -1;
+        this.player.head.getWorldPosition(this.head);
+        object.getWorldQuaternion(this.turn);
+        this.turn.premultiply(this.swing.setFromAxisAngle(UP, step));
+        setWorldQuaternion(object, this.turn);
+        object.getWorldPosition(this.floor);
+        this.offset.set(this.floor.x - this.head.x, 0, this.floor.z - this.head.z).applyAxisAngle(UP, step);
+        this.floor.set(this.head.x + this.offset.x, this.floor.y, this.head.z + this.offset.z);
+        setWorldPosition(object, this.floor);
+        this.settled = false;
+        this.world.getSystem(ViewfinderSystem)?.refresh();
+      }),
       // Back to camera, from the panel: the wearer stands at the lens again, wherever they had walked to.
       g.backToCamera.subscribe((asked) => {
         if (asked === 0 || !g.lifeSize.peek()) return;
         this.walkT = -1;
         this.cutToCamera();
-        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Pinch the air and pull to move.';
+        g.coachNote.value = 'AT THE CAMERA | You are where the shot is taken from. Point at the floor and pinch to walk.';
       }),
     );
   }
@@ -265,6 +310,7 @@ export class LifeSizeSystem extends createSystem({
       if (this.mark != null) this.mark.visible = false;
       this.settled = false;
       this.endPull();
+      this.hideBeam();
       return;
     }
     const mark = this.ensureMark(object);
@@ -272,10 +318,12 @@ export class LifeSizeSystem extends createSystem({
     if (this.growT >= 0) {
       mark.visible = false;
       this.settled = false;
+      this.hideBeam();
       return;
     }
     // On the way to a spot: the set glides under the wearer, and nothing else is aimed at until they are there.
     if (this.walkT >= 0) {
+      this.hideBeam();
       this.walkT = Math.min(1, this.walkT + delta / this.walkFor);
       const t = this.walkT;
       this.floor.lerpVectors(this.walkFrom, this.walkTo, t * t * (3 - 2 * t));
@@ -311,7 +359,7 @@ export class LifeSizeSystem extends createSystem({
     }
     // Pinch the air and pull: the set comes with the hand, as it does on the table by its striped edge, and it
     // turns with the wrist. A hand at the panel is the panel's.
-    if (this.pulling != null) {
+    if (PULL_MOVES && this.pulling != null) {
       const grip = this.player.gripSpaces[this.pulling];
       if (this.input.xr.gamepads[this.pulling]?.getSelecting() !== true) {
         this.endPull();
@@ -330,11 +378,16 @@ export class LifeSizeSystem extends createSystem({
             setWorldPosition(object, this.floor);
           }
         }
-        // The wrist turns the set, and the set swings about the wearer, who stays where they are in it.
-        const turned = this.wrist.total;
-        this.wrist.apply(object, delta, PULL_TURN_GAIN);
-        const step = this.wrist.total - turned;
+        // The wrist turns the set, and the set swings about the wearer, who stays where they are in it. The wrist
+        // is read on a stand-in, so its small rolls during a pull are left out before anything turns.
+        this.wrist.apply(this.wristProbe, delta, 1);
+        const past = Math.max(0, Math.abs(this.wrist.total) - PULL_TURN_SLACK) * Math.sign(this.wrist.total) * PULL_TURN_GAIN;
+        const step = past - this.wristTurned;
+        this.wristTurned = past;
         if (step !== 0) {
+          object.getWorldQuaternion(this.turn);
+          this.turn.premultiply(this.swing.setFromAxisAngle(UP, step));
+          setWorldQuaternion(object, this.turn);
           object.getWorldPosition(this.floor);
           this.offset.set(this.floor.x - this.head.x, 0, this.floor.z - this.head.z).applyAxisAngle(UP, step);
           this.floor.set(this.head.x + this.offset.x, this.floor.y, this.head.z + this.offset.z);
@@ -346,7 +399,7 @@ export class LifeSizeSystem extends createSystem({
       this.settled = false;
       return;
     }
-    for (let i = 0; i < SIDES.length; i++) {
+    for (let i = 0; PULL_MOVES && i < SIDES.length; i++) {
       const side = SIDES[i];
       if (this.input.xr.gamepads[side]?.getSelectStart() !== true || controls?.panelWanted(side) === true) continue;
       this.pulling = side;
@@ -355,26 +408,39 @@ export class LifeSizeSystem extends createSystem({
       this.handSmooth.copy(this.handNow);
       this.handLast.copy(this.handNow);
       this.wrist.begin(grip);
+      this.wristTurned = 0;
       this.beginGrip(this.handNow);
       mark.visible = false;
       this.settled = false;
       return;
     }
-    if (!RING_WALK) {
-      mark.visible = false;
-      this.settled = false;
-      return;
-    }
-    // Where the wearer looks on the floor is where they would stand. A head is steady and there is one of it: a
-    // hand's ray swings metres across a far floor with a turn of the wrist, and two resting hands both point down.
+    // Where a hand points on the floor is where the wearer would stand. A hand at rest points at the floor too,
+    // a few metres ahead, so a hand aims only when the wearer is looking at the spot it points at: people look
+    // where they point. Of two hands that do, the one pointing nearest the look aims.
     this.player.head.getWorldDirection(this.way).negate();
     let found = false;
-    if (this.way.y <= LOOKS_DOWN) {
-      const t = (this.floor.y - this.head.y) / this.way.y;
-      if (t >= NEAREST && t <= FARTHEST) {
-        this.hit.copy(this.head).addScaledVector(this.way, t);
-        found = Math.hypot(this.hit.x - this.head.x, this.hit.z - this.head.z) >= AHEAD;
-      }
+    let nearest = AIM_WITHIN;
+    this.aiming = null;
+    for (let i = 0; i < SIDES.length; i++) {
+      const side = SIDES[i];
+      if (controls?.panelWanted(side) === true) continue;
+      const ray = this.player.raySpaces[side];
+      ray.getWorldPosition(this.from);
+      // A target ray points down its own -Z.
+      ray.getWorldDirection(this.rayWay).negate();
+      if (this.rayWay.y > POINTS_DOWN) continue;
+      const t = (this.floor.y - this.from.y) / this.rayWay.y;
+      if (t < NEAREST || t > FARTHEST) continue;
+      this.toSpot.copy(this.from).addScaledVector(this.rayWay, t);
+      if (Math.hypot(this.toSpot.x - this.head.x, this.toSpot.z - this.head.z) < AHEAD) continue;
+      // How far off the look that spot is, as the cosine of the angle between them.
+      const along = this.offset.copy(this.toSpot).sub(this.head).normalize().dot(this.way);
+      if (along < nearest) continue;
+      nearest = along;
+      this.hit.copy(this.toSpot);
+      this.handAt.copy(this.from);
+      this.aiming = side;
+      found = true;
     }
     if (found) {
       // Along the straight line there, the walk ends in front of the first solid thing: nobody walks through a
@@ -403,6 +469,7 @@ export class LifeSizeSystem extends createSystem({
     if (!found) {
       mark.visible = false;
       this.settled = false;
+      this.hideBeam();
       return;
     }
     // The ring follows the look smoothly, so a small turn of the head does not make it jump.
@@ -414,13 +481,11 @@ export class LifeSizeSystem extends createSystem({
     // The ring breathes, so it reads as a place to go and not as part of the set.
     this.pulse = (this.pulse + delta * 5) % (Math.PI * 2);
     mark.scale.setScalar(1 + 0.1 * Math.sin(this.pulse));
-    // Either hand's pinch walks there, unless that hand is at the panel.
-    let pinched = false;
-    for (let i = 0; i < SIDES.length; i++) {
-      const side = SIDES[i];
-      if (this.input.xr.gamepads[side]?.getSelectStart() === true && controls?.panelWanted(side) !== true) pinched = true;
-    }
-    if (!pinched) return;
+    // A beam from the hand to the ring: what the hand points at is seen before it is pinched.
+    this.showBeam(this.handAt, mark.getWorldPosition(this.toSpot));
+    // The pointing hand's pinch walks there.
+    if (this.aiming == null || this.input.xr.gamepads[this.aiming]?.getSelectStart() !== true) return;
+    this.hideBeam();
     // The spot comes to the wearer's feet; the set keeps its turn.
     this.hit.copy(this.spot);
     this.hit.y = 0;
@@ -436,7 +501,31 @@ export class LifeSizeSystem extends createSystem({
   }
 
   /** The dot where a pinch began and the line from it to the hand: a pinch that took is seen. */
+  /** The beam from a pointing hand to the ring on the floor. */
+  private showBeam(from: Vector3, to: Vector3): void {
+    this.ensureGrip();
+    const line = this.gripLine!;
+    line.position.copy(from);
+    const far = from.distanceTo(to);
+    line.scale.set(1, 1, Math.max(0.001, far));
+    if (far > 0.002) line.lookAt(to);
+    line.visible = true;
+  }
+
+  private hideBeam(): void {
+    if (this.gripLine != null && this.pulling == null) this.gripLine.visible = false;
+  }
+
   private beginGrip(at: Vector3): void {
+    this.ensureGrip();
+    this.grip!.position.copy(at);
+    this.grip!.visible = true;
+    this.gripLine!.position.copy(at);
+    this.gripLine!.scale.set(1, 1, 0.001);
+    this.gripLine!.visible = true;
+  }
+
+  private ensureGrip(): void {
     if (this.grip == null || this.gripLine == null) {
       const yellow = new MeshBasicMaterial({ color: OPTIC_YELLOW, toneMapped: false });
       const dot = new Mesh(new SphereGeometry(0.012, 12, 8), yellow);
@@ -452,14 +541,11 @@ export class LifeSizeSystem extends createSystem({
         if (entity.object3D) entity.object3D.pointerEvents = 'none';
         viewfinder?.hideFromLens(mesh);
       }
+      dot.visible = false;
+      line.visible = false;
       this.grip = dot;
       this.gripLine = line;
     }
-    this.grip.position.copy(at);
-    this.grip.visible = true;
-    this.gripLine.position.copy(at);
-    this.gripLine.scale.set(1, 1, 0.001);
-    this.gripLine.visible = true;
   }
 
   private showGrip(hand: Vector3): void {

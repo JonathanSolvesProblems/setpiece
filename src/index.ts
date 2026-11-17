@@ -132,6 +132,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.lifeSizeRequested = signal(0);
   // Back to camera, on the panel at full size: the wearer stands at the lens again (src/life-size.ts).
   globals.backToCamera = signal(0);
+  // Turn left (the count goes up) and Turn right (down), on the panel at full size.
+  globals.lifeTurn = signal(0);
   globals.removeSelected = signal(0);
   globals.clearSet = signal(0);
   globals.selectedIsActor = signal(false);

@@ -492,6 +492,10 @@ export class CoachSystem extends createSystem({
     if (this.take === TakeState.Playing) {
       return [`TAKE · ${this.takeSeconds} S OF ${length} S`, 'On the monitor. Pick up a piece to stop it.'];
     }
+    // Inside the full-size set the sheet says how to move, whichever step the walkthrough is on.
+    if ((this.globals as Globals).lifeSize.peek() && this.step !== Step.Land) {
+      return ['INSIDE THE SET', 'Point at the floor and pinch to walk to the ring. Turn left and Turn right are on the panel. Back to the table leaves.'];
+    }
     switch (this.step) {
       case Step.Land:
         return [
@@ -562,7 +566,6 @@ export class CoachSystem extends createSystem({
   private fillLine(): [string, string] {
     const brief = BRIEFS[(this.globals as Globals).briefIndex.peek()];
     // The first frame is the moment to stand in it: the set grows around the wearer, in its own light.
-    if ((this.globals as Globals).lifeSize.peek()) return ['INSIDE THE SET', 'Pinch the air and pull to move. Twist your wrist to turn. Back to camera stands you at the lens. Back to the table leaves.'];
     if (this.shots === 1) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Now stand in it: pinch Step inside, or say "step inside", and the set grows around you.'];
     if (this.shots === 2) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Pinch a frame on the board to go back to its setup.'];
     if (this.said || this.mine) return [`FRAME ${this.shots} OF ${BOARD_SLOTS}`, 'Snap again, or pinch Shoot coverage and the designer shoots the rest.'];

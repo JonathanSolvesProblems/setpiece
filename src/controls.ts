@@ -51,6 +51,8 @@ const PANEL_CLEAR = 0.035;
 const LIFE_CONFIRM_MS = 3000;
 /** A second pinch this soon after the set went full size is the same press, not a wish to go back. */
 const LIFE_DOUBLE_MS = 1500;
+/** Step inside once asked to be pressed twice. On the headset that read as the button not working (17 Nov): one pinch goes in, and one big button comes back. */
+const LIFE_ASKS_TWICE = false;
 /** The two halves of one double pinch are closer together than this. */
 const LIFE_PINCH_MS = 500;
 /** How fast the panel moves aside for a piece, as a share of what is left each second. */
@@ -136,6 +138,7 @@ type Globals = {
   lifeSize: Signal<boolean>;
   lifeSizeRequested: Signal<number>;
   backToCamera: Signal<number>;
+  lifeTurn: Signal<number>;
   recordRequested: Signal<number>;
   playRequested: Signal<number>;
   trayToggle: Signal<string>;
@@ -586,6 +589,12 @@ export class ControlsSystem extends createSystem({
     };
     // Undo is on every tab: the set goes back to how it stood before the last change.
     wire('btn-undo', () => {
+      // Inside the full-size set the two buttons beside Back to camera turn the wearer: someone seated cannot
+      // turn round to see what is behind them.
+      if (g.lifeSize.peek()) {
+        g.lifeTurn.value = g.lifeTurn.peek() + 1;
+        return;
+      }
       const note = this.world.getSystem(ViewfinderSystem)?.undo() ?? '';
       if (note !== '') g.coachNote.value = note;
     });
@@ -739,7 +748,8 @@ export class ControlsSystem extends createSystem({
       panel.getElementById('tabs')?.setProperties({ display: more ? 'flex' : 'none' });
       showTry();
       panel.getElementById('btn-skip')?.setProperties({ display: g.walkthrough.peek() && !more && !g.lifeSize.peek() ? 'flex' : 'none' });
-      panel.getElementById<UIKit.Text>('btn-more')?.setProperties({ text: more ? 'Less' : 'More', borderColor: more ? OPTIC_YELLOW : CHALK_HAZE });
+      panel.getElementById<UIKit.Text>('btn-more')?.setProperties({ text: g.lifeSize.peek() ? 'Turn right' : more ? 'Less' : 'More', borderColor: more && !g.lifeSize.peek() ? OPTIC_YELLOW : CHALK_HAZE });
+      panel.getElementById<UIKit.Text>('btn-undo')?.setProperties({ text: g.lifeSize.peek() ? 'Turn left' : 'Undo' });
       for (const name of TABS) {
         panel.getElementById(`page-${name}`)?.setProperties({ display: more && name === tab ? 'flex' : 'none' });
         panel.getElementById(`tab-${name}`)?.setProperties({
@@ -750,6 +760,10 @@ export class ControlsSystem extends createSystem({
     };
     for (const name of TABS) wire(`tab-${name}`, () => showTab(name));
     wire('btn-more', () => {
+      if (g.lifeSize.peek()) {
+        g.lifeTurn.value = g.lifeTurn.peek() - 1;
+        return;
+      }
       more = !more;
       saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), more });
       showTab(openTab);
@@ -779,7 +793,7 @@ export class ControlsSystem extends createSystem({
       const askedFor = g.coachTarget.peek() === 'inside';
       // A second pinch straight after the one that went in (or came back) is the same press.
       if (performance.now() - wentIn < LIFE_DOUBLE_MS || performance.now() - pressedGo < LIFE_PINCH_MS) return;
-      if (!g.lifeSize.peek() && lifeArmed == null && !askedFor) {
+      if (LIFE_ASKS_TWICE && !g.lifeSize.peek() && lifeArmed == null && !askedFor) {
         life?.setProperties({ text: 'Press again to go full size', borderColor: OPTIC_YELLOW });
         inside?.setProperties({ text: 'Press again', borderColor: OPTIC_YELLOW });
         says('', 'Step inside grows the set to full size around you. Press again to go in.', LIFE_CONFIRM_MS);
@@ -811,6 +825,7 @@ export class ControlsSystem extends createSystem({
       g.lifeSize.subscribe((on) => {
         life?.setProperties({ text: on ? 'Back to the table' : 'Stand in the shot', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         inside?.setProperties({ text: on ? 'Back to camera' : 'Step inside', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        showTab(openTab);
         // A frame needs the slate under the actors, and the slate is back on the table.
         panel.getElementById('btn-snap')?.setProperties({ display: on ? 'none' : 'flex' });
         panel.getElementById('btn-back')?.setProperties({ display: on ? 'flex' : 'none' });

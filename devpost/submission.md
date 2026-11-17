@@ -5,7 +5,7 @@ One field per block. Nothing in a block but the value. Open values are marked `[
 ## Name
 
 ```
-Setpiece
+Setpiece | An AI film set that builds on your table
 ```
 
 ## Tagline
@@ -29,9 +29,9 @@ New Experience
 ## Description
 
 ```
-I wanted to be a VFX filmmaker before I switched to computer science. In the short I'm least embarrassed by, the creature was added on a computer weeks after the shoot. On the day the actor had nothing to look at and I had nothing to frame against.
+About ten years ago I made short VFX films for YouTube: lightning in a field, a creature floating next to me in the woods. Every effect went in on a computer weeks after the shoot. On the day I was reaching for something that wasn't there and framing the shot around empty air. I switched to computer science after that.
 
-Setpiece is a miniature film set on your real table, for a director planning a shot. You say the shot out loud, an AI set designer builds it at one-tenth scale, you move the actors and the camera with your hands, and you leave with a storyboard and a shot list. It's the table I needed that week.
+Setpiece is a miniature film set on your real table, for a director planning a shot. You say the shot out loud, an AI set designer builds it at one-tenth scale, you move the actors and the camera with your hands, and you leave with a storyboard and a shot list. It's the table I needed back then.
 
 ## The first minute
 
@@ -47,15 +47,15 @@ Immersive Web SDK in the Quest Browser, nothing to install. Passthrough makes yo
 
 ## Measured
 
-On a Quest 3S I spoke two sentences in my own words. Both times the first piece was on the table 1.6 s after I stopped speaking, and the whole set stood at 3.3 s and 3.7 s. With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving.
+On a Quest 3S I spoke two sentences in my own words. Both times the first piece was on the table 1.6 s after I stopped speaking, and the whole set stood at 3.3 s and 3.7 s. With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site, my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR, and standing inside a full-size set the designer had just built, it held 86 to 89 frames a second.
 
 ## Not yet proven
 
-On Nov 16 I went through the walkthrough on the headset as a newcomer, from landing the set to my first frame. Cover it has run on the live page and in the emulator, not yet on the headset. Every headset session so far has been in my own room.
+Cover it and moving through the full-size set by pulling it have run on the live page and in the emulator, not yet on the headset. Every headset session so far has been in my own room.
 
-[X, measured: one unbroken take, headset on to a six-frame board, in minutes.]
+## What's next
 
-[X, Jonathan: future plans, and who you wrote to.]
+Two people around the same set: a director and a DP each with a headset, moving the same pieces and arguing over the same frame. Taking the board out to the tools a crew already uses, so a frame here opens as a camera in a 3D package. More of what the designer now has to build from shapes: interiors, crowds, animals. And rooms that aren't mine.
 ```
 
 ## Hand interactions, and what excites me about VR
