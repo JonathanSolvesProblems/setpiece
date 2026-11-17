@@ -52,7 +52,7 @@ const BURNING = /\b(burning|on fire|in flames|ablaze)\b/;
 export type Finish = [number, number, number, number?];
 /** The pointer events library reads this off any object: false, and it does not look inside. */
 type Walked = Object3D & { intersectChildren?: boolean };
-type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
+type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number; quiet?: boolean };
 type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: number; air: number; beat: number };
 /**
  * In the air a wing is a flying wing: it comes down from its perched fold by this much (radians), beats this many
@@ -264,6 +264,8 @@ export class TraySystem extends createSystem({
       if (!piece.hasComponent(ShotCamera)) this.freeze(piece);
       piece.object3D!.traverse((object) => {
         if (object instanceof Mesh && PAINTED.test(object.name)) withGrain(object.material as MeshStandardMaterial);
+        // A lamp's light on the ground is light, not something to point at.
+        if (object.name === 'LampPool' || object.name === 'LampHalo') object.raycast = () => {};
         if (object.name !== 'EffectParticles') return;
         this.effects.push((object as Mesh).material as ShaderMaterial);
         object.raycast = () => {};
@@ -307,7 +309,7 @@ export class TraySystem extends createSystem({
       if (idle != null) {
         // A pair of wings carries opposite amounts, so one clock beats both together.
         this.moving.push({ piece, part, idle, rest: part.rotation[idle.axis], phase: 0, air: 0, beat: 0 });
-        this.restless.add(this.key(piece));
+        if (idle.quiet !== true) this.restless.add(this.key(piece));
         return;
       }
       part.updateMatrix();

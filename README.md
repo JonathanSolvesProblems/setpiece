@@ -40,6 +40,7 @@ I wanted to be a VFX filmmaker before I switched to computer science. The short 
 - **Then it is yours.** Pick up any piece with your fingers, turn it with your wrist, size it with two hands, or say what to change.
 - **Frame it.** Six lenses from 18 to 135 mm, a monitor that shows what the lens sees, and Snap puts the frame on a storyboard with its lens and camera height measured from where the pieces stood.
 - **Cover it.** The designer plans a wide and closer shots and the app shoots them onto the board, each fitted to its subject by measure.
+- **It sits in its world.** On the table the scene's painted sky stands behind the set, with its sun or moon and the far city or hills. After dark the windows glow and headlamps light the road. One switch on the Stage tab turns the sky off.
 - **Step inside.** The set grows to full size around you under a painted sky whose horizon fits the scene. Point at the floor and pinch to walk there; Turn left and Turn right are on the panel.
 - **Leave with it.** The board as an image, the shot list as a CSV and a take as a short video, saved from the page.
 - **Without the designer** the same sentence goes to a reader built into the app, which builds from the library's 51 assets. Nothing else depends on it.

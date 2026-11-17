@@ -107,6 +107,8 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
   globals.effectsOn = signal(0);
   globals.poseRequested = signal(0);
   globals.squirmOn = signal(loadJson<{ squirm: boolean }>(StoreKey.Settings)?.squirm !== false);
+  // The scene's sky stands behind the set on the table (src/set-light.ts); the Stage tab turns it off.
+  globals.worldOn = signal(loadJson<{ world: boolean }>(StoreKey.Settings)?.world !== false);
   globals.selectedPaint = signal(-1);
   globals.takeClear = signal(0);
   globals.layoutChanged = signal(0);

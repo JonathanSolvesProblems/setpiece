@@ -16,6 +16,7 @@ import {
   PlaneGeometry,
   ShaderMaterial,
 } from '@iwsdk/core';
+import { fireLight } from './lib/practicals.js';
 
 type Motion = 'rise' | 'burst' | 'fall';
 const MOTION: Record<Motion, number> = { rise: 0, burst: 1, fall: 2 };
@@ -152,6 +153,7 @@ export const fireEffect = named('Fire', {
   additive: true,
   motion: 'rise',
 });
+fireLight(fireEffect);
 export const smokeEffect = named('Smoke', {
   count: 42,
   radius: 0.08,

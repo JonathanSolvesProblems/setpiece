@@ -23,7 +23,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { bevelBox } from './lib/hardsurface.js';
-import { WINDOW_GLASS } from './lib/practicals.js';
+import { beamGeometry, headlights, LAMP_POOL, WINDOW_GLASS, windowGlow } from './lib/practicals.js';
 import { boatShell } from './lib/boat.js';
 import { busShell } from './lib/bus.js';
 import { pickupShell } from './lib/pickup.js';
@@ -82,6 +82,7 @@ function truck(): Group {
   g.name = 'Truck';
   truckShell(g, primer, glass, rubber, steel);
   truckLoads(g, primer, rubber, steel);
+  headlights(g, 0.072, 0.085, 0.3185);
   return g;
 }
 
@@ -90,6 +91,7 @@ function pickup(): Group {
   const g = new Group();
   g.name = 'Pickup';
   pickupShell(g, primer, glass, rubber);
+  headlights(g, 0.06, 0.086, 0.244);
   return g;
 }
 
@@ -98,6 +100,7 @@ function bus(): Group {
   const g = new Group();
   g.name = 'Bus';
   busShell(g, primer, glass, rubber);
+  headlights(g, 0.082, 0.1, 0.386);
   return g;
 }
 
@@ -332,6 +335,15 @@ function house(): Group {
     kit.put('Braces', timber, brace);
   }
   kit.build(g);
+  // After dark: each lit window glows past its frame, and their light lies on the ground in front of the house.
+  const glow = new Mesh(windowGlow(openings.slice(1).map(([x0, y0, x1, y1]) => ({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 })), 0.0165, 0.035), LAMP_POOL);
+  glow.name = 'LampHalo';
+  glow.renderOrder = 2;
+  const spill = new Mesh(beamGeometry(0.4, 0.6, 0.3, [0.5, 0.36, 0.2]), LAMP_POOL);
+  spill.name = 'LampPool';
+  spill.position.set(0, 0.0016, 0.016);
+  spill.renderOrder = 1;
+  g.add(glow, spill);
   return g;
 }
 

@@ -62,7 +62,7 @@ const FRAME_HEIGHT = (FRAME_WIDTH * 9) / 16;
 const FRAME_GAP = 0.011;
 const FRAME_COLUMNS = 3;
 /** Meshes other systems hang on the pieces to make them easy to pick up. */
-const HELPER_NAMES = new Set(['GrabVolume', 'HoverRing', 'StageHandle', 'HandleGlow', 'HandleLabel', 'EffectParticles']);
+const HELPER_NAMES = new Set(['GrabVolume', 'HoverRing', 'StageHandle', 'HandleGlow', 'HandleLabel', 'EffectParticles', 'LampPool', 'LampHalo']);
 /** Two lines under each frame: the lens and camera, then each actor's eyeline. */
 const CAPTION_HEIGHT = 0.019;
 /** The storyboard card: three frames wide, two high, the width of the monitor. */
@@ -1235,7 +1235,8 @@ export class ViewfinderSystem extends createSystem({
           felt.map = seamTexture;
           felt.color.set(0xffffff);
           object.material = felt;
-        } else if (/^(Torso|Chest|Head|Leg|Arm|Hand)/.test(object.name)) {
+        } else if (/^(Torso|Chest|Head|Leg|Arm|Hand)/.test(object.name) && !/lamp/i.test(object.name)) {
+          // (A vehicle's Headlamps are not a figure's head: they keep the lamp material the set's light turns up.)
           const wood = material.clone();
           wood.map = grainTexture;
           object.material = wood;

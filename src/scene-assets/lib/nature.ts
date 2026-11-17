@@ -140,6 +140,9 @@ export function buildTree(leaf: MeshStandardMaterial, timber: MeshStandardMateri
     })));
   }
   kit.build(g);
+  // The crown stirs in the wind, about the tree's foot: a centimetre at its top, slowly.
+  const crown = g.getObjectByName('Leaves');
+  if (crown != null) crown.userData.idle = { kind: 'sway', axis: 'z', amount: 0.016, rate: 0.85, quiet: true };
   return g;
 }
 

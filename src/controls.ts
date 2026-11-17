@@ -166,6 +166,7 @@ type Globals = {
   sizeRequested: Signal<number>;
   styleRequested: Signal<number>;
   squirmOn: Signal<boolean>;
+  worldOn: Signal<boolean>;
   cameraOn: Signal<string>;
   sceneRequest: Signal<Spoken | null>;
   coachNote: Signal<string>;
@@ -916,6 +917,10 @@ export class ControlsSystem extends createSystem({
     wire('btn-squirm', () => {
       g.squirmOn.value = !g.squirmOn.peek();
     });
+    const worldSwitch = panel.getElementById<UIKit.Text>('btn-world');
+    wire('btn-world', () => {
+      g.worldOn.value = !g.worldOn.peek();
+    });
     // The designer's replies read aloud: her voice, his, or none. Pressed, it steps on and says so in the new voice.
     const spoken = panel.getElementById<UIKit.Text>('btn-spoken');
     const showSpoken = (): void => {
@@ -934,6 +939,10 @@ export class ControlsSystem extends createSystem({
         squirm?.setProperties({ text: on ? 'Life in the actors: on' : 'Life in the actors: off', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         const settings = loadJson<{ voice?: boolean }>(StoreKey.Settings);
         saveJson(StoreKey.Settings, { ...settings, squirm: on });
+      }),
+      g.worldOn.subscribe((on) => {
+        worldSwitch?.setProperties({ text: on ? 'Sky behind the set: on' : 'Sky behind the set: off', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        saveJson(StoreKey.Settings, { ...loadJson<Record<string, unknown>>(StoreKey.Settings), world: on });
       }),
     );
 

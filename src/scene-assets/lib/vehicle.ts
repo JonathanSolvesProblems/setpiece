@@ -16,8 +16,9 @@ import {
 import type { Material } from '@iwsdk/core';
 import { alignSpan, sampleRange, type LoftSurface, type TubeSection } from './hardsurface.js';
 
-export const lens = new MeshStandardMaterial({ color: 0xe4dcc6, roughness: 0.3, metalness: 0.2 });
-export const tail = new MeshStandardMaterial({ color: 0x7c2c25, roughness: 0.35 });
+/** Headlamps and tail lamps: unlit by day, burning as the set's light falls (src/set-light.ts turns them up). */
+export const lens = new MeshStandardMaterial({ color: 0xe4dcc6, roughness: 0.3, metalness: 0.2, emissive: 0xfff0cc, emissiveIntensity: 0 });
+export const tail = new MeshStandardMaterial({ color: 0x7c2c25, roughness: 0.35, emissive: 0xff2a14, emissiveIntensity: 0 });
 export const hub = new MeshStandardMaterial({ color: 0x8d8a84, roughness: 0.45, metalness: 0.5 });
 
 export function named<T extends Mesh>(mesh: T, name: string): T {

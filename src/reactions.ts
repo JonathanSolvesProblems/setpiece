@@ -24,7 +24,8 @@ const BURNS = ['Fire', 'Embers'];
 const WET_RATE = 1.6;
 
 type Mover = { piece: Entity; box: Box3; last: Vector3; seen: boolean; vehicle: boolean };
-type Fire = { piece: Entity; material: ShaderMaterial; wet: number; told: boolean };
+/** `lights` are the fire's own glow and its light on the ground: they go down with the flames. */
+type Fire = { piece: Entity; material: ShaderMaterial; wet: number; told: boolean; lights: Object3D[] };
 /**
  * An animal a vehicle can tip over: its shape, half its width, how far over it is and which way.
  * Its body sits in a group of its own inside the piece, and that group is what goes over. The
@@ -117,8 +118,12 @@ export class ReactionsSystem extends createSystem({
         this.animals.push({ piece, box, half: (box.max.x - box.min.x) / 2, down: false, amount: 0, side: 1, tipper });
       }
       if (BURNS.includes(label)) {
+        const lights: Object3D[] = [];
         object.traverse((part) => {
-          if (part.name === 'EffectParticles') this.fires.push({ piece, material: (part as Mesh).material as ShaderMaterial, wet: 0, told: false });
+          if (part.name === 'LampHalo' || part.name === 'LampPool') lights.push(part);
+        });
+        object.traverse((part) => {
+          if (part.name === 'EffectParticles') this.fires.push({ piece, material: (part as Mesh).material as ShaderMaterial, wet: 0, told: false, lights });
         });
       }
     }
@@ -299,6 +304,12 @@ export class ReactionsSystem extends createSystem({
       const step = WET_RATE * delta;
       fire.wet = wet ? Math.min(1, fire.wet + step) : Math.max(0, fire.wet - step * 0.5);
       fire.material.uniforms.uWet.value = fire.wet;
+      for (let i = 0; i < fire.lights.length; i++) {
+        const light = fire.lights[i];
+        light.visible = fire.wet < 0.98;
+        light.scale.setScalar(Math.max(0.02, 1 - fire.wet));
+        light.updateMatrix();
+      }
       if (wet && !fire.told) {
         fire.told = true;
         (this.globals as Globals).coachNote.value = 'THE FIRE IS OUT | Water put it out. Move the water away and it catches again.';

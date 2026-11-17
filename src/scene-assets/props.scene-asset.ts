@@ -11,7 +11,7 @@ import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vecto
 import type { BufferGeometry, Material } from '@iwsdk/core';
 import { alignSpan, bevelBox } from './lib/hardsurface.js';
 import { mergeByMaterial } from './lib/vehicle.js';
-import { haloGeometry, LAMP_GLOW, LAMP_POOL, poolGeometry } from './lib/practicals.js';
+import { haloGeometry, headlights, LAMP_GLOW, LAMP_POOL, poolGeometry } from './lib/practicals.js';
 
 /** Bare basswood, as a model maker's maquette comes before anyone paints it. */
 const primer = new MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.72 });
@@ -73,6 +73,7 @@ function car(): Group {
     (s) => roofSign(s, 0.149, -0.024),
     (s) => roofRack(s, 0.146, -0.022, 0.12, 0.06, [-0.065, 0.025]),
   ]);
+  headlights(g, 0.058, 0.074, 0.212);
   return g;
 }
 
@@ -92,11 +93,14 @@ function van(): Group {
   vanShell(g, primer, glass, rubber);
   // Flat roof at y 0.21 from z -0.21 to 0.09.
   addStyles(g, [() => {}, (s) => lightBar(s, 0.21, 0.05, 0.15), (s) => roofRack(s, 0.21, -0.06, 0.26, 0.075, [-0.17, -0.06, 0.05])]);
+  headlights(g, 0.061, 0.093, 0.2395);
   return g;
 }
 
 function motorbike(): Group {
-  return buildMotorbike(primer, rubber);
+  const g = buildMotorbike(primer, rubber);
+  headlights(g, 0, 0.101, 0.104);
+  return g;
 }
 
 /** A garden wall between two pilasters: a coping on top, the mortar courses marked on both faces. */

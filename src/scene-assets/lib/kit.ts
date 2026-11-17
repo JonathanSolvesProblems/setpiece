@@ -159,7 +159,8 @@ export class Kit {
   }
 }
 
-export type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
+/** `quiet` is motion too slight to redraw the monitor for: leaves in the wind. */
+export type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number; quiet?: boolean };
 
 /** A pivot group for a part that moves on its own while on the set. */
 export function idleGroup(name: string, at: Vector3, idle: Idle): Group {
