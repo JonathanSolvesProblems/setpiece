@@ -127,7 +127,7 @@
  },
  "shader_programs_compiled_before_the_set_landed": 104,
  "found": [
-  "Sets the real model writes (6 to 14 pieces, up to 6 made) held 87 to 90 fps standing and 71 to 83 with a piece moving.",
+  "Sets the real model writes (6 to 14 pieces, up to 6 made) held 87 to 89 fps standing (90 stepped inside) and 71 to 83 with a piece moving.",
   "No shader was compiled while any set was built: the warm-up at the start of the session had made all 104 programs.",
   "40 things at once fell to 49 fps with a piece moving, and 24 ran 63 to 64; the limit of things in one reply is lowered to 20 in the next build."
  ]

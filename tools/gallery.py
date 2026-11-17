@@ -93,7 +93,7 @@ SLIDES = [
     dict(slug='say', badge=LIVE_BADGE, headline='Say the shot', picture=('live', 'designer'),
          caption='"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.'),
     dict(slug='table', badge=QUEST_17, headline='The shot, on your table', picture='captures/quest-aircraft-on-table.jpg',
-         caption='"Workers building an aircraft", then "add a ladder with a worker on its roof". A 1:10 set on the real table, its sky behind, hands on it.'),
+         caption='Asked for workers building an aircraft, then for a ladder with a worker on its roof. A 1:10 set on the real table, its sky behind it.'),
     dict(slug='made', badge=LIVE_BADGE, headline='It makes what the library lacks', picture=('live', 'castle'),
          caption='Asked for a castle gate, it built the gate and two towers from simple wooden shapes, then two guards and a horse, low and wide.'),
     dict(slug='look', badge=LIVE_BADGE, headline='The designer checks its own frame', picture=('live', 'look'),
@@ -104,8 +104,8 @@ SLIDES = [
          caption='On the headset: the first piece {quest_first_s} s after my last word, sets whole in 3 to 7 s, six shots on the storyboard {coverage_s} s after Shoot coverage.'),
     dict(slug='voice', badge='Recorded lines · public/audio/voice/lines.json', headline='It talks you through', picture=('result', 'lines'),
          caption='It reads its own reply aloud while the pieces land, and says each step once to a newcomer. Her voice, his, or none.'),
-    dict(slug='light', badge=QUEST_17, headline='Four sentences, four sets', picture='captures/quest-four-sets.jpg',
-         caption='In the headset, each from a sentence: a night chase, a road crew by day, a deck in snow with its fence on fire, an aircraft in the rain.'),
+    dict(slug='light', badge=QUEST_17, headline='Four sets on one table', picture='captures/quest-four-sets.jpg',
+         caption='In the headset: the night chase it builds first, then three built up by voice: a road crew, a deck in snow, an aircraft in the rain.'),
     dict(slug='draw', badge=LIVE_BADGE, headline='Draw it your way', picture=('live', 'draw'),
          caption='One frame four ways: as the lens sees it, a pencil storyboard, anime (the set itself turns cartoon), and hard black and white.'),
     dict(slug='coverage', badge=QUEST_17, headline='Shoot coverage', picture='captures/quest-coverage-filling.jpg',
@@ -194,9 +194,9 @@ def result_body(kind: str) -> str:
         cell = lambda big, unit, words: (f'<div class="stat"><div class="big">{big}<span class="unit">{unit}</span></div><p>{words}</p></div>')
         return ('<div class="result stats">'
                 + cell(N['quest_first_s'], 's', f'from my last word to the first piece on the table. Spoken on a Quest 3S, {len(quest_designer["runs"])} sentences in my own words.')
-                + cell(f'{max(wholes):.1f}', 's', f'at most to the whole set standing for those two ({" and ".join(f"{v:.1f}" for v in wholes)} s). Bigger sets on 17 Nov: 4 to 7 s.')
+                + cell(f'{max(wholes):.1f}', 's', f'to the whole set standing, the slower of those two ({" and ".join(f"{v:.1f}" for v in wholes)} s). Sets with more pieces, 17 Nov: 4 to 7 s.')
                 + cell(str(COVERAGE_SECONDS), 's', f'from pressing Shoot coverage to six shots planned, shot and on the storyboard. On the headset, 17 Nov.')
-                + f'<p class="muted foot">From a desktop, {hurry["plans"]} sentences: first piece a median {hurry["firstPieceMs"]["median"] / 1000:.1f} s, slowest {hurry["firstPieceMs"]["slowest"] / 1000:.1f} s.</p></div>')
+                + f'<p class="muted foot">From a desktop, {hurry["plans"]} requests: first piece a median {hurry["firstPieceMs"]["median"] / 1000:.1f} s, slowest {hurry["firstPieceMs"]["slowest"] / 1000:.1f} s.</p></div>')
     if kind == 'lines':
         when = {
             'land': 'The set has not landed yet',
@@ -676,7 +676,7 @@ async def live_capture(browser, recipe: str, out: Path) -> Path:
                         if name == 'Lens mm':
                             cell += ' mm'
                         if name == 'Camera height m':
-                            cell = f'{float(cell):.1f} m'
+                            cell = f'{float(cell):.2f} m'
                         draw.text((left + x, y + 14), cell[:22], font=font, fill=(246, 247, 239))
                     y += 88
                     draw.line((left, y - 6, width - 60, y - 6), fill=(60, 50, 42), width=2)

@@ -5,7 +5,7 @@ One block per image, in gallery order. Paste the block, nothing else.
 ## 01 table
 
 ```
-"Workers building an aircraft", then "add a ladder with a worker on its roof". A 1:10 set on the real table, its sky behind, hands on it.
+Asked for workers building an aircraft, then for a ladder with a worker on its roof. A 1:10 set on the real table, its sky behind it.
 ```
 
 ## 02 say
@@ -29,7 +29,7 @@ Once the set is up it is shown its own camera's picture and how much of the fram
 ## 05 light
 
 ```
-In the headset, each from a sentence: a night chase, a road crew by day, a deck in snow with its fence on fire, an aircraft in the rain.
+In the headset: the night chase it builds first, then three built up by voice: a road crew, a deck in snow, an aircraft in the rain.
 ```
 
 ## 06 draw
