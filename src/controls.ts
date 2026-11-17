@@ -859,7 +859,7 @@ export class ControlsSystem extends createSystem({
     });
     this.cleanupFuncs.push(
       g.squirmOn.subscribe((on) => {
-        squirm?.setProperties({ text: on ? 'Squirm when held: on' : 'Squirm when held: off', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
+        squirm?.setProperties({ text: on ? 'Life in the actors: on' : 'Life in the actors: off', borderColor: on ? OPTIC_YELLOW : CHALK_HAZE });
         const settings = loadJson<{ voice?: boolean }>(StoreKey.Settings);
         saveJson(StoreKey.Settings, { ...settings, squirm: on });
       }),

@@ -21,6 +21,7 @@ import { ViewfinderSystem } from './viewfinder.js';
 import { BARE_GRAIN, PAINTED_GRAIN, setGrain, withGrain } from './wood-grain.js';
 
 import { LOOKS, POSES } from './catalog.js';
+import { PiecesSystem } from './pieces.js';
 
 /** How high a crouched actor's eyes are, as a share of their standing eye height. */
 const CROUCH_EYES = 0.75;
@@ -52,7 +53,15 @@ export type Finish = [number, number, number, number?];
 /** The pointer events library reads this off any object: false, and it does not look inside. */
 type Walked = Object3D & { intersectChildren?: boolean };
 type Idle = { kind: 'flap' | 'spin' | 'sway'; axis: 'x' | 'y' | 'z'; amount: number; rate: number };
-type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: number };
+type Moving = { piece: Entity; part: Object3D; idle: Idle; rest: number; phase: number; air: number; beat: number };
+/**
+ * In the air a wing is a flying wing: it comes down from its perched fold by this much (radians), beats this many
+ * times as wide and as fast, and eases between the two at this rate when the piece takes off or lands.
+ */
+const FLIGHT_SPREAD = 0.55;
+const FLIGHT_WIDE = 2.2;
+const FLIGHT_FAST = 3;
+const FLIGHT_EASE = 3;
 /** An actor's pose, look and build (0 a man, 1 a woman; a board saved before builds has none, and is a man). */
 export type Cast = [number, number, number?];
 export type Dress = { cast: Record<string, Cast>; finish: Record<string, Finish> };
@@ -215,12 +224,23 @@ export class TraySystem extends createSystem({
     }
     for (let i = 0; i < this.effects.length; i++) this.effects[i].uniforms.uTime.value = time;
     for (let i = 0; i < this.rotors.length; i++) this.rotors[i].rotation.y += ROTOR_SPEED * delta;
+    const pieces = this.world.getSystem(PiecesSystem);
+    const alive = (this.globals as unknown as { squirmOn: Signal<boolean> }).squirmOn.peek();
     for (let i = 0; i < this.moving.length; i++) {
       const moving = this.moving[i];
       if (moving.piece.object3D?.visible !== true) continue;
       const { idle, part } = moving;
-      if (idle.kind === 'spin') part.rotation[idle.axis] += idle.rate * delta;
-      else part.rotation[idle.axis] = moving.rest + Math.sin(time * idle.rate + moving.phase) * idle.amount;
+      if (idle.kind === 'spin') {
+        part.rotation[idle.axis] += idle.rate * delta;
+      } else if (idle.kind === 'flap') {
+        // Perched, a wing stirs. In the air it is spread and beating: a dragon let go above the set is flying.
+        const flying = alive && pieces?.airborne(moving.piece) === true ? 1 : 0;
+        moving.air += (flying - moving.air) * Math.min(1, FLIGHT_EASE * delta);
+        moving.beat += delta * idle.rate * (1 + (FLIGHT_FAST - 1) * moving.air);
+        part.rotation[idle.axis] = moving.rest - Math.sign(idle.amount) * FLIGHT_SPREAD * moving.air + Math.sin(moving.beat + moving.phase) * idle.amount * (1 + (FLIGHT_WIDE - 1) * moving.air);
+      } else {
+        part.rotation[idle.axis] = moving.rest + Math.sin(time * idle.rate + moving.phase) * idle.amount;
+      }
     }
   }
 
@@ -286,7 +306,7 @@ export class TraySystem extends createSystem({
       const idle = part.userData.idle as Idle | undefined;
       if (idle != null) {
         // A pair of wings carries opposite amounts, so one clock beats both together.
-        this.moving.push({ piece, part, idle, rest: part.rotation[idle.axis], phase: 0 });
+        this.moving.push({ piece, part, idle, rest: part.rotation[idle.axis], phase: 0, air: 0, beat: 0 });
         this.restless.add(this.key(piece));
         return;
       }

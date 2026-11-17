@@ -39,6 +39,21 @@ const LEG_STRIDE = 0.55;
 const ARM_STRIDE = 0.45;
 const WALK_BOB = 0.004;
 const TURN_RATE = 9;
+/**
+ * Life: an actor left standing on the set is not a statue. They lean a little from foot to foot and look about
+ * (radians, and how fast), their arms move with it, and one in the Running pose runs on the spot at this many
+ * radians of stride a second, with this much of a walking stride. Small enough that the board's numbers and a
+ * frame's composition do not change.
+ */
+const LIFE_LEAN = 0.022;
+const LIFE_LOOK = 0.07;
+const LIFE_ARM = 0.06;
+const LIFE_RATE = 0.9;
+const RUN_BEAT = 9;
+const RUN_SWING = 0.8;
+/** The poses by their place in the figure (src/scene-assets/figures.scene-asset.ts): Running, and Crouch, which stays low and still. */
+const RUNNING = /^Pose3W?$/;
+const CROUCHED = /^Pose5W?$/;
 /** Flat on its back, near enough. */
 const FALL_ANGLE = 1.47;
 const FALL_RATE = 9;
@@ -72,6 +87,10 @@ type State = {
   wasX: number;
   wasZ: number;
   speed: number;
+  /** How alive it is standing on the set (0 to 1), its own clock, and where in the sway it starts, so no two move together. */
+  life: number;
+  lifeClock: number;
+  seed: number;
 };
 
 const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
@@ -188,6 +207,9 @@ export class SquirmSystem extends createSystem({
         wasX: piece.object3D?.position.x ?? 0,
         wasZ: piece.object3D?.position.z ?? 0,
         speed: 0,
+        life: 0,
+        lifeClock: 0,
+        seed: this.states.size * 2.4,
       };
       this.states.set(piece, state);
     }
@@ -224,14 +246,42 @@ export class SquirmSystem extends createSystem({
   update(delta: number): void {
     if (delta <= 0) return;
     this.watchWalkers(delta);
+    this.watchLife();
     if (this.moving.length === 0) return;
-    // A figure moving its limbs does not move as a piece, so the monitor is told to look again.
-    this.lens ??= this.world.getSystem(ViewfinderSystem);
-    this.lens?.refresh();
+    let seen = false;
     for (let i = this.moving.length - 1; i >= 0; i--) {
       const state = this.moving[i];
+      // A figure squirming, falling or walking does not move as a piece, so the monitor is told to look again.
+      // One only standing there alive is not: the monitor redrawn every frame costs the headset its frame rate.
+      if (state.amount > REST || state.fallen > REST || state.walk > REST || state.down || state.walking) seen = true;
       if (this.animate(state, delta)) continue;
       this.moving.splice(i, 1);
+    }
+    if (seen) {
+      this.lens ??= this.world.getSystem(ViewfinderSystem);
+      this.lens?.refresh();
+    }
+  }
+
+  /** Whether this actor, standing on the set, should be alive: the switch is on, and nothing else has hold of them. */
+  private lives(state: State): boolean {
+    const object = state.entity.object3D;
+    return this.squirms() && object != null && object.visible && !state.down && !state.walking && !state.entity.hasComponent(Held);
+  }
+
+  /** Everyone standing on the set is kept moving while the switch is on. */
+  private watchLife(): void {
+    if (!this.squirms()) return;
+    if (this.actors.length === 0) {
+      for (const piece of this.queries.pieces.entities) {
+        if (piece.getValue(SetPiece, 'role') === SetRole.Actor && piece.object3D != null) this.actors.push(piece);
+      }
+    }
+    for (let i = 0; i < this.actors.length; i++) {
+      const piece = this.actors[i];
+      if (piece.object3D?.visible !== true) continue;
+      const state = this.states.get(piece) ?? this.stateFor(piece);
+      if (this.lives(state) && !this.moving.includes(state)) this.moving.push(state);
     }
   }
 
@@ -308,7 +358,9 @@ export class SquirmSystem extends createSystem({
     if (object == null) return false;
     const held = state.entity.hasComponent(Held);
     const wanted = held && this.squirms();
+    const alive = this.lives(state);
     state.amount += ((wanted ? 1 : 0) - state.amount) * Math.min(1, delta * (wanted ? 12 : 8));
+    state.life += ((alive ? 1 : 0) - state.life) * Math.min(1, delta * 3);
     state.fallen += ((state.down ? 1 : 0) - state.fallen) * Math.min(1, delta * FALL_RATE);
     state.walk += ((state.walking ? 1 : 0) - state.walk) * Math.min(1, delta * 10);
     const rig = this.currentRig(state);
@@ -316,11 +368,11 @@ export class SquirmSystem extends createSystem({
       if (state.rig != null) this.rest(state.rig);
       state.rig = rig;
     }
-    if (rig == null) return wanted || state.down || state.walking;
-    if (!wanted && !state.down && !state.walking && state.amount < REST && state.fallen < REST && state.walk < REST) {
+    if (rig == null) return wanted || state.down || state.walking || alive;
+    if (!wanted && !alive && !state.down && !state.walking && state.amount < REST && state.fallen < REST && state.walk < REST && state.life < REST) {
       this.rest(rig);
       state.swingX = state.swingZ = state.speedX = state.speedZ = 0;
-      state.amount = state.fallen = state.walk = state.facing = 0;
+      state.amount = state.fallen = state.walk = state.facing = state.life = 0;
       return false;
     }
 
@@ -367,12 +419,40 @@ export class SquirmSystem extends createSystem({
     } else {
       state.facing = state.heading;
     }
+    // Standing on the set, alive: a lean from foot to foot and a look about, turned about the feet; a runner
+    // rides up and down on the stride. A held or fallen figure is doing something else.
+    const life = state.life * (1 - Math.min(1, amount + state.fallen + walk));
+    const running = RUNNING.test(rig.pose.name);
+    if (life > REST) {
+      state.lifeClock += delta;
+      const c = state.lifeClock * LIFE_RATE + state.seed;
+      if (running) {
+        state.walkClock += RUN_BEAT * delta;
+        this.step.set(0, Math.abs(Math.sin(state.walkClock)) * WALK_BOB * life, 0);
+        this.spin.identity();
+      } else {
+        const still = CROUCHED.test(rig.pose.name) ? 0.4 : 1;
+        this.euler.set(LIFE_LEAN * Math.sin(c * 0.83) * life * still, LIFE_LOOK * Math.sin(c * 0.41) * life * still, LIFE_LEAN * Math.cos(c * 0.67) * life * still);
+        this.spin.setFromEuler(this.euler);
+        this.step.set(0, 0, 0);
+      }
+      rig.pose.matrix.premultiply(this.rotate.compose(this.step, this.spin, this.one));
+    }
     rig.pose.matrixWorldNeedsUpdate = true;
 
     const energy = amount * (0.75 + 0.35 * speed);
     for (let i = 0; i < rig.limbs.length; i++) {
       const limb = rig.limbs[i];
-      const angle = Math.sin(clock + limb.phase) * limb.wave * energy + Math.sin(state.walkClock + limb.step) * limb.stride * walk;
+      // Alive: a runner's legs and arms stride; anyone else's free arms move a little as they shift.
+      const lively =
+        life <= REST
+          ? 0
+          : running
+            ? Math.sin(state.walkClock + limb.step) * limb.stride * RUN_SWING * life
+            : limb.wave === ARM_WAVE && limb.stride > 0
+              ? Math.sin(state.lifeClock * LIFE_RATE * 1.3 + limb.phase + state.seed) * LIFE_ARM * life
+              : 0;
+      const angle = Math.sin(clock + limb.phase) * limb.wave * energy + Math.sin(state.walkClock + limb.step) * limb.stride * walk + lively;
       if (limb.axis === X) this.euler.set(angle, 0, limb.splay * amount);
       else this.euler.set(0, 0, angle);
       for (let p = 0; p < limb.parts.length; p++) {

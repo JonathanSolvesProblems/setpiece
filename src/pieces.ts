@@ -452,6 +452,14 @@ export class PiecesSystem extends createSystem({
     this.drops.push({ piece, speed: 0, floor });
   }
 
+  /** Whether a piece that flies is in the air now: off the slate and not resting on anything. */
+  airborne(piece: Entity): boolean {
+    const object = piece.object3D;
+    if (object == null || !this.flies(piece) || object.position.y <= FALL_FROM) return false;
+    const index = this.dressed.indexOf(piece);
+    return index >= 0 && object.position.y > this.supportUnder(index) + FALL_FROM;
+  }
+
   /** Calls off a fall under way for this piece: it has been stood somewhere, and stays there. */
   stay(piece: Entity): void {
     for (let i = this.drops.length - 1; i >= 0; i--) if (this.drops[i].piece === piece) this.drops.splice(i, 1);
