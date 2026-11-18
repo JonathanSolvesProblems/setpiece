@@ -8,6 +8,7 @@ Live: https://setpiece.jonathansolvesproblems.com
 
 Demo video (2:58): https://www.youtube.com/watch?v=NWxwlRyEg-k
 Short (44 s): https://www.youtube.com/shorts/ZBH8obDYccA
+How I built it, on my blog: https://jonathanandrei.com/blog/setpiece-ai-film-set-on-your-table-quest-storyboard/
 
 Built for the Meta VR Start Developer Competition 2026, Productivity track, New Experience. Hands first, seated: no controller is needed, and one works if you hold it.
 
