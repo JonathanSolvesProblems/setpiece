@@ -4,6 +4,11 @@ Say the shot, and a 1:10 film set builds itself on your kitchen table, piece by 
 
 Live: https://setpiece.jonathansolvesproblems.com
 
+[![The demo on YouTube (2:58)](https://img.youtube.com/vi/NWxwlRyEg-k/maxresdefault.jpg)](https://www.youtube.com/watch?v=NWxwlRyEg-k)
+
+Demo video (2:58): https://www.youtube.com/watch?v=NWxwlRyEg-k
+Short (44 s): https://www.youtube.com/shorts/ZBH8obDYccA
+
 Built for the Meta VR Start Developer Competition 2026, Productivity track, New Experience. Hands first, seated: no controller is needed, and one works if you hold it.
 
 ## How to run it
@@ -28,6 +33,29 @@ The set designer and its voice are two server functions (`api/director.ts`, `api
 `npm run dev` serves the app at https://localhost:8081 and opens a managed browser with the Immersive Web SDK emulator. The port is fixed, so it must be free, and the certificate is self-signed, so a browser of your own warns once before it shows the page. `npm run typecheck` checks types. `npm run build` writes `dist/` for any static host. `node tools/make-audio.mjs` regenerates the fifteen sounds, and `node tools/make-voice-lines.mjs` records the set designer's fixed lines again (it needs an ElevenLabs key, and only records a line whose words changed).
 
 To check it yourself: `node tools/check-live.mjs` asserts 57 things about the live site and writes what it found to `devpost/checks/last-run.md`. `npm run check:claims` fails when this README or the submission text disagrees with the code or the measurements. Every number in this file traces to `devpost/sources.md`.
+
+## In the headset
+
+The first seven are captures from a Meta Quest 3S in the Quest Browser; the last is what the page saves for you.
+
+<table>
+<tr>
+<td width="50%"><img src="devpost/gallery/01-castle.png" alt="In the headset I asked for a knight charging a castle, then two more fighting at its gate. A 1:10 set on my real table."><br><sub>In the headset I asked for a knight charging a castle, then two more fighting at its gate. A 1:10 set on my real table.</sub></td>
+<td width="50%"><img src="devpost/gallery/02-say.png" alt="&quot;A night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop&quot;: piece by piece."><br><sub>&quot;A night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop&quot;: piece by piece.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="devpost/gallery/03-evolve.png" alt="Four sentences, said in the headset one after another. Each one changes the set that is standing, in a few seconds."><br><sub>Four sentences, said in the headset one after another. Each one changes the set that is standing, in a few seconds.</sub></td>
+<td width="50%"><img src="devpost/gallery/04-lens.png" alt="In the headset: the set built, it looked through its own camera, moved it back and wider to hold horse and gate, and said so."><br><sub>In the headset: the set built, it looked through its own camera, moved it back and wider to hold horse and gate, and said so.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="devpost/gallery/05-rider.png" alt="A hand on the dragon, its rider seated on its back. Pinch a piece or close a fist on it. Controllers work too."><br><sub>A hand on the dragon, its rider seated on its back. Pinch a piece or close a fist on it. Controllers work too.</sub></td>
+<td width="50%"><img src="devpost/gallery/06-inside.png" alt="The same set at full size around you: the knights at eye level, the dragon overhead. Back to the table in one pinch."><br><sub>The same set at full size around you: the knights at eye level, the dragon overhead. Back to the table in one pinch.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="devpost/gallery/07-coverage.png" alt="Shot 3 of 6, in the headset: the designer planned the shots, the camera goes to each one and the board fills by itself. Six in 25 s."><br><sub>Shot 3 of 6, in the headset: the designer planned the shots, the camera goes to each one and the board fills by itself. Six in 25 s.</sub></td>
+<td width="50%"><img src="devpost/gallery/08-leave.png" alt="Saved from the page: the board the designer shot, each frame with its lens and height, and the shot list as a CSV for the crew."><br><sub>Saved from the page: the board the designer shot, each frame with its lens and height, and the shot list as a CSV for the crew.</sub></td>
+</tr>
+</table>
 
 ## Why
 
