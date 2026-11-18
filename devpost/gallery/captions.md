@@ -20,10 +20,10 @@ Asked for a knight charging a castle, then two knights fighting, then rain. A 1:
 Said in the headset, one after another. Each change lands in seconds and leaves the rest of the set as it was.
 ```
 
-## 04 look
+## 04 lens
 
 ```
-Once the set is up it is shown its own camera's picture and how much of the frame each piece takes. It moves the camera if the shot is off.
+In the headset: the set built, it looked through its own camera, moved it back and wider to hold horse and gate, and said so.
 ```
 
 ## 05 rider

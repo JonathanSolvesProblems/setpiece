@@ -99,6 +99,8 @@ SLIDES = [
          caption='A hand on the dragon, its rider seated on its back. Pinch a piece or close a fist on it. Controllers work too.'),
     dict(slug='inside', badge=QUEST_18, headline='Step inside', picture='captures/quest-inside-castle.jpg',
          caption='The same set at full size around you: the knights at eye level, the dragon overhead. Back to the table in one pinch.'),
+    dict(slug='lens', badge=QUEST_18, headline='It checks its own frame', picture='captures/quest-through-the-lens.jpg',
+         caption='In the headset: the set built, it looked through its own camera, moved it back and wider to hold horse and gate, and said so.'),
     dict(slug='say', badge=LIVE_BADGE, headline='Say the shot', picture=('live', 'designer'),
          caption='"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.'),
     dict(slug='table', badge=QUEST_17, headline='The shot, on your table', picture='captures/quest-aircraft-on-table.jpg',
@@ -144,7 +146,7 @@ SLIDES = [
 # The gallery as it is submitted: eleven slides in the order of a first visit. A cold judge read on 15 Nov found
 # nineteen too many, with some repeating others, and a second on 16 Nov asked for the numbers on one slide; the rest stay above for anyone who wants to render them.
 # (Eight since 18 Nov: the form takes eight, and four of them are from that night's headset run.)
-SUBMITTED = ['castle', 'say', 'evolve', 'look', 'rider', 'inside', 'coverage', 'leave']
+SUBMITTED = ['castle', 'say', 'evolve', 'lens', 'rider', 'inside', 'coverage', 'leave']
 SLIDES = [next(slide for slide in SLIDES if slide['slug'] == slug) for slug in SUBMITTED]
 
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
