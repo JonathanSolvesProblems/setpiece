@@ -149,6 +149,17 @@ export const LOOKS = [
 ] as const;
 export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim', 'Crouch', 'Sitting'] as const;
 /**
+ * What an actor does while the set is alive, on the spot (src/squirm.ts plays it): nothing, or one of these. Fight
+ * strikes with what is in the hand (or the fist) and lunges; Shoot is the kick of a gun fired again and again; Talk
+ * is hands and head in a conversation; Wave is an arm up and waving, or a cheer; Dance; Work is a job done over and
+ * over with the hand (hammering, digging, chopping, typing).
+ */
+export const ACTS = ['', 'Fight', 'Shoot', 'Talk', 'Wave', 'Dance', 'Work'] as const;
+/** The words a plan uses for them; "still" is nothing. */
+export const ACT_WORDS = ['fight', 'shoot', 'talk', 'wave', 'dance', 'work', 'still'] as const;
+export const actIndex = (word: string): number => Math.max(0, ACTS.findIndex((act) => act.toLowerCase() === word.trim().toLowerCase()));
+
+/**
  * A seated figure has its seat at its origin and its legs hanging below it (src/scene-assets/figures.scene-asset.ts):
  * this far, on the table, for an actor at the kit's size. On the bare ground a seated actor stands this high.
  */

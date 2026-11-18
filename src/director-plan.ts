@@ -7,7 +7,7 @@
  * the wearer and at 90 to their right.
  */
 import { LENSES } from './camera-formats.js';
-import { BUILDS, LOOKS, PAINTS, POSES } from './catalog.js';
+import { ACT_WORDS, BUILDS, LOOKS, PAINTS, POSES } from './catalog.js';
 
 /** Shapes a new piece is turned and cut from. Each is one unit across before it is sized. */
 export const SHAPES = ['box', 'cylinder', 'cone', 'pyramid', 'sphere', 'dome', 'wedge'] as const;
@@ -51,6 +51,8 @@ export type Thing = {
   paint: string;
   fitting: string;
   pose: string;
+  /** What an actor is doing: one of ACT_WORDS, or "" to keep what they were doing. */
+  act: string;
   look: string;
   build: string;
   parts: string[];
@@ -132,7 +134,7 @@ export const PLAN_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['id', 'name', 'x', 'z', 'y', 'yaw', 'size', 'paint', 'fitting', 'pose', 'look', 'build', 'parts'],
+        required: ['id', 'name', 'x', 'z', 'y', 'yaw', 'size', 'paint', 'fitting', 'pose', 'act', 'look', 'build', 'parts'],
         properties: {
           id: string,
           name: string,
@@ -144,6 +146,7 @@ export const PLAN_SCHEMA = {
           paint: { type: 'string', enum: ['', ...PAINT_NAMES] },
           fitting: string,
           pose: { type: 'string', enum: ['', ...POSES] },
+          act: { type: 'string', enum: ['', ...ACT_WORDS] },
           look: { type: 'string', enum: ['', ...LOOKS.map((look) => look.name)] },
           build: { type: 'string', enum: ['', ...BUILDS] },
           parts: { type: 'array', items: string },
@@ -227,6 +230,7 @@ export function cleanThing(raw: unknown): Thing | null {
   const text = (value: unknown, longest: number): string => (typeof value === 'string' ? value.replace(/[^\x20-\x7e]/g, '').trim().slice(0, longest) : '');
   const paint = text(t.paint, 20).toLowerCase();
   const pose = text(t.pose, 20);
+  const act = text(t.act, 10).toLowerCase();
   const look = text(t.look, 20);
   const build = text(t.build, 10);
   const parts = Array.isArray(t.parts) ? t.parts.filter((part): part is string => typeof part === 'string').slice(0, MOST_PARTS) : [];
@@ -242,6 +246,7 @@ export function cleanThing(raw: unknown): Thing | null {
     paint: PAINT_NAMES.includes(paint) ? paint : '',
     fitting: text(t.fitting, 20),
     pose: (POSES as readonly string[]).includes(pose) ? pose : '',
+    act: (ACT_WORDS as readonly string[]).includes(act) ? act : '',
     look: LOOKS.some((entry) => entry.name === look) ? look : '',
     build: (BUILDS as readonly string[]).includes(build) ? build : '',
     parts: parts.map((part) => part.slice(0, 120)),

@@ -66,10 +66,11 @@ const FLIGHT_WIDE = 2.2;
 const FLIGHT_FAST = 3;
 const FLIGHT_EASE = 3;
 /**
- * An actor's pose, look, build (0 a man, 1 a woman; a board saved before builds has none, and is a man) and what
- * they hold (a place in HELD, src/catalog.ts; a board saved before that has none, and holds nothing).
+ * An actor's pose, look, build (0 a man, 1 a woman; a board saved before builds has none, and is a man), what they
+ * hold (a place in HELD, src/catalog.ts; a board saved before that has none, and holds nothing) and what they are
+ * doing (a place in ACTS; none is nothing).
  */
-export type Cast = [number, number, number?, number?];
+export type Cast = [number, number, number?, number?, number?];
 export type Dress = { cast: Record<string, Cast>; finish: Record<string, Finish> };
 type Saved = { on: string[]; sensor: number; rig: string } & Partial<Dress>;
 /**
@@ -582,7 +583,7 @@ export class TraySystem extends createSystem({
     const actors = this.managed.filter((piece) => this.on.has(this.key(piece)) && isActor(this.key(piece)));
     actors.forEach((piece, i) => {
       const key = this.key(piece);
-      const value: Cast = [AIM, this.cast.get(key)?.[1] ?? 0, this.cast.get(key)?.[2] ?? 0, this.cast.get(key)?.[3] ?? 0];
+      const value: Cast = [AIM, this.cast.get(key)?.[1] ?? 0, this.cast.get(key)?.[2] ?? 0, this.cast.get(key)?.[3] ?? 0, this.cast.get(key)?.[4] ?? 0];
       this.cast.set(key, value);
       this.dress(piece, value);
       const from = piece.object3D;
@@ -808,7 +809,7 @@ export class TraySystem extends createSystem({
   private seated = new Set<string>();
 
   /** One pose shows; its clothes are the look, tinted over the figure's own wood. */
-  private dress(actor: Entity, [pose, look, build = 0, holds = 0]: Cast): void {
+  private dress(actor: Entity, [pose, look, build = 0, holds = 0, acts = 0]: Cast): void {
     const style = LOOKS[look] ?? LOOKS[0];
     // A crouched actor's eyes are three quarters as high as when they stand (src/scene-assets/figures.scene-asset.ts):
     // the camera aims there, a close-up is fitted there, and an eyeline is measured from there.
@@ -819,6 +820,8 @@ export class TraySystem extends createSystem({
       this.standingEyes.set(key, standing);
     }
     actor.setValue(SetPiece, 'eyeHeight', standing * (POSES[pose] === 'Crouch' ? CROUCH_EYES : POSES[pose] === 'Sitting' ? SIT_EYES : 1));
+    // What they are doing is read off the figure by whatever moves it (src/squirm.ts).
+    actor.object3D!.userData.acts = acts;
     // Seated on the bare ground, the figure is a shin's length up so its legs are not through the slate; taking
     // another pose there, it is back on its feet. Up on something (a bench, a dragon), it is left where it is.
     const figure = actor.object3D!;

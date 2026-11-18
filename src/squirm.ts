@@ -54,6 +54,22 @@ const RUN_SWING = 0.8;
 /** The poses by their place in the figure (src/scene-assets/figures.scene-asset.ts): Running, and Crouch and Sitting, which stay low and still. */
 const RUNNING = /^Pose3W?$/;
 const CROUCHED = /^Pose[56]W?$/;
+const ARMS_UP = /^Pose2W?$/;
+/**
+ * What an actor is doing (ACTS, src/catalog.ts), played on the spot while the set is alive. Beats a second, and how
+ * far: a strike's swing about the shoulder (radians), a lunge forward (slate metres: about 12 cm at full size), a
+ * gun's kick. The feet stay on their mark, so a frame's composition holds.
+ */
+const ACT_FIGHT = 1;
+const ACT_SHOOT = 2;
+const ACT_TALK = 3;
+const ACT_WAVE = 4;
+const ACT_DANCE = 5;
+const ACT_WORK = 6;
+const FIGHT_BEAT = 5.2;
+const FIGHT_SWING = 0.72;
+const FIGHT_LUNGE = 0.012;
+const SHOOT_EVERY = 1.1;
 /** Flat on its back, near enough. */
 const FALL_ANGLE = 1.47;
 const FALL_RATE = 9;
@@ -91,6 +107,8 @@ type State = {
   life: number;
   lifeClock: number;
   seed: number;
+  /** The clock of what they are doing. */
+  actClock: number;
 };
 
 const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
@@ -210,6 +228,7 @@ export class SquirmSystem extends createSystem({
         life: 0,
         lifeClock: 0,
         seed: this.states.size * 2.4,
+        actClock: 0,
       };
       this.states.set(piece, state);
     }
@@ -423,6 +442,8 @@ export class SquirmSystem extends createSystem({
     // rides up and down on the stride. A held or fallen figure is doing something else.
     const life = state.life * (1 - Math.min(1, amount + state.fallen + walk));
     const running = RUNNING.test(rig.pose.name);
+    // What they are doing, if anything: read off the figure, where the tray wrote it. A runner runs.
+    const act = running || life <= REST ? 0 : ((object.userData.acts as number | undefined) ?? 0);
     if (life > REST) {
       state.lifeClock += delta;
       const c = state.lifeClock * LIFE_RATE + state.seed;
@@ -433,8 +454,34 @@ export class SquirmSystem extends createSystem({
       } else {
         const still = CROUCHED.test(rig.pose.name) ? 0.4 : 1;
         this.euler.set(LIFE_LEAN * Math.sin(c * 0.83) * life * still, LIFE_LOOK * Math.sin(c * 0.41) * life * still, LIFE_LEAN * Math.cos(c * 0.67) * life * still);
-        this.spin.setFromEuler(this.euler);
         this.step.set(0, 0, 0);
+        // What they are doing moves the whole figure too: a lunge with the strike, the kick of a shot, a dancer's bounce.
+        if (act > 0) {
+          state.actClock += delta;
+          const t = state.actClock + state.seed;
+          if (act === ACT_FIGHT) {
+            const lunge = Math.max(0, Math.sin(t * FIGHT_BEAT - 0.5)) * life * still;
+            this.euler.x += 0.1 * lunge;
+            this.euler.y += 0.2 * Math.sin(t * FIGHT_BEAT * 0.5) * life * still;
+            this.step.set(0, 0.002 * Math.abs(Math.sin(t * FIGHT_BEAT)) * life * still, FIGHT_LUNGE * lunge);
+          } else if (act === ACT_SHOOT) {
+            const kick = Math.exp(-9 * ((t % SHOOT_EVERY) / SHOOT_EVERY)) * life;
+            this.euler.x -= 0.07 * kick;
+            this.step.set(0, 0, -0.004 * kick);
+          } else if (act === ACT_TALK) {
+            this.euler.x += 0.03 * Math.sin(t * 2.3) * life;
+            this.euler.y += 0.12 * Math.sin(t * 1.1) * life;
+          } else if (act === ACT_WAVE) {
+            this.euler.z += 0.04 * Math.sin(t * 3) * life;
+          } else if (act === ACT_DANCE) {
+            this.euler.y += 0.5 * Math.sin(t * 2.5) * life * still;
+            this.euler.z += 0.08 * Math.sin(t * 5) * life;
+            this.step.set(0, 0.006 * Math.abs(Math.sin(t * 5)) * life * still, 0);
+          } else if (act === ACT_WORK) {
+            this.euler.x += (0.07 + 0.05 * Math.abs(Math.sin(t * 4))) * life;
+          }
+        }
+        this.spin.setFromEuler(this.euler);
       }
       rig.pose.matrix.premultiply(this.rotate.compose(this.step, this.spin, this.one));
     }
@@ -452,7 +499,8 @@ export class SquirmSystem extends createSystem({
             : limb.wave === ARM_WAVE && limb.stride > 0
               ? Math.sin(state.lifeClock * LIFE_RATE * 1.3 + limb.phase + state.seed) * LIFE_ARM * life
               : 0;
-      const angle = Math.sin(clock + limb.phase) * limb.wave * energy + Math.sin(state.walkClock + limb.step) * limb.stride * walk + lively;
+      const acting = act > 0 ? this.actAngle(act, rig, i, state.actClock + state.seed) * life : 0;
+      const angle = Math.sin(clock + limb.phase) * limb.wave * energy + Math.sin(state.walkClock + limb.step) * limb.stride * walk + lively + acting;
       if (limb.axis === X) this.euler.set(angle, 0, limb.splay * amount);
       else this.euler.set(0, 0, angle);
       for (let p = 0; p < limb.parts.length; p++) {
@@ -463,6 +511,41 @@ export class SquirmSystem extends createSystem({
     const offStand = amount > 0.05 || state.fallen > 0.05 || walk > 0.05;
     for (let i = 0; i < rig.stand.length; i++) rig.stand[i].visible = !offStand;
     return true;
+  }
+
+  /**
+   * How far a limb is swung about its joint by what the actor is doing, at this moment of it. The working arm is the
+   * one with something in its hand, or the right; the legs of someone crouched or seated stay where they are.
+   */
+  private actAngle(act: number, rig: Rig, index: number, t: number): number {
+    const limb = rig.limbs[index];
+    if (limb.axis !== X) return act === ACT_TALK ? 0.05 * Math.sin(t * 2.3) : 0;
+    const arm = limb.wave === ARM_WAVE;
+    // Left and right take turns: an arm with the opposite leg.
+    const side = Math.cos(limb.step) > 0 ? 1 : -1;
+    if (!arm) {
+      if (CROUCHED.test(rig.pose.name)) return 0;
+      if (act === ACT_FIGHT) return 0.2 * Math.sin(t * FIGHT_BEAT * 0.5) * side;
+      if (act === ACT_DANCE) return 0.3 * Math.sin(t * 5) * side;
+      return 0;
+    }
+    let working = -1;
+    let right = -1;
+    for (let i = 0; i < rig.limbs.length; i++) {
+      const other = rig.limbs[i];
+      if (other.axis !== X || other.wave !== ARM_WAVE) continue;
+      if (Math.cos(other.step) > 0) right = i;
+      for (let p = 0; p < other.parts.length; p++) if (other.parts[p].visible && (other.parts[p].name.startsWith('Held') || other.parts[p].name.startsWith('Pistol'))) working = i;
+    }
+    const works = index === (working >= 0 ? working : right);
+    const up = ARMS_UP.test(rig.pose.name);
+    if (act === ACT_FIGHT) return works ? -0.2 - FIGHT_SWING * Math.sin(t * FIGHT_BEAT) : 0.25 * Math.sin(t * FIGHT_BEAT);
+    if (act === ACT_SHOOT) return works ? -0.1 * Math.exp(-9 * ((t % SHOOT_EVERY) / SHOOT_EVERY)) : 0;
+    if (act === ACT_TALK) return works ? 0 : -0.3 - 0.22 * Math.sin(t * 2.1);
+    if (act === ACT_WAVE) return up ? 0.28 * Math.sin(t * 7 + (side > 0 ? 0 : 1.6)) : works ? 0 : -2.3 + 0.3 * Math.sin(t * 7);
+    if (act === ACT_DANCE) return (up ? 0 : -0.5) + 0.6 * Math.sin(t * 5 + (side > 0 ? 0 : Math.PI));
+    if (act === ACT_WORK) return works ? -0.3 - 0.65 * Math.abs(Math.sin(t * 4)) : 0;
+    return 0;
   }
 
   /** out = base turned by this rotation about a point. */
