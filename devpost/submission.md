@@ -97,7 +97,7 @@ Let the model propose and have code check it. The designer writes a set in a few
 
 Send the answer a piece at a time. The whole set still takes a few seconds, but something lands at 1.6, and that is when it starts to look like someone is building.
 
-The emulator is not the headset, so this page says which is which. Not yet run on the headset, only in its emulator: walking the full-size set (pointing shows its beam and ring on the headset; the pinch that walks you there has not been tried on it), a controller in place of a hand, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. One room, mine. On Nov 17 and the night after, the heaviest sets (rain, fire, a dragon, four actors fighting) ran at 52 to 61 frames a second on the table with the headset's screen recorder running, and 76 at full size. I have not measured them with the recorder off.
+The emulator is not the headset, so this page says which is which. Not yet run on the headset, only in its emulator: a controller in place of a hand, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. One room, mine. On Nov 17 and the night after, the heaviest sets (rain, fire, a dragon, four actors fighting) ran at 52 to 61 frames a second on the table with the headset's screen recorder running, and 76 at full size. I have not measured them with the recorder off.
 
 ## What's next for Setpiece
 

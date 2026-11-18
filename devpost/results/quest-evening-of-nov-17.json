@@ -53,9 +53,11 @@
   }
  },
  "not_seen": [
-  "walking inside the set by pointing",
   "a board's tab bringing its set back",
   "a saved board's picture arriving in Downloads at the end of a session (the Downloads folder was empty after these runs)",
   "sword and shield together: an actor holds one thing, and 'give one of them a shield' replaced that knight's sword"
+ ],
+ "seen_in_the_recording": [
+  "walking inside the full-size set by pointing at the floor and pinching: the headset's recording of the run in the first hour of 18 Nov shows the ring on the floor between the two knights with the pinching hand in view, and half a second later the view from that spot (read off the recording on 18 Nov; the wearer was not asked to repeat it)"
  ]
 }
