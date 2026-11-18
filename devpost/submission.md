@@ -31,7 +31,7 @@ New Experience
 ```
 ## Inspiration
 
-About ten years ago I made short VFX films and put them online: lightning striking a back yard, a second copy of me on the couch, fire bursting out of the ground in the woods. Every effect went in on a computer weeks after the shoot. On the day I was framing the shot around empty air, with nothing for the actor to look at.
+About ten years ago I made short VFX films and put them online: lightning hitting my back yard, me sitting on the couch next to myself, fire bursting out of the ground in the woods. Every effect went in on the computer weeks after we shot it. On the day there was nothing there yet, so I was guessing at the framing, and the actor (usually me) had nothing to look at.
 
 A director works that out before the shoot day, with a storyboard, and on a creature shoot with a tennis ball on a stand where the creature's eyes will be. I wanted to do that pass at my own table, with my hands, before anyone is on set.
 
