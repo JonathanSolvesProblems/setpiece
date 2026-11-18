@@ -4,7 +4,7 @@
  * requests, so it is read from the cache after the first.
  */
 import { LENSES } from './camera-formats.js';
-import { ASSETS, BUILDS, LOOKS, POSES, SHELF_ASSETS, sparesOf } from './catalog.js';
+import { HELD, ASSETS, BUILDS, LOOKS, POSES, SHELF_ASSETS, sparesOf } from './catalog.js';
 import { FINISHES, MADE_MOST, MOST_NEW, MOST_PARTS, MOST_THINGS, SHAPES } from './director-plan.js';
 
 /**
@@ -62,6 +62,8 @@ function libraryLines(): string {
       size ? `${metres(size[0])} wide, ${metres(size[1])} long, ${metres(size[2])} high` : '',
       asset.paint === true ? 'paintable' : '',
       asset.styles ? `fittings ${asset.styles.join(' / ')}` : '',
+      // An actor's fitting is what is in their hand (src/catalog.ts HELD).
+      /^[A-D]$/.test(asset.label) ? `fittings (held in the hand) ${HELD.slice(1).join(' / ').toLowerCase()}` : '',
       asset.aliases?.length ? `also called ${asset.aliases.join(', ')}` : '',
     ].filter((part) => part !== '');
     lines.push(`- ${parts.join('; ')}`);
@@ -84,6 +86,7 @@ ${libraryLines()}
 
 Actors cannot sit or lie down: an actor meant to be seated stands just beside the seat, facing the way they would sit. There are four actors. For more people (a crowd, soldiers, a queue), make one plain figure as a new piece (a cylinder body and a sphere head, 1.7 m tall) and copy it.
 Actors (A, B, C, D) take a pose: ${POSES.join(', ')} (Aim holds a pistol two-handed; First pose stands relaxed; Second pose has a hand on the hip; Crouch is down low on bent knees, for hiding, ducking or taking cover). And a look: ${LOOKS.map((look) => look.name).join(', ')}. And a build, ${BUILDS.join(' or ')}: as the sentence says (a woman, two sisters, a mother and her son); where it does not say, a mix of the two; "" keeps the build they have.
+An actor's fitting is what they hold in the hand: "sword", "staff" or "umbrella" (a katana, a blade or a knife is a sword; a spear, a pole, a broom, a wand or a walking stick is a staff). When the director names one of these, or the action cannot be done without it, you must set that actor's fitting to it (and not otherwise: enemies facing each other, a soldier or a guard hold nothing unless a weapon is named): a sword fight is two actors each with fitting "sword"; a wizard has fitting "staff"; mourners in the rain each have fitting "umbrella". It is then in their hand in every pose and goes where they go. Never make a held thing as a new piece and never lay one on the ground. "none" empties the hand; "" on an edit keeps what is in it; an actor holding nothing on a new scene has "".
 Paints for paintable pieces: bare wood, red, orange, yellow, green, blue, white, black.
 Size scales a piece: 1 is its own size; 0.7 small, 1.5 big, 2.2 giant; 0 keeps the size it has now. Keep everything at size 1 so the shot reads at true scale (previs is for judging what fits in a frame): change a size only when the director asks, or when a thing is meant to be out of scale (a giant dragon). When the stage is too small for everything, show less of the place, never shrink it. Actors are always 1.
 Effects are animated particles: put them where they happen (fire on a burning car takes the car's x and z).
@@ -143,6 +146,8 @@ You also place the shot camera: its x and z, the height of its lens, the lens, a
 - says: one sentence, under 110 characters, saying what you built and how the shot is framed. Plain words, no exclamation marks.
 - next: one short thing the director could say next, in their words, under eight words: "low angle on the dragon", "add rain", "move the car closer".
 - light: the light the scene is in, read from the sentence: night for a night chase or anything after dark, golden hour for sunset or dawn, day for daylight outside, overcast for grey or rainy weather, spotlight for one pool of light on a dark stage (a product shot, an interrogation, a solo on a stage), studio for an interior or when nothing says. On a new scene always choose one: day when it is outdoors and nothing says. On an edit, "" keeps the light unless the director asks for another ("make it night").
+- drawn: how the director wants the pictures drawn, only when they name a way: anime (also cartoon, manga, animated, cel), sketch (pencil, hand drawn, a storyboard drawing), noir (black and white), photo (plain, realistic, back to normal). Otherwise "", which keeps it as it is. The recogniser cannot write the word anime: it writes \"enemy\", \"enemies\", \"and am a\", \"and i'm a\", \"anna a\", \"any may\" or \"animate\". When such words stand where a kind of film or a look would (\"an enemy sword fight\", \"an enemy fight between two samurai\", \"and and am a sword night on a rooftop\", \"make it enemy\", \"and i'm a style\", \"make it look like a japanese enemy\", \"two enemy heroes face a giant robot\"), the director said anime: set drawn to anime, build or keep that scene, and add no enemies for it. People who are plainly enemies in the story (\"two enemies face each other\", \"an enemy soldier attacks\") are not anime. It cannot write noir either: \"who are look\", \"no are\", \"nor look\", \"new are style\" and the like are noir.
+  A sentence that asks only for how it is drawn (\"make it anime\", \"sketch style\", \"black and white\") changes nothing else: fresh false, things [], remove [], camera keep true.
 - far: what stands on the horizon behind the set, all the way round: city for streets, rooftops and anything modern; hills for open country, farms and villages; mountains for castles, fantasy and the wild; forest for woods and camps; open for sea, desert, plains, space or a stage. On a new scene always choose one. On an edit, "" keeps it.
 - At most ${MOST_THINGS} things and ${MOST_NEW} new pieces. Every thing has every field: use "" and [] where a field does not apply, and size 0 on an edit to keep a piece's size as it is.
 - Never use brand or product names, real people, or characters from films, games or books, even when the director says one: build a plain stand-in and use the plain words everywhere you write (a jeep is an "off-road car", a famous caped crusader is a "caped hero", a famous monster is a "giant lizard"). Write plain ASCII.`;

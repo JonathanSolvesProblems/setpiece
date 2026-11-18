@@ -10,7 +10,8 @@ export function localBounds(object: Object3D): Box3 {
   // The piece itself may be off the set, and so hidden; what is hidden inside it (a fitting
   // that is not on, a pose that is not showing) is not part of its shape.
   const visit = (node: Object3D): void => {
-    if (node !== object && !node.visible) return;
+    // (Nor is what an actor holds part of the actor's size: a staff does not make them a pole wide.)
+    if (node !== object && (!node.visible || node.name.startsWith('Held'))) return;
     if (node instanceof Mesh && node.name !== 'EffectParticles' && node.name !== 'GrabVolume' && node.name !== 'HoverRing' && node.name !== 'LampPool' && node.name !== 'LampHalo') {
       const geometry = node.geometry;
       if (geometry.boundingBox == null) geometry.computeBoundingBox();

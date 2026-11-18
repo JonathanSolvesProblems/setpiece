@@ -20,6 +20,8 @@ import {
   Quaternion,
   SphereGeometry,
   Vector3,
+  ConeGeometry,
+  DoubleSide,
 } from '@iwsdk/core';
 
 const SCALE = 0.1;
@@ -133,6 +135,53 @@ function propPistol(hand: Vector3, tag: 'L' | 'R'): Mesh {
   return slide;
 }
 
+const blade = new MeshStandardMaterial({ color: 0xd4d8dc, roughness: 0.32, metalness: 0.7 });
+const cloth = new MeshStandardMaterial({ color: 0x2c3138, roughness: 0.85 });
+
+/**
+ * The things an actor holds, each a group at the wrist with its own up along the thing: a sword raised forward of
+ * the hand, a staff upright in it, an open umbrella over the head. Cut a little over scale, as the pistol is, so
+ * they read from across a table. Named Held1, Held2, Held3 and the hand's letter; the name keeps them on the arm.
+ */
+function heldProps(elbow: Vector3, wrist: Vector3, tag: 'L' | 'R', h: number): Group[] {
+  const forearm = wrist.clone().sub(elbow).normalize();
+  const out: Group[] = [];
+  const held = (kind: number, along: Vector3, ...parts: Mesh[]): void => {
+    const group = new Group();
+    group.name = `Held${kind}${tag}`;
+    group.position.copy(wrist);
+    group.quaternion.setFromUnitVectors(UP, along.normalize());
+    for (const part of parts) {
+      part.name = 'HeldPart';
+      part.updateMatrix();
+      group.add(part);
+    }
+    group.visible = false;
+    group.updateMatrix();
+    out.push(group);
+  };
+  const at = (mesh: Mesh, y: number): Mesh => {
+    mesh.position.y = y;
+    return mesh;
+  };
+  // A sword: grip in the fist, a guard, the blade up and forward of the hand whichever way the arm hangs.
+  held(
+    1,
+    new Vector3(0, 1, 0.5).addScaledVector(forearm, 0.4),
+    at(new Mesh(new CylinderGeometry(0.0022, 0.0022, 0.02 * h / 0.175, 8), woodDark), 0),
+    at(new Mesh(new BoxGeometry(0.02 * h / 0.175, 0.003, 0.0045), blade), 0.011 * h / 0.175),
+    at(new Mesh(new BoxGeometry(0.0062, 0.092 * h / 0.175, 0.0018), blade), 0.058 * h / 0.175),
+  );
+  // A staff: taller than the figure, upright, held a third of the way up.
+  held(2, new Vector3(0, 1, 0.12), at(new Mesh(new CylinderGeometry(0.0026, 0.003, 1.1 * h, 8), woodDark), 0.2 * h));
+  // An umbrella: its handle in the hand, its canopy open over the head.
+  const canopy = new Mesh(new ConeGeometry(0.34 * h, 0.1 * h, 14, 1, true), cloth);
+  canopy.material.side = DoubleSide;
+  const reach = Math.max(0.3 * h, 1.12 * h - wrist.y);
+  held(3, new Vector3(0, 1, 0.05), at(new Mesh(new CylinderGeometry(0.0016, 0.0016, reach, 6), woodDark), reach / 2), at(canopy, reach));
+  return out;
+}
+
 /**
  * A woman's lay figure is made in her proportions, as artists' figures are: shoulders and limbs narrower, a waist,
  * the hips wider, the head a little smaller. The parts and their names are the same, so poses, looks and the squirm
@@ -241,6 +290,8 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       hand(elbow, wrist, h, tag),
     );
     if (stance.aiming === tag) g.add(propPistol(wrist, tag));
+    // What an actor may hold (src/catalog.ts HELD), in the hand that points or aims, or the right: hidden until held.
+    if (tag === (stance.aiming ?? stance.pointing ?? 'R')) for (const held of heldProps(elbow, wrist, tag, h)) g.add(held);
   }
   return g;
 }

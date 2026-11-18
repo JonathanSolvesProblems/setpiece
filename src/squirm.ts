@@ -94,7 +94,7 @@ type State = {
 };
 
 const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
-  arm: new RegExp(`^(Shoulder${tag}|Arm${tag}Upper|Elbow${tag}|Arm${tag}Lower|Hand${tag}|Pistol${tag})$`),
+  arm: new RegExp(`^(Shoulder${tag}|Arm${tag}Upper|Elbow${tag}|Arm${tag}Lower|Hand${tag}|Pistol${tag}|Held\\d${tag})$`),
   leg: new RegExp(`^(Leg${tag}Upper|Knee${tag}|Leg${tag}Lower|Foot${tag})$`),
 });
 

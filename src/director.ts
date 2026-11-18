@@ -8,11 +8,11 @@ import { createSystem, Entity, Object3D, Vector3 } from '@iwsdk/core';
 import type { World } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
-import { assetByLabel, assetTitle, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf } from './catalog.js';
+import { assetByLabel, assetTitle, HELD, heldIndex, isMade, LOOKS, PAINTS, POSES, SIZES, sparesOf } from './catalog.js';
 import type { Asset } from './catalog.js';
 import { LENSES, SENSORS } from './camera-formats.js';
 import { fitShot } from './coverage-plan.js';
-import { cleanCamera, cleanThing, fitMade, isFar, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
+import { cleanCamera, cleanThing, fitMade, isDrawn, isFar, isLight, MOST_THINGS, plainLine, PlanReader, readPart } from './director-plan.js';
 import type { CameraPlan, Thing } from './director-plan.js';
 import { MadeSystem } from './made.js';
 import type { MadeDef } from './made.js';
@@ -568,7 +568,7 @@ export class DirectorSystem extends createSystem({
       const scale = (finish[3] ?? 0) > 0 ? finish[3]! : (SIZES[finish[1]]?.scale ?? 1);
       if (Math.abs(scale - 1) > 0.01) words.push(`size ${one(scale)}`);
       if (finish[2] > 0 && asset.styles?.[finish[2]]) words.push(`fitting ${asset.styles[finish[2]]}`);
-      if (cast != null) words.push(`pose ${POSES[cast[0]] ?? POSES[0]}, look ${LOOKS[cast[1]]?.name ?? LOOKS[0].name}, build ${cast[2] === 1 ? 'woman' : 'man'}`);
+      if (cast != null) words.push(`pose ${POSES[cast[0]] ?? POSES[0]}, look ${LOOKS[cast[1]]?.name ?? LOOKS[0].name}, build ${cast[2] === 1 ? 'woman' : 'man'}${(cast[3] ?? 0) > 0 ? `, holding ${HELD[cast[3]!].toLowerCase()}` : ''}`);
       lines.push(`- ${words.filter((word) => word !== '').join('; ')}`);
     }
     if (lines.length === 0) lines.push('Nothing is on the set.');
@@ -652,6 +652,8 @@ class PlanBuild {
     else if (key === 'light' && isLight(value) && !this.looking && this.begun) (this.world.globals as unknown as { setLight: Signal<string> }).setLight.value = value;
     // What stands on the horizon; "" keeps it, and a look does not change it.
     else if (key === 'far' && isFar(value) && !this.looking && this.begun) (this.world.globals as unknown as { setFar: Signal<string> }).setFar.value = value;
+    // How the frames are drawn, when the director named a style; "" keeps it, and a look does not change it.
+    else if (key === 'drawn' && isDrawn(value) && !this.looking) (this.world.globals as unknown as { frameStyle: Signal<string> }).frameStyle.value = value;
     else if (key === 'remove' && Array.isArray(value) && !this.looking) {
       this.begin(this.fresh);
       const labels = value.filter((id): id is string => typeof id === 'string').map((id) => this.labels.get(id) ?? id);
@@ -971,7 +973,10 @@ class PlanBuild {
       const pose = POSES.indexOf(thing.pose as (typeof POSES)[number]);
       const look = LOOKS.findIndex((entry) => entry.name === thing.look);
       const build = thing.build === 'woman' ? 1 : thing.build === 'man' ? 0 : (was[2] ?? 0);
-      cast = [pose >= 0 ? pose : was[0], look >= 0 ? look : was[1], build];
+      // What they hold: a fitting names it, "none" empties the hand, and no fitting keeps what was in it.
+      const fitting = thing.fitting.trim().toLowerCase();
+      const holds = fitting === '' ? (was[3] ?? 0) : heldIndex(fitting);
+      cast = [pose >= 0 ? pose : was[0], look >= 0 ? look : was[1], build, holds];
     }
     return { finish, cast };
   }

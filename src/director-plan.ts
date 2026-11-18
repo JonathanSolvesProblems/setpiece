@@ -109,18 +109,23 @@ export const isFar = (value: unknown): value is FarName => typeof value === 'str
 
 export const LIGHTS = ['studio', 'day', 'golden hour', 'night', 'overcast', 'spotlight'] as const;
 export type LightName = (typeof LIGHTS)[number];
+/** How the frames are drawn, when the director names it (src/frame-style.ts has the same four). */
+export const DRAWN = ['photo', 'sketch', 'anime', 'noir'] as const;
+export const isDrawn = (value: unknown): value is (typeof DRAWN)[number] => typeof value === 'string' && (DRAWN as readonly string[]).includes(value);
+
 export const isLight = (value: unknown): value is LightName => typeof value === 'string' && (LIGHTS as readonly string[]).includes(value);
 
 export const PLAN_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['title', 'says', 'fresh', 'light', 'far', 'remove', 'things', 'camera', 'next'],
+  required: ['title', 'says', 'fresh', 'light', 'far', 'drawn', 'remove', 'things', 'camera', 'next'],
   properties: {
     title: string,
     says: string,
     fresh: { type: 'boolean' },
     light: { type: 'string', enum: ['', ...LIGHTS] },
     far: { type: 'string', enum: ['', ...FARS] },
+    drawn: { type: 'string', enum: ['', ...DRAWN] },
     remove: { type: 'array', items: string },
     things: {
       type: 'array',

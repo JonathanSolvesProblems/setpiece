@@ -168,3 +168,16 @@ export const SIZES = [
   { name: 'Big', scale: 1.5 },
   { name: 'Giant', scale: 2.2 },
 ] as const;
+
+/** What an actor can hold, in the hand: part of the figure (src/scene-assets/figures.scene-asset.ts). The first is nothing. */
+export const HELD = ['', 'Sword', 'Staff', 'Umbrella'] as const;
+const HELD_WORDS: Record<string, number> = {
+  sword: 1, swords: 1, katana: 1, blade: 1, sabre: 1, saber: 1, rapier: 1, machete: 1, dagger: 1, knife: 1,
+  staff: 2, spear: 2, pole: 2, stick: 2, lance: 2, broom: 2, cane: 2, rod: 2, bat: 2, club: 2,
+  umbrella: 3, parasol: 3,
+};
+/** Which of them a word or two names ("a katana", "long spear"), or 0 for nothing; "none" and "nothing" are 0 too. */
+export function heldIndex(words: string): number {
+  for (const word of words.toLowerCase().split(/[^a-z]+/)) if (word in HELD_WORDS) return HELD_WORDS[word];
+  return 0;
+}
