@@ -441,9 +441,10 @@ export class SquirmSystem extends createSystem({
     // Standing on the set, alive: a lean from foot to foot and a look about, turned about the feet; a runner
     // rides up and down on the stride. A held or fallen figure is doing something else.
     const life = state.life * (1 - Math.min(1, amount + state.fallen + walk));
-    const running = RUNNING.test(rig.pose.name);
-    // What they are doing, if anything: read off the figure, where the tray wrote it. A runner runs.
-    const act = running || life <= REST ? 0 : ((object.userData.acts as number | undefined) ?? 0);
+    // What they are doing, if anything: read off the figure, where the tray wrote it. It comes before running on
+    // the spot: a duelist caught mid-stride fights (headset, 17 Nov: the designer gave one the Running pose).
+    const act = life <= REST ? 0 : ((object.userData.acts as number | undefined) ?? 0);
+    const running = act === 0 && RUNNING.test(rig.pose.name);
     if (life > REST) {
       state.lifeClock += delta;
       const c = state.lifeClock * LIFE_RATE + state.seed;
