@@ -23,6 +23,28 @@ export function downloadBoard(viewfinder: ViewfinderSystem, name = 'setpiece-boa
   }, 'image/png');
 }
 
+/**
+ * A board saved from inside the headset: its picture is made there and then and held, and goes to Downloads as the
+ * session ends. A download is the browser's to show, and a browser that left the session to show one would take
+ * the wearer out of the set they asked to stay in.
+ */
+const kept = new Map<string, Blob>();
+export function keepBoard(viewfinder: ViewfinderSystem, name: string): void {
+  viewfinder.boardPicture().toBlob((blob) => {
+    if (blob) kept.set(name, blob);
+  }, 'image/png');
+}
+/** The pictures held since the session began, saved one after another; how many there were. */
+export function saveKept(): number {
+  let n = 0;
+  for (const [name, blob] of kept) {
+    window.setTimeout(() => save(blob, name), n * 250);
+    n++;
+  }
+  kept.clear();
+  return n;
+}
+
 const field = (value: string | number): string => `"${String(value).replace(/"/g, '""')}"`;
 
 export function downloadShotList(shots: readonly Shot[]): void {

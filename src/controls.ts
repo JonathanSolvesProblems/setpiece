@@ -27,7 +27,7 @@ import { noteSeconds } from './coach.js';
 import { hear } from './spoken.js';
 import { DirectorSystem } from './director.js';
 import { ViewfinderSystem } from './viewfinder.js';
-import { downloadBoard } from './exports.js';
+import { downloadBoard, keepBoard } from './exports.js';
 import { loadJson, saveJson, StoreKey } from './store.js';
 import { Voice } from './voice.js';
 import type { VoiceState } from './voice.js';
@@ -707,13 +707,17 @@ export class ControlsSystem extends createSystem({
           return;
         }
         // Saved where the wearer is: the session carries on. (It used to end the session to save from the page.)
+        // In a session the picture is made now and goes to Downloads as the session ends (src/exports.ts).
         const viewfinder = this.world.getSystem(ViewfinderSystem);
-        if (viewfinder != null) downloadBoard(viewfinder, `setpiece-board-${board}.png`);
+        if (viewfinder != null) {
+          if (this.world.session != null) keepBoard(viewfinder, `setpiece-board-${board}.png`);
+          else downloadBoard(viewfinder, `setpiece-board-${board}.png`);
+        }
         savedBoard = boardKey();
         g.coachNote.value =
           g.boardsNow.peek().frames.length < 4
-            ? `BOARD ${board} SAVED | Its picture is in this headset's Downloads, and the board keeps its tab. Next board starts another.`
-            : `BOARD ${board} SAVED | Its picture is in this headset's Downloads. Four boards is the most: New board, under More, clears this one for the next.`;
+            ? `BOARD ${board} SAVED | It keeps its tab, and its picture goes to Downloads when you leave the set. Next board starts another.`
+            : `BOARD ${board} SAVED | Its picture goes to Downloads when you leave the set. Four boards is the most: New board, under More, clears this one for the next.`;
         showTry();
         return;
       }

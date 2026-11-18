@@ -24,7 +24,7 @@ import { EffectSoundSystem } from './effect-sound.js';
 import { CoverageSystem } from './coverage.js';
 import { SetFinderSystem } from './set-finder.js';
 import { SlateSystem } from './slate.js';
-import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList } from './exports.js';
+import { canRecordVideo, downloadAnimatic, downloadBoard, downloadShotList, saveKept } from './exports.js';
 import { LifeSizeSystem } from './life-size.js';
 import { TakeState, TakeSystem } from './take.js';
 import { ReactionsSystem } from './reactions.js';
@@ -628,7 +628,10 @@ World.create(document.getElementById('scene-container') as HTMLDivElement, optio
     reloadWhenFree();
   });
   world.visibilityState.subscribe((state) => {
-    if (state === VisibilityState.NonImmersive) reloadWhenFree();
+    if (state !== VisibilityState.NonImmersive) return;
+    // The boards saved inside the headset are saved to Downloads now that the session is over.
+    saveKept();
+    reloadWhenFree();
   });
 
   // Debug and test hook: lets scripts drive the app from the page.
