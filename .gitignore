@@ -69,3 +69,6 @@ PHASE0.md
 
 # Headset captures and recordings for the video (large, kept local)
 broll/
+
+# The form's private answers (contact, team): for pasting, not for the repo
+devpost/form-answers.local.md

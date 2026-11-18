@@ -1,6 +1,6 @@
 # Submission form
 
-One field per block. Nothing in a block but the value. Open values are marked `[X ...]` and the form is not filled in until none remain. Every number traces to `sources.md`.
+One field per block. Nothing in a block but the value. Every number traces to `sources.md`. The answers to the form's other questions (contact, team, hand interactions, capabilities) are not kept in the repo.
 
 ## Name
 
@@ -24,30 +24,6 @@ Productivity
 
 ```
 New Experience
-```
-
-## Build path
-
-```
-IWSDK (Web XR)
-```
-
-## Built with
-
-```
-immersive-web-sdk, webxr, meta-quest, three.js, typescript, vite, claude, anthropic, elevenlabs, vosk, vercel, hand-tracking, passthrough, webassembly
-```
-
-## Release channel
-
-```
-https://setpiece.jonathansolvesproblems.com
-```
-
-## Meta VR capabilities used
-
-```
-Hand tracking: pinch and fist grab on every piece, wrist rotation to turn a piece and tilt the camera, and a fingertip to land the set by touch. Passthrough mixed reality in the Quest Browser, through WebXR. A live hit test, so the set lands on a real table with no room scan; where a room has been scanned, scene understanding (planes and labelled meshes) offers its table. A spatial anchor is asked for where the set lands (I have not measured it holding across a relaunch). Spatial UI panels (UIKitML), positional audio, and the microphone for voice. Controllers are supported and so far tested only in the emulator. Built with the Immersive Web SDK, its emulator and its CLI.
 ```
 
 ## Description
@@ -104,44 +80,4 @@ The emulator is not the headset, so this page says which is which. Not yet run o
 ## What's next for Setpiece
 
 First, that list on the headset. Then two people around the same set, a director and a camera operator each with a headset, working on the same frame. Not built yet: a camera that follows the action, and stepping in to play one of the actors yourself.
-```
-
-## Hand interactions
-
-```
-Everything can be done with your hands, and a controller's trigger and grip do the same if you hold one. Reach out and pinch a piece, or close your fist on it, and it comes with you. Point and pinch for anything further away. A pinch held on the striped edge moves the whole set. Twisting your wrist turns what you're holding, and tilts the camera. I measured my own hand to set where a fist starts, because the first version only worked if you pointed in a straight line and pinched, and my hand kept trying to just grab the thing. Held actors squirm a little in your fingers, and you can turn that off.
-
-A newcomer is walked through once: the designer says each step out loud and a small arrow points at the button or the piece, and it can be skipped. At full size, you point at the floor and pinch to walk there, and turn with two buttons on the panel, without standing up.
-```
-
-## What makes me excited about the future of VR
-
-```
-I wanted to be a VFX filmmaker and switched to computer science. Ten years ago, planning a shot meant drawing it or imagining it, and the effect went in weeks later. Now a headset sees my table and my hands well enough that I can put a set on the table and move it around, in a browser, with nothing to install and no controller to learn. A filmmaker, a photographer or a hobbyist can see their scene before they get to set. I think a lot of planning that happens on paper today moves onto the table like this.
-```
-
-## Target launch date
-
-```
-Already published: it is live on the web at https://setpiece.jonathansolvesproblems.com
-```
-
-## Team or organization name
-
-```
-Jonathan Andrei
-```
-
-## Team
-
-```
-Jonathan Andrei, jon_andrei04@hotmail.com, solo developer
-```
-
-## Links the form asks for
-
-```
-Live: https://setpiece.jonathansolvesproblems.com
-Repo: https://github.com/JonathanSolvesProblems/setpiece
-Video: [X, after Nov 14]
 ```
