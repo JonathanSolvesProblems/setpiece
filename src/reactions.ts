@@ -8,6 +8,7 @@
 import { Box3, createSystem, Entity, Group, Mesh, Object3D, Quaternion, ShaderMaterial, Vector3 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
+import { SIT_LEGS } from './catalog.js';
 import { ACTOR_REACH, ANIMAL_REACH, KNOCK_SPEED } from './contact.js';
 import { assetByLabel, assetTitle } from './catalog.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
@@ -52,6 +53,8 @@ const DRIVEN = 0.82;
  */
 const RIDING = 0.04;
 const RIDER_REACH = 0.09;
+/** A rider sits no higher than this above the top of what they ride. */
+const RIDER_HEADROOM = 0.03;
 
 /** And whatever moves has to be heading for them, not past them or away. */
 const HEADED = 0.3;
@@ -180,7 +183,11 @@ export class ReactionsSystem extends createSystem({
           if (!body.visible || body.parent !== object.parent || this.actors[a].hasComponent(Held)) continue;
           // (Moved this frame already, by a plan, the set dresser or a take, they have gone with it.)
           if (body.position.distanceToSquared(this.actorLast[a]) > 1e-12) continue;
-          if (body.position.y < mover.last.y - this.velocity.y + RIDING) continue;
+          // Up on it, and no higher than its own top: someone on a roof it passes under is not its rider. (Seated
+          // on the ground an actor is a shin's length up, more for a big one, and is not riding either.)
+          const was = mover.last.y - this.velocity.y;
+          if (body.position.y < was + Math.max(RIDING, SIT_LEGS * body.scale.y + 0.007)) continue;
+          if (body.position.y > was + mover.box.max.y * object.scale.y + RIDER_HEADROOM) continue;
           if (Math.hypot(body.position.x - (object.position.x - this.velocity.x), body.position.z - (object.position.z - this.velocity.z)) > RIDER_REACH) continue;
           body.position.add(this.velocity);
         }
@@ -198,7 +205,7 @@ export class ReactionsSystem extends createSystem({
         if (!body.visible || body.parent !== object.parent || actor.hasComponent(Held)) continue;
         if (this.squirm?.isDown(actor)) continue;
         // Up on it (a rider), or up on anything else, they are not in its way.
-        if (body.position.y > object.position.y + RIDING) continue;
+        if (body.position.y > object.position.y + Math.max(RIDING, SIT_LEGS * body.scale.y + 0.007)) continue;
         if (!this.headedFor(object, body, travelled)) continue;
         // Where the actor stands, as the vehicle sees it.
         object.worldToLocal(body.getWorldPosition(this.at));

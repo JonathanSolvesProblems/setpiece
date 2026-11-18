@@ -491,6 +491,8 @@ export class SquirmSystem extends createSystem({
     }
     rig.pose.matrixWorldNeedsUpdate = true;
 
+    // The arm that does the work, found once a frame: the one with something in its hand, or the right.
+    const working = act > 0 ? this.workingArm(rig) : -1;
     const energy = amount * (0.75 + 0.35 * speed);
     for (let i = 0; i < rig.limbs.length; i++) {
       const limb = rig.limbs[i];
@@ -503,7 +505,7 @@ export class SquirmSystem extends createSystem({
             : limb.wave === ARM_WAVE && limb.stride > 0
               ? Math.sin(state.lifeClock * LIFE_RATE * 1.3 + limb.phase + state.seed) * LIFE_ARM * life
               : 0;
-      const acting = act > 0 ? this.actAngle(act, rig, i, state.actClock + state.seed) * life : 0;
+      const acting = act > 0 ? this.actAngle(act, rig, i, working, state.actClock + state.seed) * life : 0;
       const angle = Math.sin(clock + limb.phase) * limb.wave * energy + Math.sin(state.walkClock + limb.step) * limb.stride * walk + lively + acting;
       if (limb.axis === X) this.euler.set(angle, 0, limb.splay * amount);
       else this.euler.set(0, 0, angle);
@@ -517,11 +519,23 @@ export class SquirmSystem extends createSystem({
     return true;
   }
 
+  private workingArm(rig: Rig): number {
+    let working = -1;
+    let right = -1;
+    for (let i = 0; i < rig.limbs.length; i++) {
+      const other = rig.limbs[i];
+      if (other.axis !== X || other.wave !== ARM_WAVE) continue;
+      if (Math.cos(other.step) > 0) right = i;
+      for (let p = 0; p < other.parts.length; p++) if (other.parts[p].visible && (other.parts[p].name.startsWith('Held') || other.parts[p].name.startsWith('Pistol'))) working = i;
+    }
+    return working >= 0 ? working : right;
+  }
+
   /**
    * How far a limb is swung about its joint by what the actor is doing, at this moment of it. The working arm is the
    * one with something in its hand, or the right; the legs of someone crouched or seated stay where they are.
    */
-  private actAngle(act: number, rig: Rig, index: number, t: number): number {
+  private actAngle(act: number, rig: Rig, index: number, working: number, t: number): number {
     const limb = rig.limbs[index];
     if (limb.axis !== X) return act === ACT_TALK ? 0.05 * Math.sin(t * 2.3) : 0;
     const arm = limb.wave === ARM_WAVE;
@@ -533,15 +547,7 @@ export class SquirmSystem extends createSystem({
       if (act === ACT_DANCE) return 0.3 * Math.sin(t * 5) * side;
       return 0;
     }
-    let working = -1;
-    let right = -1;
-    for (let i = 0; i < rig.limbs.length; i++) {
-      const other = rig.limbs[i];
-      if (other.axis !== X || other.wave !== ARM_WAVE) continue;
-      if (Math.cos(other.step) > 0) right = i;
-      for (let p = 0; p < other.parts.length; p++) if (other.parts[p].visible && (other.parts[p].name.startsWith('Held') || other.parts[p].name.startsWith('Pistol'))) working = i;
-    }
-    const works = index === (working >= 0 ? working : right);
+    const works = index === working;
     const up = ARMS_UP.test(rig.pose.name);
     if (act === ACT_FIGHT) return works ? -0.2 - FIGHT_SWING * Math.sin(t * FIGHT_BEAT) : 0.25 * Math.sin(t * FIGHT_BEAT);
     if (act === ACT_SHOOT) return works ? -0.1 * Math.exp(-9 * ((t % SHOOT_EVERY) / SHOOT_EVERY)) : 0;

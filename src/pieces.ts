@@ -934,7 +934,7 @@ export class PiecesSystem extends createSystem({
       if (j === self || body == null || !body.visible || other.hasComponent(Held)) continue;
       if (other.getValue(SetPiece, 'role') !== SetRole.Actor) continue;
       // Standing on something else, at another height, they are out of its way; and so is its own rider.
-      if (Math.abs(body.position.y - object.position.y) > height || body.position.y > object.position.y + 0.04) continue;
+      if (Math.abs(body.position.y - object.position.y) > height || body.position.y > object.position.y + Math.max(0.04, SIT_LEGS * body.scale.y + 0.007)) continue;
       this.point.copy(body.position).sub(object.position).applyQuaternion(this.turnBack).divideScalar(scale);
       const lat = Math.max(0, Math.abs(this.point.x) - halfWidth) * scale;
       const fwd = (this.point.z * way - front) * scale;

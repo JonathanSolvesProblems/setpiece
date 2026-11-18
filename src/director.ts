@@ -570,7 +570,7 @@ export class DirectorSystem extends createSystem({
       const scale = (finish[3] ?? 0) > 0 ? finish[3]! : (SIZES[finish[1]]?.scale ?? 1);
       if (Math.abs(scale - 1) > 0.01) words.push(`size ${one(scale)}`);
       if (finish[2] > 0 && asset.styles?.[finish[2]]) words.push(`fitting ${asset.styles[finish[2]]}`);
-      if (cast != null) words.push(`pose ${POSES[cast[0]] ?? POSES[0]}, look ${LOOKS[cast[1]]?.name ?? LOOKS[0].name}, build ${cast[2] === 1 ? 'woman' : 'man'}${(cast[3] ?? 0) > 0 ? `, holding ${HELD[cast[3]!].toLowerCase()}` : ''}${(cast[4] ?? 0) > 0 ? `, act ${ACTS[cast[4]!].toLowerCase()}` : ''}`);
+      if (cast != null) words.push(`pose ${POSES[cast[0]] ?? POSES[0]}, look ${LOOKS[cast[1]]?.name ?? LOOKS[0].name}, build ${cast[2] === 1 ? 'woman' : 'man'}${(cast[3] ?? 0) > 0 ? `, holding ${(HELD[cast[3]!] ?? '').toLowerCase()}` : ''}${(cast[4] ?? 0) > 0 ? `, act ${(ACTS[cast[4]!] ?? '').toLowerCase()}` : ''}`);
       lines.push(`- ${words.filter((word) => word !== '').join('; ')}`);
     }
     if (lines.length === 0) lines.push('Nothing is on the set.');
@@ -1000,7 +1000,9 @@ class PlanBuild {
       const build = thing.build === 'woman' ? 1 : thing.build === 'man' ? 0 : (was[2] ?? 0);
       // What they hold: a fitting names it, "none" empties the hand, and no fitting keeps what was in it.
       const fitting = thing.fitting.trim().toLowerCase();
-      const holds = fitting === '' ? (was[3] ?? 0) : heldIndex(fitting);
+      // (A fitting that names nothing held, a hat or glasses, leaves the hand as it was.)
+      const empties = /^(none|nothing|empty|no|unarmed)$/.test(fitting);
+      const holds = fitting === '' ? (was[3] ?? 0) : empties ? 0 : heldIndex(fitting) || (was[3] ?? 0);
       // What they do: an act names it, "still" stops it, and no act keeps what they were doing.
       const acts = thing.act === '' ? (was[4] ?? 0) : actIndex(thing.act);
       cast = [pose >= 0 ? pose : was[0], look >= 0 ? look : was[1], build, holds, acts];
