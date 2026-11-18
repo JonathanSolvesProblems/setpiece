@@ -19,6 +19,7 @@ import {
   MeshStandardMaterial,
   Quaternion,
   SphereGeometry,
+  TorusGeometry,
   Vector3,
   ConeGeometry,
   DoubleSide,
@@ -26,6 +27,9 @@ import {
 
 const SCALE = 0.1;
 const UP = new Vector3(0, 1, 0);
+/** A torch's light, and a flag's cloth: the only things a figure holds that are not wood, steel or dark cloth. */
+const glow = new MeshStandardMaterial({ color: 0xffc46b, emissive: 0xff9a2e, emissiveIntensity: 1.8, roughness: 0.5 });
+const flagCloth = new MeshStandardMaterial({ color: 0xb3312a, roughness: 0.8 });
 
 const woodLight = new MeshStandardMaterial({ color: 0xd9ac8b, roughness: 0.62 });
 const wood = new MeshStandardMaterial({ color: 0xa37a60, roughness: 0.66 });
@@ -117,6 +121,12 @@ export type Stance = {
   aiming?: 'L' | 'R';
   /** Down on bent knees with the back leaning forward and the hands by the knees: hiding behind cover. */
   crouching?: boolean;
+  /**
+   * Seated, with the seat at the figure's origin: thighs forward and level, shins hanging, hands on the thighs.
+   * On a bench, a wall, a horse or a dragon's back the legs hang in front of it; on the bare ground the tray
+   * stands the figure a shin's length up (SIT_LEGS, src/catalog.ts), as on a stool no one has dressed in yet.
+   */
+  sitting?: boolean;
 };
 
 /**
@@ -164,21 +174,57 @@ function heldProps(elbow: Vector3, wrist: Vector3, tag: 'L' | 'R', h: number): G
     mesh.position.y = y;
     return mesh;
   };
-  // A sword: grip in the fist, a guard, the blade up and forward of the hand whichever way the arm hangs.
+  const k = h / 0.175;
+  const forward = (rise: number): Vector3 => new Vector3(0, rise, 1).addScaledVector(forearm, 0.5);
+  const box = (w: number, t: number, d: number, material: MeshStandardMaterial, y: number, x = 0, z = 0): Mesh => {
+    const mesh = new Mesh(new BoxGeometry(w * k, t * k, d * k), material);
+    mesh.position.set(x * k, y * k, z * k);
+    return mesh;
+  };
+  const rod = (radius: number, length: number, material: MeshStandardMaterial, y: number): Mesh => at(new Mesh(new CylinderGeometry(radius * k, radius * k, length * k, 8), material), y * k);
+  // 1. A sword: grip in the fist, a guard, the blade up and forward of the hand whichever way the arm hangs.
   held(
     1,
     new Vector3(0, 1, 0.5).addScaledVector(forearm, 0.4),
-    at(new Mesh(new CylinderGeometry(0.0022, 0.0022, 0.02 * h / 0.175, 8), woodDark), 0),
-    at(new Mesh(new BoxGeometry(0.02 * h / 0.175, 0.003, 0.0045), blade), 0.011 * h / 0.175),
-    at(new Mesh(new BoxGeometry(0.0062, 0.092 * h / 0.175, 0.0018), blade), 0.058 * h / 0.175),
+    at(new Mesh(new CylinderGeometry(0.0022, 0.0022, 0.02 * k, 8), woodDark), 0),
+    at(new Mesh(new BoxGeometry(0.02 * k, 0.003, 0.0045), blade), 0.011 * k),
+    at(new Mesh(new BoxGeometry(0.0062, 0.092 * k, 0.0018), blade), 0.058 * k),
   );
-  // A staff: taller than the figure, upright, held a third of the way up.
+  // 2. A staff: taller than the figure, upright, held a third of the way up.
   held(2, new Vector3(0, 1, 0.12), at(new Mesh(new CylinderGeometry(0.0026, 0.003, 1.1 * h, 8), woodDark), 0.2 * h));
-  // An umbrella: its handle in the hand, its canopy open over the head.
+  // 3. An umbrella: its handle in the hand, its canopy open over the head.
   const canopy = new Mesh(new ConeGeometry(0.34 * h, 0.1 * h, 14, 1, true), cloth);
   canopy.material.side = DoubleSide;
   const reach = Math.max(0.3 * h, 1.12 * h - wrist.y);
   held(3, new Vector3(0, 1, 0.05), at(new Mesh(new CylinderGeometry(0.0016, 0.0016, reach, 6), woodDark), reach / 2), at(canopy, reach));
+  // 4. A rifle: a long gun levelled the way the figure faces, its stock behind the hand, a scope on top.
+  held(4, forward(0.06), rod(0.0024, 0.125, blade, 0.05), box(0.007, 0.04, 0.012, woodDark, -0.022), box(0.006, 0.03, 0.006, cloth, 0.03, 0, -0.006), box(0.005, 0.018, 0.012, woodDark, 0.004, 0, 0.008));
+  // 5. A pistol, in any pose: the same block-and-grip prop the Aim pose carries.
+  held(5, forward(0.08), box(0.005, 0.03, 0.007, woodDark, 0.012), box(0.005, 0.008, 0.014, woodDark, 0.002, 0, 0.006));
+  // 6. A bow: a half ring standing in the fist, its string behind it.
+  const bow = new Mesh(new TorusGeometry(0.4 * h, 0.0016 * k, 5, 18, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), woodDark);
+  held(6, new Vector3(0, 1, 0.04), bow, at(new Mesh(new CylinderGeometry(0.0005 * k, 0.0005 * k, 0.8 * h, 4), cloth), 0));
+  // 7. A shield: a round one on the forearm, facing where the figure faces.
+  const shield = new Mesh(new CylinderGeometry(0.19 * h, 0.19 * h, 0.004 * k, 18).rotateX(Math.PI / 2), blade);
+  shield.position.set(0, 0.02 * h, 0.012 * k);
+  const boss = new Mesh(new SphereGeometry(0.05 * h, 10, 6), woodDark);
+  boss.position.set(0, 0.02 * h, 0.014 * k);
+  boss.scale.z = 0.5;
+  held(7, new Vector3(0, 1, 0.02), shield, boss);
+  // 8. A torch: a stick with a light at its end (a flashlight, a lantern, a candle), which shows in the dark.
+  const flame = new Mesh(new SphereGeometry(0.007 * k, 10, 8), glow);
+  flame.position.y = 0.04 * k;
+  held(8, new Vector3(0, 1, 0.45).addScaledVector(forearm, 0.3), rod(0.0022, 0.034, woodDark, 0.014), flame);
+  // 9. An axe: a haft with a head across its top (a hammer, a pick, a wrench).
+  held(9, new Vector3(0, 1, 0.45).addScaledVector(forearm, 0.4), rod(0.0022, 0.07, woodDark, 0.03), box(0.004, 0.016, 0.026, blade, 0.058, 0, 0.008));
+  // 10. A bag: a case hanging from the hand (a briefcase, a suitcase, a bucket, a toolbox).
+  held(10, new Vector3(0, 1, 0), box(0.012, 0.03, 0.042, cloth, -0.024), box(0.003, 0.01, 0.014, woodDark, -0.005));
+  // 11. Something small in the hand: a phone, a radio, a camera, a book, a cup.
+  held(11, new Vector3(0, 1, 0.35).addScaledVector(forearm, 0.3), box(0.011, 0.02, 0.004, cloth, 0.01));
+  // 12. A flag: a pole taller than the figure with its cloth out to one side (a banner, a sign).
+  const flag = box(0.062, 0.042, 0.0012, flagCloth, 0, 0.033);
+  flag.position.y = 0.925 * h - 0.023 * k;
+  held(12, new Vector3(0, 1, 0.08), at(new Mesh(new CylinderGeometry(0.0018 * k, 0.0018 * k, 1.25 * h, 6), woodDark), 0.3 * h), flag);
   return out;
 }
 
@@ -199,14 +245,16 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
   base.name = 'Base';
   base.position.y = 0.002;
   const low = stance.crouching === true;
+  const sat = stance.sitting === true;
   // Crouched, the hips drop to knee height and the back leans in over the knees: everything above the hips keeps
   // its length and tips forward with it.
-  const hipY = (low ? 0.3 : 0.5) * h;
+  const hipY = (sat ? 0.07 : low ? 0.3 : 0.5) * h;
   const lean = low ? 0.42 : 0;
   const up = (above: number): Vector3 => new Vector3(0, hipY + above * h * Math.cos(lean), above * h * Math.sin(lean) - (low ? 0.05 * h : 0));
-  const post = new Mesh(new CylinderGeometry(0.0022, 0.0022, hipY, 8), steel);
+  // (Seated, the post is the stool's leg: from the seat down to where the feet are.)
+  const post = new Mesh(new CylinderGeometry(0.0022, 0.0022, sat ? 0.19 * h : hipY, 8), steel);
   post.name = 'Post';
-  post.position.set(0, hipY / 2, low ? -0.05 * h : 0);
+  post.position.set(0, sat ? -0.095 * h : hipY / 2, low ? -0.05 * h : 0);
   const pelvis = ball(up(0), 0.1 * h, wood, 'Pelvis');
   pelvis.scale.set(1.1 * build.hips, 0.8, 0.82 * (woman ? 1.08 : 1));
   const torso = limb(up(0.02), up(0.28), 0.1 * h * build.waist, woodLight, 'Torso');
@@ -230,6 +278,11 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       knee = new Vector3(side * 0.075 * h, fore ? 0.36 * h : 0.26 * h, fore ? 0.17 * h : -0.08 * h);
       ankle = new Vector3(side * 0.075 * h, fore ? 0.14 * h : 0.2 * h, fore ? 0.14 * h : -0.26 * h);
     }
+    if (sat) {
+      // Thighs forward and level, a little apart (astride, or on a bench), shins hanging from the knees.
+      knee = new Vector3(side * 0.11 * h, hipY, 0.22 * h);
+      ankle = new Vector3(side * 0.11 * h, hipY - 0.21 * h, 0.235 * h);
+    }
     if (low) {
       // Thighs forward and level, shins dropping back under them to feet flat on the ground.
       knee = new Vector3(side * 0.1 * h, 0.3 * h, 0.17 * h);
@@ -238,7 +291,7 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
     const foot = ball(
       low
         ? new Vector3(side * 0.085 * h, 0.035 * h, 0.09 * h)
-        : stance.running
+        : stance.running || sat
         ? ankle.clone().add(new Vector3(0, -0.015 * h, 0.03 * h))
         : new Vector3(side * 0.075 * h, 0.035 * h, (stepping ? 0.11 : 0.02) * h),
       0.04 * h,
@@ -251,7 +304,7 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       absorb(limb(hip, knee, 0.05 * h * build.limbs, wood, `Leg${tag}Upper`), limb(knee, ankle, 0.042 * h * build.limbs, wood, `Leg${tag}Lower`)),
       absorb(ball(knee, 0.047 * h, joint, `Knee${tag}`), foot),
     );
-    const shoulder = low ? up(0.3).setX(side * 0.16 * h) : new Vector3(side * 0.16 * h, 0.8 * h, 0);
+    const shoulder = low ? up(0.3).setX(side * 0.16 * h) : new Vector3(side * 0.16 * h, hipY + 0.3 * h, 0);
     let elbow = new Vector3(side * 0.19 * h, 0.62 * h, -0.01 * h);
     let wrist = new Vector3(side * 0.16 * h, 0.45 * h, -0.05 * h);
     if (low) {
@@ -259,7 +312,12 @@ export function layFigure(name: string, realHeightM: number, stance: Stance = {}
       elbow = new Vector3(side * 0.2 * h, 0.4 * h, 0.13 * h);
       wrist = new Vector3(side * 0.12 * h, 0.36 * h, 0.24 * h);
     }
-    if (low) {
+    if (sat) {
+      // Hands resting on the thighs.
+      elbow = new Vector3(side * 0.2 * h, hipY + 0.12 * h, 0.05 * h);
+      wrist = new Vector3(side * 0.13 * h, hipY + 0.055 * h, 0.17 * h);
+    }
+    if (low || sat) {
       // (set above)
     } else if (stance.aiming === tag) {
       elbow = new Vector3(side * 0.12 * h, 0.8 * h, 0.17 * h);
@@ -352,9 +410,10 @@ const armsUp: Stance = { armsUp: true };
 const running: Stance = { running: true };
 const aiming: Stance = { aiming: 'R', step: 'L' };
 const crouching: Stance = { crouching: true };
+const sitting: Stance = { sitting: true };
 
-export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running, aiming, crouching]);
-export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running, aiming, crouching]);
-export const actorC = castFigure('ActorC', 1.78, [neutral, { step: 'L' }, armsUp, running, aiming, crouching]);
-export const actorD = castFigure('ActorD', 1.6, [neutral, { pointing: 'L' }, armsUp, running, aiming, crouching]);
+export const actorA = castFigure('ActorA', 1.7, [{ pointing: 'R' }, neutral, armsUp, running, aiming, crouching, sitting]);
+export const actorB = castFigure('ActorB', 1.65, [{ akimbo: 'L', step: 'R' }, neutral, armsUp, running, aiming, crouching, sitting]);
+export const actorC = castFigure('ActorC', 1.78, [neutral, { step: 'L' }, armsUp, running, aiming, crouching, sitting]);
+export const actorD = castFigure('ActorD', 1.6, [neutral, { pointing: 'L' }, armsUp, running, aiming, crouching, sitting]);
 export const creature = eyelineStand(0.33);

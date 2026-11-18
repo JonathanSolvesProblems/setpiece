@@ -147,7 +147,12 @@ export const LOOKS = [
   { name: 'White shirt', top: 0xe6e4da, legs: 0x2a2c31, hair: true },
   { name: 'Hi-vis', top: 0xd6e13c, legs: 0x2f3a45, hair: true },
 ] as const;
-export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim', 'Crouch'] as const;
+export const POSES = ['First pose', 'Second pose', 'Arms up', 'Running', 'Aim', 'Crouch', 'Sitting'] as const;
+/**
+ * A seated figure has its seat at its origin and its legs hanging below it (src/scene-assets/figures.scene-asset.ts):
+ * this far, on the table, for an actor at the kit's size. On the bare ground a seated actor stands this high.
+ */
+export const SIT_LEGS = 0.033;
 /** An actor's build: a lay figure is made in a man's and a woman's proportions, as artists' figures are. */
 export const BUILDS = ['man', 'woman'] as const;
 
@@ -170,11 +175,20 @@ export const SIZES = [
 ] as const;
 
 /** What an actor can hold, in the hand: part of the figure (src/scene-assets/figures.scene-asset.ts). The first is nothing. */
-export const HELD = ['', 'Sword', 'Staff', 'Umbrella'] as const;
+export const HELD = ['', 'Sword', 'Staff', 'Umbrella', 'Rifle', 'Pistol', 'Bow', 'Shield', 'Torch', 'Axe', 'Bag', 'Phone', 'Flag'] as const;
 const HELD_WORDS: Record<string, number> = {
-  sword: 1, swords: 1, katana: 1, blade: 1, sabre: 1, saber: 1, rapier: 1, machete: 1, dagger: 1, knife: 1,
-  staff: 2, spear: 2, pole: 2, stick: 2, lance: 2, broom: 2, cane: 2, rod: 2, bat: 2, club: 2,
+  sword: 1, swords: 1, katana: 1, blade: 1, sabre: 1, saber: 1, rapier: 1, machete: 1, dagger: 1, knife: 1, lightsaber: 1,
+  staff: 2, spear: 2, pole: 2, stick: 2, lance: 2, broom: 2, cane: 2, rod: 2, bat: 2, club: 2, wand: 2, trident: 2, pitchfork: 2, shovel: 2, rake: 2, oar: 2, mop: 2,
   umbrella: 3, parasol: 3,
+  rifle: 4, sniper: 4, shotgun: 4, musket: 4, carbine: 4, bazooka: 4, launcher: 4, machinegun: 4, crossbow: 4, cannon: 4,
+  pistol: 5, gun: 5, handgun: 5, revolver: 5, blaster: 5, taser: 5,
+  bow: 6, longbow: 6,
+  shield: 7,
+  torch: 8, flashlight: 8, lantern: 8, lamp: 8, candle: 8, flare: 8, light: 8,
+  axe: 9, hammer: 9, pickaxe: 9, pick: 9, wrench: 9, hatchet: 9, mallet: 9, crowbar: 9, tool: 9,
+  bag: 10, briefcase: 10, suitcase: 10, case: 10, bucket: 10, basket: 10, toolbox: 10, backpack: 10, luggage: 10, box: 10, purse: 10,
+  phone: 11, radio: 11, camera: 11, book: 11, cup: 11, mug: 11, bottle: 11, glass: 11, microphone: 11, mic: 11, clipboard: 11, tablet: 11, map: 11, letter: 11, binoculars: 11, badge: 11,
+  flag: 12, banner: 12, sign: 12, placard: 12,
 };
 /** Which of them a word or two names ("a katana", "long spear"), or 0 for nothing; "none" and "nothing" are 0 too. */
 export function heldIndex(words: string): number {

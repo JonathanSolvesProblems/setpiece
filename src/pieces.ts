@@ -40,7 +40,8 @@ import {
 import type { Intersection, UIKitMLAsset } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
 import { localBounds } from './bounds.js';
-import { assetByLabel, assetTitle, isMade } from './catalog.js';
+import { assetByLabel, assetTitle, isMade, SIT_LEGS } from './catalog.js';
+import type { Asset } from './catalog.js';
 import { ACTOR_REACH, KNOCK_SPEED } from './contact.js';
 import { HandReading } from './hand-reading.js';
 import { HandTurn } from './hand-turn.js';
@@ -169,6 +170,16 @@ const GLIDE_LEAST = 0.005;
 const GLIDE_RISE = 0.05;
 /** Let go this far below the top of something, a piece goes beside or inside it, not onto it. */
 const STACK_SLACK = 0.03;
+/**
+ * What an actor can be sat on without its being a solid thing to stand on: every creature, and these. An actor let
+ * go inside one of them, this far or more off whatever it stands on, sits on its back.
+ */
+const MOUNTS = new Set(['Horse', 'Wolf', 'Motorbike', 'Bicycle', 'Helicopter', 'Saucer']);
+const MOUNT_FROM = 0.02;
+const isMount = (asset: Asset | undefined): boolean =>
+  asset != null && asset.solid !== true && (asset.shelf === 'Creatures' || MOUNTS.has(asset.spareOf ?? asset.label));
+/** The seated pose, by its place in the figure (src/scene-assets/figures.scene-asset.ts). */
+const SEATED = /^Pose6W?$/;
 const NO_RAYCAST = (): void => {};
 /** The ghost pinch over the piece the call sheet is asking for: a finger and a thumb, closing. */
 const GHOST_RATE = 2.4;
@@ -301,6 +312,12 @@ export class PiecesSystem extends createSystem({
   private bounds: Box3[] = [];
   /** The shape of each piece that others can be set down on, by index; null for the rest. */
   private solids: (Box3 | null)[] = [];
+  /** The shape of each piece an actor can be sat on (a creature, a horse, a bike), by index; null for the rest. */
+  private mounts: (Box3 | null)[] = [];
+  private mountRay = new Raycaster();
+  private mountHits: Intersection[] = [];
+  private rayFrom = new Vector3();
+  private rayTo = new Vector3();
   /** A made piece's parts, each a box something can be set down on, by index; null for every other piece. */
   private surfaces: (Box3[] | null)[] = [];
   /** The shape a rolling vehicle stops against, for every piece that has one: not an effect, an actor or a camera. */
@@ -916,8 +933,8 @@ export class PiecesSystem extends createSystem({
       const body = other.object3D;
       if (j === self || body == null || !body.visible || other.hasComponent(Held)) continue;
       if (other.getValue(SetPiece, 'role') !== SetRole.Actor) continue;
-      // Standing on something else, at another height, they are out of its way.
-      if (Math.abs(body.position.y - object.position.y) > height) continue;
+      // Standing on something else, at another height, they are out of its way; and so is its own rider.
+      if (Math.abs(body.position.y - object.position.y) > height || body.position.y > object.position.y + 0.04) continue;
       this.point.copy(body.position).sub(object.position).applyQuaternion(this.turnBack).divideScalar(scale);
       const lat = Math.max(0, Math.abs(this.point.x) - halfWidth) * scale;
       const fwd = (this.point.z * way - front) * scale;
@@ -1121,6 +1138,7 @@ export class PiecesSystem extends createSystem({
     const asset = assetByLabel(String(piece.getValue(SetPiece, 'label')));
     const role = piece.getValue(SetPiece, 'role');
     this.solids.push(asset?.solid === true ? shape.clone() : null);
+    this.mounts.push(isMount(asset) && role !== SetRole.Actor && !shape.isEmpty() ? shape.clone() : null);
     this.surfaces.push(null);
     const inTheWay = asset != null && (!ROLL_THROUGH.has(asset.shelf) || asset.mover === true) && role !== SetRole.Actor && role !== SetRole.Camera && !shape.isEmpty();
     this.blockers.push(inTheWay ? shape.clone() : null);
@@ -1183,7 +1201,71 @@ export class PiecesSystem extends createSystem({
         if (height > top) top = height;
       }
     }
+    // An actor can also be sat on a creature, a horse or a bike: let go on it, or anywhere inside it off the
+    // ground, they come to rest on its back, at the height the model has under them.
+    if (this.dressed[index].getValue(SetPiece, 'role') === SetRole.Actor) {
+      for (let j = 0; j < this.dressed.length; j++) {
+        const box = this.mounts[j];
+        if (box == null || j === index) continue;
+        const other = this.dressed[j].object3D;
+        if (other == null || !other.visible || other.parent !== object.parent || this.dressed[j].hasComponent(Held)) continue;
+        const back = this.backHeight(j, object.position.x, object.position.z);
+        if (back == null) continue;
+        const height = other.position.y + back;
+        const inside = object.position.y > other.position.y + box.min.y * other.scale.y + MOUNT_FROM;
+        if (object.position.y < height - STACK_SLACK && !inside) continue;
+        if (height > top) top = height;
+      }
+    }
+    // Seated on the bare ground, the figure rests a shin's length up: its legs hang below its seat.
+    if (top === 0 && this.seatedNow(object)) top = SIT_LEGS * object.scale.y;
     return top;
+  }
+
+  private seatedNow(object: Object3D): boolean {
+    for (let i = 0; i < object.children.length; i++) if (object.children[i].visible && SEATED.test(object.children[i].name)) return true;
+    return false;
+  }
+
+  /**
+   * How high above a mount's own origin its back is under this spot of the stage (x and z in the stage's frame),
+   * read off the model itself with a ray from above: a rider sits on the dragon's back, not on the box around its
+   * wings. Null when the spot is not over the model. Only when a piece is let go or a plan is settled.
+   */
+  private backHeight(j: number, x: number, z: number): number | null {
+    const box = this.mounts[j];
+    const other = this.dressed[j].object3D;
+    const stage = other?.parent;
+    if (box == null || other == null || stage == null) return null;
+    other.updateWorldMatrix(true, true);
+    stage.localToWorld(this.rayFrom.set(x, other.position.y + box.max.y * other.scale.y + 0.01, z));
+    stage.localToWorld(this.rayTo.set(x, other.position.y + box.min.y * other.scale.y - 0.01, z));
+    this.mountRay.far = this.rayFrom.distanceTo(this.rayTo);
+    this.mountRay.set(this.rayFrom, this.rayTo.sub(this.rayFrom).normalize());
+    this.mountHits.length = 0;
+    this.mountRay.intersectObject(other, true, this.mountHits);
+    for (let i = 0; i < this.mountHits.length; i++) {
+      const hit = this.mountHits[i];
+      let seen = hit.object.name !== 'GrabVolume' && hit.object.name !== 'HoverRing';
+      for (let up: Object3D | null = hit.object; seen && up != null && up !== other; up = up.parent) seen = up.visible;
+      if (!seen) continue;
+      const height = stage.worldToLocal(this.local.copy(hit.point)).y - other.position.y;
+      this.mountHits.length = 0;
+      return height;
+    }
+    this.mountHits.length = 0;
+    return null;
+  }
+
+  /**
+   * For the set dresser: how high above this piece's own origin an actor at this spot of the stage would sit on
+   * it, or null when it is not something to sit on or the spot is not over it.
+   */
+  backOf(mount: Entity, x: number, z: number): number | null {
+    const j = this.dressed.indexOf(mount);
+    const other = mount.object3D;
+    if (j < 0 || other == null || !other.visible || this.mounts[j] == null) return null;
+    return this.backHeight(j, x, z);
   }
 
   /** Something was lifted: whatever was standing on it comes down. */

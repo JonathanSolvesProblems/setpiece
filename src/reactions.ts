@@ -46,6 +46,13 @@ const NOSE = new Vector3(0, 0, 1);
  * headset a truck being moved out of the way put two actors and a horse on the floor.
  */
 const DRIVEN = 0.82;
+/**
+ * An actor this far or more above the ground a horse, a bike or a creature stands on (4 cm on the table: more than a
+ * seated actor's legs) is up on something, and within this of its middle is its rider.
+ */
+const RIDING = 0.04;
+const RIDER_REACH = 0.09;
+
 /** And whatever moves has to be heading for them, not past them or away. */
 const HEADED = 0.3;
 type Globals = {
@@ -62,6 +69,8 @@ export class ReactionsSystem extends createSystem({
   private ready = false;
   private movers: Mover[] = [];
   private actors: Entity[] = [];
+  /** Where each actor was a frame ago, in order with `actors`: one that moved by itself is not carried as well. */
+  private actorLast: Vector3[] = [];
   private fires: Fire[] = [];
   private animals: Animal[] = [];
   private forward = new Vector3();
@@ -98,7 +107,10 @@ export class ReactionsSystem extends createSystem({
       const label = String(piece.getValue(SetPiece, 'label'));
       const role = piece.getValue(SetPiece, 'role');
       const object = piece.object3D!;
-      if (role === SetRole.Actor) this.actors.push(piece);
+      if (role === SetRole.Actor) {
+        this.actors.push(piece);
+        this.actorLast.push(new Vector3().copy(object.position));
+      }
       if (assetByLabel(label)?.mover === true) {
         this.movers.push({ piece, box: localBounds(object), last: new Vector3(), seen: false, vehicle: assetByLabel(label)?.shelf === 'Vehicles' });
       }
@@ -142,6 +154,11 @@ export class ReactionsSystem extends createSystem({
   }
 
   private knockDown(delta: number): void {
+    this.carryAndKnock(delta);
+    for (let a = 0; a < this.actors.length; a++) this.actorLast[a].copy(this.actors[a].object3D!.position);
+  }
+
+  private carryAndKnock(delta: number): void {
     for (let m = 0; m < this.movers.length; m++) {
       const mover = this.movers[m];
       const object = mover.piece.object3D!;
@@ -156,6 +173,18 @@ export class ReactionsSystem extends createSystem({
         continue;
       }
       const travelled = Math.hypot(this.velocity.x, this.velocity.z);
+      // Whoever rides it goes where it goes, rolled, flown or carried in a hand: an actor up on it, near its middle.
+      if (travelled + Math.abs(this.velocity.y) > 1e-6) {
+        for (let a = 0; a < this.actors.length; a++) {
+          const body = this.actors[a].object3D!;
+          if (!body.visible || body.parent !== object.parent || this.actors[a].hasComponent(Held)) continue;
+          // (Moved this frame already, by a plan, the set dresser or a take, they have gone with it.)
+          if (body.position.distanceToSquared(this.actorLast[a]) > 1e-12) continue;
+          if (body.position.y < mover.last.y - this.velocity.y + RIDING) continue;
+          if (Math.hypot(body.position.x - (object.position.x - this.velocity.x), body.position.z - (object.position.z - this.velocity.z)) > RIDER_REACH) continue;
+          body.position.add(this.velocity);
+        }
+      }
       if (travelled > JUMP || travelled / delta < KNOCK_SPEED) continue;
       if (mover.vehicle) {
         this.forward.copy(NOSE).applyQuaternion(object.quaternion);
@@ -168,6 +197,8 @@ export class ReactionsSystem extends createSystem({
         const body = actor.object3D!;
         if (!body.visible || body.parent !== object.parent || actor.hasComponent(Held)) continue;
         if (this.squirm?.isDown(actor)) continue;
+        // Up on it (a rider), or up on anything else, they are not in its way.
+        if (body.position.y > object.position.y + RIDING) continue;
         if (!this.headedFor(object, body, travelled)) continue;
         // Where the actor stands, as the vehicle sees it.
         object.worldToLocal(body.getWorldPosition(this.at));

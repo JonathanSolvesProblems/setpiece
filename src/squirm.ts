@@ -51,9 +51,9 @@ const LIFE_ARM = 0.06;
 const LIFE_RATE = 0.9;
 const RUN_BEAT = 9;
 const RUN_SWING = 0.8;
-/** The poses by their place in the figure (src/scene-assets/figures.scene-asset.ts): Running, and Crouch, which stays low and still. */
+/** The poses by their place in the figure (src/scene-assets/figures.scene-asset.ts): Running, and Crouch and Sitting, which stay low and still. */
 const RUNNING = /^Pose3W?$/;
-const CROUCHED = /^Pose5W?$/;
+const CROUCHED = /^Pose[56]W?$/;
 /** Flat on its back, near enough. */
 const FALL_ANGLE = 1.47;
 const FALL_RATE = 9;
@@ -94,7 +94,7 @@ type State = {
 };
 
 const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
-  arm: new RegExp(`^(Shoulder${tag}|Arm${tag}Upper|Elbow${tag}|Arm${tag}Lower|Hand${tag}|Pistol${tag}|Held\\d${tag})$`),
+  arm: new RegExp(`^(Shoulder${tag}|Arm${tag}Upper|Elbow${tag}|Arm${tag}Lower|Hand${tag}|Pistol${tag}|Held\\d+${tag})$`),
   leg: new RegExp(`^(Leg${tag}Upper|Knee${tag}|Leg${tag}Lower|Foot${tag})$`),
 });
 

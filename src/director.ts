@@ -86,6 +86,8 @@ const ROOM = { halfX: 0.3, halfZ: 0.2, overhang: 0.01, bodyGap: 0.01, solidGap: 
 const BODY_HALF = 0.025;
 /** Higher than this off the ground, a piece is up on something or flying, and the set dresser leaves it be. */
 const RAISED = 0.01;
+/** An actor planned this close to the middle of a creature, a horse or a bike is its rider (8 cm on the table). */
+const RIDER_NEAR = 0.08;
 /**
  * How tall each burning effect is, on the slate. One inside a solid piece taller than this share of it is hidden,
  * and is stood this far below the piece's top (2 cm: 20 cm at full size): fire on a truck burns from the truck's
@@ -710,13 +712,14 @@ class PlanBuild {
     if (tray == null || entity == null || entity.hasComponent(Held)) return;
     const was = entity.object3D?.visible === true;
     const { finish, cast } = this.dressFor(label, thing, tray);
-    const object = tray.planPiece(label, thing.x * SLATE, thing.y * SLATE, thing.z * SLATE, thing.yaw * DEG, finish, cast);
+    const y = tray.seatY(label, cast, thing.y * SLATE);
+    const object = tray.planPiece(label, thing.x * SLATE, y, thing.z * SLATE, thing.yaw * DEG, finish, cast);
     if (object == null) return;
     this.placed.add(label);
-    this.restY.set(label, thing.y * SLATE);
+    this.restY.set(label, y);
     this.labels.set(thing.id, label);
     // New to the set, it drops on; already there, it is moved where the plan wants it.
-    if (!was || this.fresh) drop(entity, object, thing.y * SLATE);
+    if (!was || this.fresh) drop(entity, object, y);
   }
 
   /** The label a thing goes up as: a library piece (or a free copy of it), a made piece, or a new one made now. */
@@ -903,6 +906,28 @@ class PlanBuild {
       owners.push(one);
     }
     if (feet.length > 0) apply(feet, owners);
+    // A rider: an actor this plan put up in the air over a creature, a horse or a bike (or seated at its middle)
+    // sits on its back, at the height the model has there. The designer guesses that height; the model knows it.
+    const backs = this.world.getSystem(PiecesSystem);
+    for (const one of standing) {
+      if (backs == null || !this.placed.has(one.label) || one.entity.getValue(SetPiece, 'role') !== SetRole.Actor) continue;
+      const seated = POSES[tray.dressOf(one.label).cast?.[0] ?? 0] === 'Sitting';
+      if (one.rest <= RAISED && !seated) continue;
+      for (const mount of standing) {
+        if (mount === one) continue;
+        const near = Math.hypot(mount.object.position.x - one.object.position.x, mount.object.position.z - one.object.position.z);
+        // Near its middle they are its rider, and sit at its middle wherever the dresser has just moved it;
+        // further out (standing on a wing, on a roof rack) they stay over the spot they were given.
+        let back = near < RIDER_NEAR ? backs.backOf(mount.entity, mount.object.position.x, mount.object.position.z) : null;
+        if (back != null) {
+          one.object.position.x = mount.object.position.x;
+          one.object.position.z = mount.object.position.z;
+        } else if (one.rest > RAISED) back = backs.backOf(mount.entity, one.object.position.x, one.object.position.z);
+        if (back == null) continue;
+        lifts.push([one, mount.rest + back]);
+        break;
+      }
+    }
     if (moves.length === 0 && lifts.length === 0) return 0;
     // What stood on a piece that moved goes with it: fire on a car, a dragon on a roof, a lamp on a table.
     for (const [one, base] of under) {

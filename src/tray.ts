@@ -21,11 +21,13 @@ import { TakeSystem } from './take.js';
 import { ViewfinderSystem } from './viewfinder.js';
 import { BARE_GRAIN, PAINTED_GRAIN, setGrain, withGrain } from './wood-grain.js';
 
-import { LOOKS, POSES } from './catalog.js';
+import { LOOKS, POSES, SIT_LEGS } from './catalog.js';
 import { PiecesSystem } from './pieces.js';
 
 /** How high a crouched actor's eyes are, as a share of their standing eye height. */
 const CROUCH_EYES = 0.75;
+/** Seated, the eyes are this share of their standing height above the seat. */
+const SIT_EYES = 0.54;
 export { LOOKS, POSES };
 const WOOD_TOP = /^(Torso|Chest|Arm)/;
 // The pelvis is worn under the trousers, so a suited actor has no band of wood at the waist.
@@ -802,6 +804,8 @@ export class TraySystem extends createSystem({
 
   /** Each actor's eye height standing, as the scene gave it: a crouch lowers it and standing up puts it back. */
   private standingEyes = new Map<string, number>();
+  /** The actors seated now, by key: one of them taking another pose on the ground stands back down on it. */
+  private seated = new Set<string>();
 
   /** One pose shows; its clothes are the look, tinted over the figure's own wood. */
   private dress(actor: Entity, [pose, look, build = 0, holds = 0]: Cast): void {
@@ -814,7 +818,15 @@ export class TraySystem extends createSystem({
       standing = Number(actor.getValue(SetPiece, 'eyeHeight') ?? 0);
       this.standingEyes.set(key, standing);
     }
-    actor.setValue(SetPiece, 'eyeHeight', standing * (POSES[pose] === 'Crouch' ? CROUCH_EYES : 1));
+    actor.setValue(SetPiece, 'eyeHeight', standing * (POSES[pose] === 'Crouch' ? CROUCH_EYES : POSES[pose] === 'Sitting' ? SIT_EYES : 1));
+    // Seated on the bare ground, the figure is a shin's length up so its legs are not through the slate; taking
+    // another pose there, it is back on its feet. Up on something (a bench, a dragon), it is left where it is.
+    const figure = actor.object3D!;
+    const legs = SIT_LEGS * figure.scale.y;
+    if (POSES[pose] === 'Sitting') {
+      if (figure.position.y < legs) figure.position.y = legs;
+      this.seated.add(key);
+    } else if (this.seated.delete(key) && Math.abs(figure.position.y - legs) < 0.004) figure.position.y = 0;
     for (const child of actor.object3D!.children) {
       // A woman's poses are named with a W after the number.
       const match = /^Pose(\d)(W?)$/.exec(child.name);
@@ -823,7 +835,7 @@ export class TraySystem extends createSystem({
       (child as Walked).intersectChildren = child.visible;
       child.traverse((object) => {
         // What is held shows, and nothing else of its kind; a hand with a sword in it has no pistol.
-        const held = /^Held(\d)[LR]$/.exec(object.name);
+        const held = /^Held(\d+)[LR]$/.exec(object.name);
         if (held != null) object.visible = Number(held[1]) === holds;
         else if (object.name.startsWith('Pistol')) object.visible = holds === 0;
         if (object.name === 'Hair') object.visible = style.hair;
@@ -989,6 +1001,13 @@ export class TraySystem extends createSystem({
    * One piece of the plan, on the set where the plan put it, in slate metres and radians, and dressed as it
    * asked. Returns the piece's object, or null when there is no such piece. The set is published at the end.
    */
+  /** Where a piece planned at this height comes to rest: a seated actor on the bare ground is a shin's length up. */
+  seatY(label: string, cast: Cast | null, y: number): number {
+    if (cast == null || POSES[cast[0]] !== 'Sitting') return y;
+    const scale = this.managed.find((entity) => this.key(entity) === label)?.object3D?.scale.y ?? 1;
+    return Math.max(y, SIT_LEGS * scale);
+  }
+
   planPiece(label: string, x: number, y: number, z: number, yaw: number, finish: Finish | null, cast: Cast | null): Object3D | null {
     const piece = this.managed.find((entity) => this.key(entity) === label);
     const object = piece?.object3D;
