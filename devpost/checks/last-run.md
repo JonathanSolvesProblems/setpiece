@@ -1,21 +1,21 @@
 # Live site checks
 
-Run on 2026-11-17 20:33 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 74335e5-20261117T2032.
+Run on 2026-11-18 01:44 UTC against https://setpiece.jonathansolvesproblems.com/ by `node tools/check-live.mjs`. Build served: 1eb6819-20261118T0144.
 
 **57 of 57 passed.**
 
 | Check | Result | Detail |
 |---|---|---|
-| the page answers over HTTPS | pass | 200, 216 ms |
+| the page answers over HTTPS | pass | 200, 319 ms |
 | it is Setpiece | pass |  |
 | search engines are allowed to index it | pass | no X-Robots-Tag |
 | the loading card is in the page | pass |  |
 | the page controls start locked until the set is ready | pass |  |
 | the page signs itself | pass |  |
 | the page has the board tabs and the carry-on row | pass |  |
-| the app script is named in the page | pass | assets/index-CDch4hEr.js |
+| the app script is named in the page | pass | assets/index-DtViUsk9.js |
 | version.json is served | pass | 200 |
-| version.json names a build | pass | 74335e5-20261117T2032 |
+| version.json names a build | pass | 1eb6819-20261118T0144 |
 | the app script is served | pass | 200, 2.74 MB |
 | the app script is under 3 MB | pass | 2.74 MB |
 | the served script carries the same build as version.json | pass |  |
@@ -38,11 +38,11 @@ Run on 2026-11-17 20:33 UTC against https://setpiece.jonathansolvesproblems.com/
 | the page has the Shot box and three shots to try | pass |  |
 | the set designer answers and has its key | pass | 200, ready true |
 | another site is refused by the set designer | pass | 403 |
-| a sentence comes back as a set with a horse in it | pass | 200, end_turn, first piece of the reply at 741 ms, whole 2115 ms |
+| a sentence comes back as a set with a horse in it | pass | 200, end_turn, first piece of the reply at 1733 ms, whole 3059 ms |
 | the reply carries a pass for the line it will speak | pass | "A horse stands in an open field by a tree and fence, framed " |
-| the reply streams: its first part arrives well before its last | pass | 61 parts, the first 866 ms after the request and the last at 2114 ms |
+| the reply streams: its first part arrives well before its last | pass | 60 parts, the first 1812 ms after the request and the last at 3058 ms |
 | the voice answers and has its key | pass | 200, ready true |
-| the designer's line comes back read aloud | pass | 200, audio/mpeg, 44556 bytes in 356 ms |
+| the designer's line comes back read aloud | pass | 200, audio/mpeg, 42048 bytes in 336 ms |
 | words with no pass, or with the pass of another line, are not read | pass | 403, 403 |
 | another site is refused by the voice | pass | 403 |
 | the designer's 12 recorded lines are served in both voices | pass | 24 of 24 files |
