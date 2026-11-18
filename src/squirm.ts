@@ -14,6 +14,7 @@
  */
 import { createSystem, Entity, Euler, Matrix4, Object3D, Quaternion, Vector3 } from '@iwsdk/core';
 import type { Signal } from '@preact/signals-core';
+import { heldThings } from './figure-parts.js';
 import { Held, SetPiece, SetRole } from './set-components.js';
 import { ViewfinderSystem } from './viewfinder.js';
 
@@ -117,7 +118,9 @@ const NAMES = (tag: string): { arm: RegExp; leg: RegExp } => ({
 });
 
 function rigFor(pose: Object3D): Rig {
-  const byName = (pattern: RegExp): Object3D[] => pose.children.filter((part) => pattern.test(part.name));
+  // What the pose could hold is part of its arm whether or not it is on the figure now (src/figure-parts.ts).
+  const all = [...pose.children.filter((part) => !/^Held/.test(part.name)), ...heldThings(pose)];
+  const byName = (pattern: RegExp): Object3D[] => all.filter((part) => pattern.test(part.name));
   const aiming = (parts: Object3D[]): boolean => parts.some((part) => part.name.startsWith('Pistol'));
   const limb = (parts: Object3D[], pivot: Vector3, wave: number, phase: number, splay: number, axis: Vector3 = X, stride = 0, step = 0): Limb => ({
     parts,

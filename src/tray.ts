@@ -22,6 +22,7 @@ import { ViewfinderSystem } from './viewfinder.js';
 import { BARE_GRAIN, PAINTED_GRAIN, setGrain, withGrain } from './wood-grain.js';
 
 import { LOOKS, POSES, SIT_LEGS } from './catalog.js';
+import { heldThings, hold } from './figure-parts.js';
 import { PiecesSystem } from './pieces.js';
 
 /** How high a crouched actor's eyes are, as a share of their standing eye height. */
@@ -334,6 +335,8 @@ export class TraySystem extends createSystem({
     piece.object3D!.traverse((part) => {
       if (/^(Pose|Style)\d$/.test(part.name)) (part as Walked).intersectChildren = part.visible;
     });
+    // An actor nobody has dressed yet holds nothing: the things each pose could hold come off the figure.
+    for (const part of piece.object3D!.children) if (/^Pose\d+W?$/.test(part.name)) heldThings(part);
   }
 
   private show(piece: Entity, on: boolean): void {
@@ -836,11 +839,11 @@ export class TraySystem extends createSystem({
       if (match == null) continue;
       child.visible = Number(match[1]) === pose && (match[2] === 'W') === (build === 1);
       (child as Walked).intersectChildren = child.visible;
+      // What is held is on the figure, and nothing else of its kind is (src/figure-parts.ts).
+      hold(child, holds, child.visible);
       child.traverse((object) => {
-        // What is held shows, and nothing else of its kind; a hand with a sword in it has no pistol.
-        const held = /^Held(\d+)[LR]$/.exec(object.name);
-        if (held != null) object.visible = Number(held[1]) === holds;
-        else if (object.name.startsWith('Pistol')) object.visible = holds === 0;
+        // A hand with a sword in it has no pistol.
+        if (object.name.startsWith('Pistol')) object.visible = holds === 0;
         if (object.name === 'Hair') object.visible = style.hair;
         if (!(object instanceof Mesh)) return;
         const colour = WOOD_TOP.test(object.name) ? style.top : WOOD_LEGS.test(object.name) ? style.legs : -1;
