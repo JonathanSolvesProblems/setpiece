@@ -1,0 +1,61 @@
+{
+ "what": "What was seen and measured on a Quest 3S on the evening of 17 Nov and the first hour of 18 Nov 2026, on the live site, in three runs by the wearer in his own words. Read off the session by the developer over a USB cable; the headset's own screen recorder was running unless it says otherwise.",
+ "builds": [
+  "1eb6819",
+  "b4ea1ec",
+  "80a770f"
+ ],
+ "seen": [
+  "A sword in each duelist's hand, from a spoken sentence (20:55 run, build 1eb6819).",
+  "A sniper asked for by voice crouched with a rifle (22:33, build b4ea1ec).",
+  "A rider asked for on a dragon seated on its back: 0.335 above the table against 0.340 for the height read off the model (22:34); in the 00:52 run, 0.152 above the dragon on both, and centred on it.",
+  "A knight asked for on a horse (heard as 'a night on a horse') seated at the horse's back, 0.144 on both, holding a sword, not knocked over (00:50, build 80a770f).",
+  "Two knights added by voice both given the act 'fight': their held hands travelled 9.4 cm and 10.4 cm on the table in 1.2 s while the mounted knight's travelled 0.1 cm (00:51).",
+  "A seventh frame opening Board 2 with Board 1 keeping its tab; Shoot coverage filling Board 2; Save the board with the session carrying on 13 s later (22:35 to 22:36).",
+  "'Make it a sketch' answered by the designer with the look changed and the set and camera left as they were (00:54).",
+  "A take recorded and played back on the monitor (00:54).",
+  "The word 'anime' written correctly by the recogniser once (22:32); 'enemy' on the panel in the 20:55 run, mended by the app."
+ ],
+ "frame_rate": {
+  "nightclub_on_the_table_recorder_on": {
+   "old_build_b4ea1ec": 61.1,
+   "new_build_80a770f": 64.5,
+   "note": "four dancers, fog, sparks, a spotlight; 10 pieces"
+  },
+  "nightclub_on_the_table_recorder_off_old_build": 62.6,
+  "castle_on_the_table_recorder_on": {
+   "fps": 56.1,
+   "worst_frame_ms": 43,
+   "note": "a made castle, a horse, a dragon, four actors, rain, fire and dust; 132 draw calls, 58,470 triangles"
+  },
+  "castle_at_full_size_recorder_on": {
+   "fps": 76.5,
+   "worst_frame_ms": 18,
+   "note": "the same set stepped inside; 86 draw calls"
+  },
+  "logged_through_the_00_50_run": [
+   59.3,
+   73.3,
+   65.2,
+   84.8,
+   49.4,
+   53.8,
+   68.9,
+   48.8,
+   48.1
+  ],
+  "scene_nodes": {
+   "before": 4257,
+   "after": 2173,
+   "pass_ms_before": 1.64,
+   "pass_ms_after": 0.78,
+   "note": "the things each pose could hold were left on the figure hidden; only the one held is on it now (commit 80a770f)"
+  }
+ },
+ "not_seen": [
+  "walking inside the set by pointing",
+  "a board's tab bringing its set back",
+  "a saved board's picture arriving in Downloads at the end of a session (the Downloads folder was empty after these runs)",
+  "sword and shield together: an actor holds one thing, and 'give one of them a shield' replaced that knight's sword"
+ ]
+}
