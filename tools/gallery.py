@@ -92,9 +92,9 @@ LIVE_BADGE = 'Live site · setpiece.jonathansolvesproblems.com' if 'GALLERY_BASE
 # recipe run on the deployed page, or a result rendered as text.
 SLIDES = [
     dict(slug='castle', badge=QUEST_18, headline='The shot, on your table', picture='captures/quest-castle-on-table.jpg',
-         caption='Asked for a knight charging a castle, then two knights fighting, then rain. A 1:10 set on the real table, the fight playing.'),
+         caption='In the headset I asked for a knight charging a castle, then two more fighting at its gate. A 1:10 set on my real table.'),
     dict(slug='evolve', badge=QUEST_18, headline='One scene, four sentences', picture='captures/quest-evolution.jpg',
-         caption='Said in the headset, one after another. Each change lands in seconds and leaves the rest of the set as it was.'),
+         caption='Four sentences, said in the headset one after another. Each one changes the set that is standing, in a few seconds.'),
     dict(slug='rider', badge=QUEST_18, headline='By hand', picture='captures/quest-rider-in-hand.jpg',
          caption='A hand on the dragon, its rider seated on its back. Pinch a piece or close a fist on it. Controllers work too.'),
     dict(slug='inside', badge=QUEST_18, headline='Step inside', picture='captures/quest-inside-castle.jpg',
@@ -102,7 +102,7 @@ SLIDES = [
     dict(slug='lens', badge=QUEST_18, headline='It checks its own frame', picture='captures/quest-through-the-lens.jpg',
          caption='In the headset: the set built, it looked through its own camera, moved it back and wider to hold horse and gate, and said so.'),
     dict(slug='say', badge=LIVE_BADGE, headline='Say the shot', picture=('live', 'designer'),
-         caption='"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.'),
+         caption='"A night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop": piece by piece.'),
     dict(slug='table', badge=QUEST_17, headline='The shot, on your table', picture='captures/quest-aircraft-on-table.jpg',
          caption='Asked for workers building an aircraft, then for a ladder with a worker on its roof. A 1:10 set on the real table, its sky behind it.'),
     dict(slug='made', badge=LIVE_BADGE, headline='It makes what the library lacks', picture=('live', 'castle'),

@@ -5,19 +5,19 @@ One block per image, in gallery order. Paste the block, nothing else.
 ## 01 castle
 
 ```
-Asked for a knight charging a castle, then two knights fighting, then rain. A 1:10 set on the real table, the fight playing.
+In the headset I asked for a knight charging a castle, then two more fighting at its gate. A 1:10 set on my real table.
 ```
 
 ## 02 say
 
 ```
-"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.
+"A night chase, a red car racing past a burning truck, two actors running at camera, and a dragon on a rooftop": piece by piece.
 ```
 
 ## 03 evolve
 
 ```
-Said in the headset, one after another. Each change lands in seconds and leaves the rest of the set as it was.
+Four sentences, said in the headset one after another. Each one changes the set that is standing, in a few seconds.
 ```
 
 ## 04 lens

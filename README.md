@@ -4,7 +4,7 @@ Say the shot, and a 1:10 film set builds itself on your kitchen table, piece by 
 
 Live: https://setpiece.jonathansolvesproblems.com
 
-Built for the Meta VR Start Developer Competition 2026, Productivity track, New Experience. Hands only, seated, no controller needed.
+Built for the Meta VR Start Developer Competition 2026, Productivity track, New Experience. Hands first, seated: no controller is needed, and one works if you hold it.
 
 ## How to run it
 
@@ -66,14 +66,14 @@ For the frame rate: the monitor's second view of the set is drawn only on frames
 
 - **Seen on a Quest 3S, hands only.** Landing the set by pointing, in a room with no scan. Picking up, carrying and turning pieces, and snapping frames. Sets built from sentences spoken in my own words on the live site, with the replies read aloud, the first piece 1.6 s after the last word (`devpost/results/quest-voice-designer.json`). The newcomer walkthrough, from landing to the first frame (Nov 16). Stepping inside under the painted skies, at 86 to 89 frames a second on the live site (Nov 16). Shoot coverage: six shots planned and on the board in 25 seconds, the scene's sky behind the set on the table, and a board's tab bringing its frames back (Nov 17, `devpost/results/quest-coverage-and-world.json`).
 - **Frame rate on the headset.** With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving (Nov 14, replies replayed on the development server, `devpost/results/quest-frame-time-designer.json`). A set of 24 things ran at 63 to 64, so a reply holds 20 at most. On Nov 17, with the headset's own recorder running (it costs about ten), lighter sets averaged 64 to 75 and the heaviest of the day (17 pieces, four effects) 52 to 61; that set has not been measured again with the recorder off.
-- **In the emulator only.** Walking the full-size set by pointing, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. The board and shot list have been saved from the desktop page.
+- **In the emulator only.** Walking the full-size set (pointing shows its beam and ring on the headset; the pinch that walks you there has not been tried on it), a controller in place of a hand, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. The board and shot list have been saved from the desktop page.
 - **Not measured.** Anchors across a relaunch, the frame rate while a take plays, and any room but mine.
 
 The dated record behind each line is in [docs/where-this-stands.md](docs/where-this-stands.md).
 
 ## Type, art and sound
 
-Big Shoulders Stencil by Patric King and Schibsted Grotesk by Schibsted, both under the SIL Open Font License (`public/ui/fonts/OFL.txt`). The chalk drawings were generated on my own machine from a written art direction and keyed by hand; the mark, the wordmark and every number were set, not generated. The fifteen sounds (the clap, a piece lifted, a piece set down, a big piece set down, the slate landing, a tick for each panel press, the rush of air as the set grows around you, two notes as the microphone opens and closes, the loops that rain, fire, wind and water play from where they stand on the set, and the crickets of a night set heard once you are inside it) are synthesised by `tools/make-audio.mjs` from sine partials and filtered noise; nothing is sampled. The designer's voice is two of ElevenLabs' stock voices: its replies are read as they are written, and its twelve fixed lines were recorded once with the same voices and settings.
+Big Shoulders Stencil by Patric King and Schibsted Grotesk by Schibsted, both under the SIL Open Font License (`public/ui/fonts/OFL.txt`). The chalk drawings were generated on my own machine from a written art direction and keyed by hand; the mark, the wordmark and every number were set, not generated. The fifteen sounds (the clap, a piece lifted, a piece set down, a big piece set down, the slate landing, a tick for each panel press, the rush of air as the set grows around you, two notes as the microphone opens and closes, footsteps as you walk inside it, the loops that rain, fire, wind and water play from where they stand on the set, and the crickets of a night set heard once you are inside it) are synthesised by `tools/make-audio.mjs` from sine partials and filtered noise; nothing is sampled. The designer's voice is two of ElevenLabs' stock voices: its replies are read as they are written, and its twelve fixed lines were recorded once with the same voices and settings.
 
 ## Licence
 

@@ -11,7 +11,7 @@ Setpiece | An AI film set that builds on your table
 ## Tagline
 
 ```
-For filmmakers: say the shot, a miniature set starts building on your table about two seconds later. Block it by hand, keep the storyboard.
+For filmmakers: say a shot and a miniature set starts building on your table about two seconds later. Move it by hand, keep the storyboard.
 ```
 
 ## Track
@@ -29,7 +29,7 @@ New Experience
 ## Description
 
 ```
-About ten years ago I made short VFX films for YouTube: lightning in a field, a creature floating next to me in the woods. Every effect went in on a computer weeks after the shoot. On the day I was framing the shot around empty air, with nothing for the actor to look at.
+About ten years ago I made short VFX films and put them online: lightning in a back yard, a creature floating next to me in the woods. Every effect went in on a computer weeks after the shoot. On the day I was framing the shot around empty air, with nothing for the actor to look at.
 
 Setpiece is a miniature film set on your real table, for the storyboard pass a director does before a shoot day. You say the shot out loud, an AI set designer builds it at one-tenth scale, and you move the actors and the camera with your hands. You leave with a six-frame storyboard and a shot list (a spreadsheet with the lens and camera height of every shot) to send to the crew.
 
@@ -51,7 +51,7 @@ Immersive Web SDK in the Quest Browser, in passthrough: the set lands where you 
 
 Two sentences spoken in my own words (Nov 15 and 16): the first piece was on the table 1.6 s after the recogniser had my last word, both times, and the whole set stood at 3.3 s and 3.7 s. Bigger sets on Nov 17 took 4 to 7 s. On Nov 14, with both hands tracked and the designer's replies replayed, its sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site (Nov 16), my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR (68 on an earlier run that day). On Nov 17, Shoot coverage planned six shots and had all six on the board 25 seconds after I pressed it.
 
-Limits. Not yet run on the headset, only in its emulator: walking the full-size set by pointing, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. One room, mine. On the evening of Nov 17 into the 18th the heaviest sets (rain, fire, a dragon, four actors fighting) ran at 52 to 61 frames a second on the table with the headset's screen recorder running, and 76 at full size. I have not measured them with the recorder off.
+Limits. Not yet run on the headset, only in its emulator: walking the full-size set (pointing shows its beam and ring on the headset; the pinch that walks you there has not been tried on it), a controller in place of a hand, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. One room, mine. On Nov 17 and the night after, the heaviest sets (rain, fire, a dragon, four actors fighting) ran at 52 to 61 frames a second on the table with the headset's screen recorder running, and 76 at full size. I have not measured them with the recorder off.
 
 ## What's next
 
@@ -61,7 +61,7 @@ Two people around the same set, a director and a camera operator each with a hea
 ## Hand interactions, and what excites me about VR
 
 ```
-Everything is done with hands. Reach out and pinch a piece, or close your fist on it, and it comes with you. Point and pinch for anything further away. A pinch held on the striped edge moves the whole set. Twisting your wrist turns what you're holding, and tilts the camera. I measured my own hand to set where a fist starts, because the first version only worked if you pointed in a straight line and pinched, and my hand kept trying to just grab the thing. Held actors squirm a little in your fingers, and you can turn that off.
+Everything can be done with your hands, and a controller's trigger and grip do the same if you hold one. Reach out and pinch a piece, or close your fist on it, and it comes with you. Point and pinch for anything further away. A pinch held on the striped edge moves the whole set. Twisting your wrist turns what you're holding, and tilts the camera. I measured my own hand to set where a fist starts, because the first version only worked if you pointed in a straight line and pinched, and my hand kept trying to just grab the thing. Held actors squirm a little in your fingers, and you can turn that off.
 
 A newcomer is walked through once: the designer says each step out loud and a small arrow points at the button or the piece, and it can be skipped. At full size, you point at the floor and pinch to walk there, and turn with two buttons on the panel, without standing up.
 ```
