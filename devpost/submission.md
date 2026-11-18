@@ -67,6 +67,8 @@ Setpiece is a miniature film set on your real table, for the storyboard pass a d
 
 **After that, by hand.** Pick up any piece with your fingers, or say what to change: "add rain". Actors hold what the scene needs (a sword, a rifle, a torch), sit, ride a horse or a dragon, and act: ask for a sword fight and they fight. A tennis ball on a stand marks where the creature's eyes will be, and each frame records how far every actor looks up at it. Pick a lens from 18 to 135 mm and snap, and the frame goes on the storyboard with its lens and camera height. Press Shoot coverage and the designer plans a wide shot and closer ones, then shoots them onto the board while you watch. Step inside and the set grows to full size around you. Say "an anime sword fight" and the set turns cartoon; say "sketch" and the board is drawn in pencil.
 
+**The set reacts.** Pieces answer each other. Let an actor go above a car and they stand on its roof; a crate lands on the truck; a rider goes where the horse or the dragon goes. Add rain over a fire and the fire goes out, then catches again when the rain moves away. These are rules I wrote, not a physics engine, so the set stays a place you can direct: nothing falls over unless something drove into it.
+
 Up to four boards are kept, and your set and board are there when you come back.
 
 ## How I built it
