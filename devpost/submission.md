@@ -11,7 +11,7 @@ Setpiece | An AI film set that builds on your table
 ## Tagline
 
 ```
-Say a film shot and a miniature set starts building on your table about two seconds later. Move it by hand, leave with a storyboard.
+For filmmakers: say the shot, a miniature set starts building on your table about two seconds later. Block it by hand, keep the storyboard.
 ```
 
 ## Track
@@ -45,13 +45,13 @@ Up to four boards are kept, and your set and board are there when you come back.
 
 ## How it's built
 
-Immersive Web SDK in the Quest Browser, in passthrough: the set lands where you pointed, found by the headset's own surface detection with no room scan, and hands do everything. The designer is Claude behind a small server, answering one piece at a time, so each piece lands as soon as it is written. Code then checks its work: an actor it stood inside a car is moved out before the camera is placed. If the designer can't be reached, the app still builds from its own library of 51 pieces.
+Immersive Web SDK in the Quest Browser, in passthrough: the set lands where you pointed, found by the headset's own surface detection with no room scan. You ask by voice and handle everything by hand; no controller is needed. The designer is Claude behind a small server, answering one piece at a time, so each piece lands as soon as it is written. Code then checks its work: an actor it stood inside a car is moved out before the camera is placed. If the designer can't be reached, the app still builds from its own library of 51 pieces.
 
 ## Measured, on a Quest 3S
 
-Two sentences spoken in my own words (Nov 15 and 16): the first piece was on the table 1.6 s after the recogniser had my last word, both times, and the whole set stood at 3.3 s and 3.7 s. Bigger sets on Nov 17 took 4 to 7 s. On Nov 14, with both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site (Nov 16), my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR (68 on an earlier run that day). On Nov 17, Shoot coverage planned six shots and had all six on the board 25 seconds after I pressed it.
+Two sentences spoken in my own words (Nov 15 and 16): the first piece was on the table 1.6 s after the recogniser had my last word, both times, and the whole set stood at 3.3 s and 3.7 s. Bigger sets on Nov 17 took 4 to 7 s. On Nov 14, with both hands tracked and the designer's replies replayed, its sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving. Going through it as a first visit on the live site (Nov 16), my own spoken shot was a frame on the board 53 seconds after I pressed Enter XR (68 on an earlier run that day). On Nov 17, Shoot coverage planned six shots and had all six on the board 25 seconds after I pressed it.
 
-Limits. Run only in the headset emulator so far: walking the full-size set by pointing and its turn buttons, a board bringing its set back, a saved board's picture downloading as the session ends, nine of the twelve things an actor can hold (a sword, a rifle and a shield have been held on the headset), sizing with two hands, the spoken controls, rolling vehicles, and building without the designer. The board and shot list have been saved from the desktop page. One room, mine; the set lands by live surface detection, not a stored layout. The heaviest set (17 pieces, four effects) ran at 52 to 61 frames a second with the headset's screen recorder running, which I measured the day before to cost about ten. I have not measured it again with the recorder off.
+Limits. Not yet run on the headset, only in its emulator: walking the full-size set by pointing, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. One room, mine. On the evening of Nov 17 into the 18th the heaviest sets (rain, fire, a dragon, four actors fighting) ran at 52 to 61 frames a second on the table with the headset's screen recorder running, and 76 at full size. I have not measured them with the recorder off.
 
 ## What's next
 

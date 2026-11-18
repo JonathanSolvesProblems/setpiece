@@ -16,16 +16,16 @@ On a Meta Quest 3 or 3S, nothing to install:
 
 The same address runs flat in a desktop browser: drag a figure, pick a lens, snap a frame.
 
-From a clone (Node 20.19 or newer):
+From a clone (Node 20.19 or newer in the 20 line, 22.12 or newer in the 22 line, or 24):
 
 ```
 npm install
 npm run dev
 ```
 
-The set designer and its voice are two server functions (`api/director.ts`, `api/speak.ts`) that need keys of your own: put `SETPIECE_ANTHROPIC_KEY=...` and, for the spoken replies, `ELEVENLABS_API_KEY=...` in a file named `.env.local` at the root, and the dev server answers for both. Without them the app builds from its own library reader and stays quiet, and everything else works.
+The set designer and its voice are two server functions (`api/director.ts`, `api/speak.ts`) that need keys of your own: put `SETPIECE_ANTHROPIC_KEY=...` and, for the spoken replies, `ELEVENLABS_API_KEY=...` in a file named `.env.local` at the root, and the dev server answers for both. (If that key is not set, an `ANTHROPIC_API_KEY` already in your shell is used, and billed.) Without them the app builds from its own library reader and stays quiet, and everything else works.
 
-`npm run dev` opens a managed browser with the Immersive Web SDK emulator. `npm run typecheck` checks types. `npm run build` writes `dist/` for any static host. `node tools/make-audio.mjs` regenerates the fifteen sounds, and `node tools/make-voice-lines.mjs` records the set designer's fixed lines again (it needs an ElevenLabs key, and only records a line whose words changed).
+`npm run dev` serves the app at https://localhost:8081 and opens a managed browser with the Immersive Web SDK emulator. The port is fixed, so it must be free, and the certificate is self-signed, so a browser of your own warns once before it shows the page. `npm run typecheck` checks types. `npm run build` writes `dist/` for any static host. `node tools/make-audio.mjs` regenerates the fifteen sounds, and `node tools/make-voice-lines.mjs` records the set designer's fixed lines again (it needs an ElevenLabs key, and only records a line whose words changed).
 
 To check it yourself: `node tools/check-live.mjs` asserts 57 things about the live site and writes what it found to `devpost/checks/last-run.md`. `npm run check:claims` fails when this README or the submission text disagrees with the code or the measurements. Every number in this file traces to `devpost/sources.md`.
 
@@ -66,7 +66,7 @@ For the frame rate: the monitor's second view of the set is drawn only on frames
 
 - **Seen on a Quest 3S, hands only.** Landing the set by pointing, in a room with no scan. Picking up, carrying and turning pieces, and snapping frames. Sets built from sentences spoken in my own words on the live site, with the replies read aloud, the first piece 1.6 s after the last word (`devpost/results/quest-voice-designer.json`). The newcomer walkthrough, from landing to the first frame (Nov 16). Stepping inside under the painted skies, at 86 to 89 frames a second on the live site (Nov 16). Shoot coverage: six shots planned and on the board in 25 seconds, the scene's sky behind the set on the table, and a board's tab bringing its frames back (Nov 17, `devpost/results/quest-coverage-and-world.json`).
 - **Frame rate on the headset.** With both hands tracked, the designer's sets ran at 87 to 89 frames a second standing and 71 to 83 with a piece moving (Nov 14, replies replayed on the development server, `devpost/results/quest-frame-time-designer.json`). A set of 24 things ran at 63 to 64, so a reply holds 20 at most. On Nov 17, with the headset's own recorder running (it costs about ten), lighter sets averaged 64 to 75 and the heaviest of the day (17 pieces, four effects) 52 to 61; that set has not been measured again with the recorder off.
-- **In the emulator only.** Walking the full-size set by pointing and its turn buttons, a board bringing its set back, a saved board's picture downloading as the session ends, nine of the twelve things an actor can hold (a sword, a rifle and a shield have been held on the headset), sizing with two hands, the spoken controls, rolling vehicles, and building without the designer. The board and shot list have been saved from the desktop page.
+- **In the emulator only.** Walking the full-size set by pointing, a board's tab bringing its set back as well as its frames, a saved board's picture downloading when the session ends, sizing with two hands, the lens and camera words ("eighty five", "wider"), rolling vehicles, and building without the designer. The board and shot list have been saved from the desktop page.
 - **Not measured.** Anchors across a relaunch, the frame rate while a take plays, and any room but mine.
 
 The dated record behind each line is in [docs/where-this-stands.md](docs/where-this-stands.md).

@@ -95,7 +95,7 @@ SLIDES = [
          caption='Asked for a knight charging a castle, then two knights fighting, then rain. A 1:10 set on the real table, the fight playing.'),
     dict(slug='evolve', badge=QUEST_18, headline='One scene, four sentences', picture='captures/quest-evolution.jpg',
          caption='Said in the headset, one after another. Each change lands in seconds and leaves the rest of the set as it was.'),
-    dict(slug='rider', badge=QUEST_18, headline='Hands only', picture='captures/quest-rider-in-hand.jpg',
+    dict(slug='rider', badge=QUEST_18, headline='By hand', picture='captures/quest-rider-in-hand.jpg',
          caption='A hand on the dragon, its rider seated on its back. Pinch a piece or close a fist on it. Controllers work too.'),
     dict(slug='inside', badge=QUEST_18, headline='Step inside', picture='captures/quest-inside-castle.jpg',
          caption='The same set at full size around you: the knights at eye level, the dragon overhead. Back to the table in one pinch.'),
