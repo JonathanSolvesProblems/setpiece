@@ -85,11 +85,20 @@ N = {
 }
 QUEST = 'Quest 3S · headset capture · 6 Nov 2026'
 QUEST_17 = 'Quest 3S · headset capture · 17 Nov 2026'
+QUEST_18 = 'Quest 3S · headset capture · 18 Nov 2026'
 LIVE_BADGE = 'Live site · setpiece.jonathansolvesproblems.com' if 'GALLERY_BASE' not in os.environ else 'Development build · desktop browser'
 
 # One entry per slide, in the order a judge scrolls. `picture` is a file under devpost/, a live
 # recipe run on the deployed page, or a result rendered as text.
 SLIDES = [
+    dict(slug='castle', badge=QUEST_18, headline='The shot, on your table', picture='captures/quest-castle-on-table.jpg',
+         caption='Asked for a knight charging a castle, then two knights fighting, then rain. A 1:10 set on the real table, the fight playing.'),
+    dict(slug='evolve', badge=QUEST_18, headline='One scene, four sentences', picture='captures/quest-evolution.jpg',
+         caption='Said in the headset, one after another. Each change lands in seconds and leaves the rest of the set as it was.'),
+    dict(slug='rider', badge=QUEST_18, headline='Hands only', picture='captures/quest-rider-in-hand.jpg',
+         caption='A hand on the dragon, its rider seated on its back. Pinch a piece or close a fist on it. Controllers work too.'),
+    dict(slug='inside', badge=QUEST_18, headline='Step inside', picture='captures/quest-inside-castle.jpg',
+         caption='The same set at full size around you: the knights at eye level, the dragon overhead. Back to the table in one pinch.'),
     dict(slug='say', badge=LIVE_BADGE, headline='Say the shot', picture=('live', 'designer'),
          caption='"A night chase, a red car past a burning truck, two actors running at camera, a dragon on a rooftop", built piece by piece.'),
     dict(slug='table', badge=QUEST_17, headline='The shot, on your table', picture='captures/quest-aircraft-on-table.jpg',
@@ -134,7 +143,8 @@ SLIDES = [
 
 # The gallery as it is submitted: eleven slides in the order of a first visit. A cold judge read on 15 Nov found
 # nineteen too many, with some repeating others, and a second on 16 Nov asked for the numbers on one slide; the rest stay above for anyone who wants to render them.
-SUBMITTED = ['table', 'say', 'made', 'look', 'light', 'draw', 'coverage', 'pinch', 'speed', 'leave']
+# (Eight since 18 Nov: the form takes eight, and four of them are from that night's headset run.)
+SUBMITTED = ['castle', 'say', 'evolve', 'look', 'rider', 'inside', 'coverage', 'leave']
 SLIDES = [next(slide for slide in SLIDES if slide['slug'] == slug) for slug in SUBMITTED]
 
 TEMPLATE = """<!doctype html><html><head><meta charset="utf-8"><style>
